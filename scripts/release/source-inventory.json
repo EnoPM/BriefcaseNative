@@ -102,7 +102,7 @@
     },
     {
       "path": "docs/Repositories.md",
-      "sha256": "282d2898c23219098963c437c2b7be1255fc71b1222a049805e84ebdd5039c47"
+      "sha256": "dfa42c1f370e9a57283bd6705e6d2c8ce4aa68361839b53b8c9f611eb41898f9"
     },
     {
       "path": "docs/ServerLauncher.md",
@@ -114,7 +114,7 @@
     },
     {
       "path": "docs/SpyApi.md",
-      "sha256": "49c8d7ce24bdcd431976fa3f3b734d4a671a1cde2df3e1d2d828695e1bdfb9f4"
+      "sha256": "5317811360e7b183357c34ca68a5efd0ad8a33aa13a5412209f6391626b5f125"
     },
     {
       "path": "docs/StartupApi.md",
@@ -602,7 +602,7 @@
     },
     {
       "path": "scripts/release/Assert-SDK.ps1",
-      "sha256": "160f2d8c6468c13ad0ba3478da9ebc64c532c9f1174c56b2c3a513238f56c95e"
+      "sha256": "8270e9d066721b2c4aba842f1cdcf18d9758b7682b81b2e7e46460f7734312a3"
     },
     {
       "path": "scripts/release/Assert-Source.py",
@@ -610,7 +610,7 @@
     },
     {
       "path": "scripts/release/Package-SDK.ps1",
-      "sha256": "c5338f75f346be0ad727553106a683faf4087c2d68e6889265ae6d16cbab77e6"
+      "sha256": "cf61d9b7d42b6be2137e5defd5b3370529f6353c5a0f27a969b4f3cc7a6f9d69"
     },
     {
       "path": "scripts/release/Publish-Release.ps1",
@@ -706,7 +706,7 @@
     },
     {
       "path": "sdk/BriefcaseNativeSDKConfig.cmake.in",
-      "sha256": "0023eb3a027b4bc0c0d5a597b190ccfba5d7fe03d3cc20ade77f9699e9a77f0f"
+      "sha256": "61fe63c849261c4af6de08e275e0f9bc0b7358d1467c49145c29978ca470cf00"
     },
     {
       "path": "sdk/templates/NativeMod/release.yml",

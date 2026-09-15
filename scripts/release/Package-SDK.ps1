@@ -13,6 +13,13 @@ foreach($dir in @('include','third_party/include','Licenses','cmake')){
 foreach($api in @('Briefcase.ModApi','Briefcase.ClientModApi')){
  Copy-Item -Path (Join-Path $project "sdk/$api/include/*") -Destination (Join-Path $stage 'include') -Recurse -Force
 }
+# Ship the typed adapter's sources, without any host/backend implementation.
+$typedSource=Join-Path $stage 'src/DeceiveInc'
+New-Item -ItemType Directory -Path $typedSource -Force|Out-Null
+Copy-Item -Path (Join-Path $project 'sdk/Briefcase.DeceiveInc/include/*') -Destination (Join-Path $stage 'include') -Recurse -Force
+foreach($name in @('Spy.cpp','SpyContracts.hpp')){
+ Copy-Item -LiteralPath (Join-Path $project "sdk/Briefcase.DeceiveInc/src/$name") -Destination $typedSource
+}
 Copy-Item -LiteralPath (Join-Path $project 'build/_deps/json-src/include/nlohmann') -Destination (Join-Path $stage 'third_party/include') -Recurse
 Copy-Item -LiteralPath (Join-Path $project 'build/_deps/json-src/LICENSE.MIT') -Destination (Join-Path $stage 'Licenses/nlohmann-json.txt')
 $config=(Get-Content -LiteralPath (Join-Path $project 'sdk/BriefcaseNativeSDKConfig.cmake.in') -Raw).Replace('@VERSION@',$version)

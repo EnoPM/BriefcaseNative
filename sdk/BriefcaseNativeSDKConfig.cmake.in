@@ -12,3 +12,11 @@ if(NOT TARGET Briefcase::ModApi)
  set_target_properties(Briefcase::Json PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${_bc_sdk}/third_party/include")
 endif()
 set(BriefcaseNativeSDK_VERSION "@VERSION@")
+
+# Optional typed game API, compiled into the consuming module through the public C ABI.
+if(NOT TARGET Briefcase::DeceiveInc)
+ add_library(Briefcase.DeceiveInc.SDK STATIC EXCLUDE_FROM_ALL "${_bc_sdk}/src/DeceiveInc/Spy.cpp")
+ target_link_libraries(Briefcase.DeceiveInc.SDK PUBLIC Briefcase::ModApi)
+ set_target_properties(Briefcase.DeceiveInc.SDK PROPERTIES POSITION_INDEPENDENT_CODE ON)
+ add_library(Briefcase::DeceiveInc ALIAS Briefcase.DeceiveInc.SDK)
+endif()

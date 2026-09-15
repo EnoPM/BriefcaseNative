@@ -1,6 +1,6 @@
 # API C++ typée : Spy
 
-Inclure <Briefcase/DeceiveInc/Spy.hpp> et lier la cible CMake Briefcase.DeceiveInc.
+Inclure <Briefcase/DeceiveInc/Spy.hpp> et lier la cible CMake Briefcase::DeceiveInc du SDK distribué.
 Cette bibliothèque fait partie du SDK Briefcase. Elle est compilée dans le mod,
 sans nouvelle DLL à installer et sans dépendance à UE4SS ou ImGui dans l'API publique.
 L'ABI C existante reste le seul contrat entre le mod et le runtime.

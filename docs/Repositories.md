@@ -11,3 +11,7 @@ and link Briefcase::ModApi and Briefcase::Json.
 
 The framework updater preserves independently installed mods and their data.
 Only the explicitly inventoried framework files belong to a framework update.
+
+The SDK also provides Briefcase::DeceiveInc for typed game objects. Its adapter sources
+are compiled into the consuming module and call only the public C ABI.
+The SDK contains no host, backend or application mod implementation.
