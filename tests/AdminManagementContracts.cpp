@@ -1,7 +1,9 @@
 #include "../runtime/Briefcase.Admin/Management.hpp"
+#ifdef _WIN32
 #include "../runtime/Briefcase.Client.Admin/Credentials.hpp"
+#endif
 #include "../runtime/Briefcase.NativeHost/Configuration.hpp"
-#include <Windows.h>
+
 #include <iostream>
 using namespace bc::admin;
 static unsigned checks;
@@ -21,18 +23,28 @@ template <class F> void rejects(F f, const std::string &code = "invalid_values")
 }
 int main() {
     try {
-        auto root = fs::current_path() / ("management-fixture-" + hex(random_bytes(8)));
+#ifdef _WIN32
+        const auto fixture_base = fs::current_path();
+#else
+        const auto fixture_base = fs::temp_directory_path();
+#endif
+        auto root = fixture_base / ("management-fixture-" + hex(random_bytes(8)));
         struct Cleanup {
-            fs::path p;
+            fs::path p, base;
             ~Cleanup() {
                 std::error_code e;
-                if (p.parent_path() == fs::current_path() &&
+                if (p.parent_path() == base &&
                     p.filename().string().starts_with("management-fixture-"))
                     fs::remove_all(p, e);
             }
-        } cleanup{root};
-        auto game = root / "DeceiveInc", briefcase = game / "Binaries" / "Win64" / "Briefcase",
-             ini = game / "Saved" / "Config" / "WindowsServer" / "TripwireServer.ini";
+        } cleanup{root, fixture_base};
+#ifdef _WIN32
+        const auto binaries = "Win64", config = "WindowsServer";
+#else
+        const auto binaries = "Linux", config = "LinuxServer";
+#endif
+        auto game = root / "DeceiveInc", briefcase = game / "Binaries" / binaries / "Briefcase",
+             ini = game / "Saved" / "Config" / config / "TripwireServer.ini";
         fs::create_directories(ini.parent_path());
         fs::create_directories(briefcase / "Admin");
         fs::create_directories(game / "Community Balance Template");
@@ -241,6 +253,7 @@ int main() {
         rejects([&] { m.dispatch("server.restart", {{"command", "calc"}}); });
         rejects([&] { m.dispatch("server.restart", {}); },
                 "unavailable"); // A fixture cannot restart any Shipping process.
+#ifdef _WIN32
         PasswordStore vault(briefcase);
         const std::string password = "Synthetic-client-password-2026";
         vault.put("game:1", "admin:2", std::string(64, 'a'), password);
@@ -258,6 +271,7 @@ int main() {
                 "credentials"); // DPAPI entropy binds the actual identity, not only the JSON metadata.
         vault.forget("game:1");
         check(!vault.contains("game:1", "admin:2", std::string(64, 'b')), "forget failed");
+#endif
         std::cout << "PASS " << checks << " administration management checks\n";
         return 0;
     } catch (const std::exception &e) {

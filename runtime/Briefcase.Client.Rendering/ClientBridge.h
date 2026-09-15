@@ -1,6 +1,6 @@
 #pragma once
 #include <Briefcase/ClientModApi.h>
-enum : uint32_t { BC_UI_PENDING = 0, BC_UI_LOADED = 1, BC_UI_DISABLED = 2, BC_UI_ERROR = 3 };
+#include "../Briefcase.NativeHost/ModState.hpp"
 struct BcClientHome {
     uint32_t size, discovered, loaded, unreal_state;
     BcBuild build;

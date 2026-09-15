@@ -1,19 +1,28 @@
-#include "../Briefcase.Client.Rendering/ClientBridge.h"
+#include "Platform.hpp"
+#include "ExecutableImage.hpp"
+#include "ModState.hpp"
 #include "Backend.hpp"
-#include "../Briefcase.Client.Admin/Client.hpp"
-#include "../Briefcase.Admin/Management.hpp"
-#include "../Briefcase.Localization/Client.hpp"
-#include "ClientStartup.hpp"
-#include "../Briefcase.Client.Servers/ServerDirectory.hpp"
 #include "Configuration.hpp"
-#include "../Briefcase.Client.Settings/Store.hpp"
 #include "GameProfile.hpp"
 #include "Manifest.hpp"
 #include "Startup.hpp"
 #include "UnrealServices.hpp"
+#include "../Briefcase.Admin/Management.hpp"
+#ifdef _WIN32
+#include "../Briefcase.Client.Rendering/ClientBridge.h"
+#include "../Briefcase.Client.Admin/Client.hpp"
+#include "../Briefcase.Localization/Client.hpp"
+#include "ClientStartup.hpp"
+#include "../Briefcase.Client.Servers/ServerDirectory.hpp"
+#include "../Briefcase.Client.Settings/Store.hpp"
 #include <Windows.h>
-#include <atomic>
 #include <bcrypt.h>
+#else
+#include <mbedtls/sha256.h>
+#include <condition_variable>
+#endif
+#include <atomic>
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <cstring>
@@ -36,16 +45,19 @@ struct Scope {
     uint64_t id;
     Manifest manifest;
     BcApi api{};
-    HMODULE module{};
+    platform::Module module{};
     std::atomic<bool> loaded{};
     bool eligible{};
     std::atomic<uint32_t> status{BC_UI_PENDING};
     std::string error;
     std::atomic<bool> accepting{true};
     std::string config_schema, config_text;
+#ifdef _WIN32
     client_settings::Store client_settings;
+#endif
     std::vector<FileChange> files;
     std::vector<ImmediateChange> patches;
+    std::vector<CodeChange> code_patches;
 };
 static std::vector<std::unique_ptr<Scope>> scopes;
 void log(std::string_view message) noexcept {
@@ -124,9 +136,14 @@ static BcResult BC_CALL api_post(void *c, BcTask task, void *user) noexcept {
         return BC_INTERNAL;
     }
 }
+static uint32_t initial_game_thread{};
+static double bootstrap_ms{};
+#ifdef _WIN32
 #include "ClientServices.inc"
+#endif
 #include "Services.inc"
 static std::string sha256(const fs::path &path) {
+#ifdef _WIN32
     BCRYPT_ALG_HANDLE algorithm{};
     BCRYPT_HASH_HANDLE hash{};
     if (BCryptOpenAlgorithmProvider(&algorithm, BCRYPT_SHA256_ALGORITHM, nullptr, 0) < 0)
@@ -159,13 +176,29 @@ static std::string sha256(const fs::path &path) {
     for (auto b : digest)
         result += std::format("{:02x}", b);
     return result;
+#else
+    mbedtls_sha256_context context;
+    mbedtls_sha256_init(&context);
+    struct Cleanup { mbedtls_sha256_context* p; ~Cleanup() { mbedtls_sha256_free(p); } } cleanup{&context};
+    if (mbedtls_sha256_starts(&context, 0)) throw std::runtime_error("SHA256 init failed");
+    std::ifstream stream(path, std::ios::binary);
+    if (!stream) throw std::runtime_error("Cannot open game executable");
+    std::array<unsigned char, 65536> chunk{};
+    while (stream) {
+        stream.read(reinterpret_cast<char*>(chunk.data()), chunk.size());
+        if (mbedtls_sha256_update(&context, chunk.data(), static_cast<size_t>(stream.gcount())))
+            throw std::runtime_error("SHA256 update failed");
+    }
+    if (!stream.eof()) throw std::runtime_error("Cannot read game executable");
+    std::array<unsigned char, 32> digest{};
+    if (mbedtls_sha256_finish(&context, digest.data())) throw std::runtime_error("SHA256 final failed");
+    std::string result;
+    for (auto b : digest) result += std::format("{:02x}", b);
+    return result;
+#endif
 }
 static void no_reparse(const fs::path &path, const fs::path &root) {
-    for (auto p = path; p != root && !p.empty(); p = p.parent_path()) {
-        auto a = GetFileAttributesW(p.c_str());
-        if (a == INVALID_FILE_ATTRIBUTES || (a & FILE_ATTRIBUTE_REPARSE_POINT))
-            throw std::runtime_error("Missing file or reparse point: " + p.string());
-    }
+    assert_plain_path(path);
 }
 static std::vector<size_t> load_order;
 static void discover_mods(const fs::path &root) {
@@ -216,6 +249,9 @@ static void discover_mods(const fs::path &root) {
                 s->status = BC_UI_DISABLED;
                 log("Disabled mod " + m.id);
             } else {
+#ifndef _WIN32
+            if (m.entry.ends_with(".dll")) throw std::runtime_error("Windows DLL cannot load on Linux");
+#endif
                 s->eligible = true;
                 active_indices.push_back(scopes.size());
                 active.push_back(m);
@@ -281,17 +317,16 @@ static void load_phase(std::string_view phase, bool rendering_only = false) {
         }
         auto dll = s.manifest.directory / s.manifest.entry;
         assert_plain_path(dll);
-        s.module = LoadLibraryExW(dll.c_str(), nullptr,
-                                  LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32);
-        if (!s.module) {
-            s.error = std::format("LoadLibrary error {}", GetLastError());
+        try { s.module = platform::open_library(dll); }
+        catch (const std::exception& e) {
+            s.error = e.what();
             s.status = BC_UI_ERROR;
-            log(std::format("Mod {} LoadLibrary error {}", s.manifest.id, GetLastError()));
+            log("Mod " + s.manifest.id + ": " + s.error);
             continue;
         }
-        auto entry = reinterpret_cast<BcModLoad>(GetProcAddress(s.module, "BriefcaseModLoad"));
+        auto entry = reinterpret_cast<BcModLoad>(platform::symbol(s.module, "BriefcaseModLoad"));
         loading_scope = &s;
-        loading_thread.store(GetCurrentThreadId(), std::memory_order_release);
+        loading_thread.store(platform::thread_id(), std::memory_order_release);
         BcResult result = BC_VERSION_MISMATCH;
         try {
             if (entry)
@@ -304,15 +339,16 @@ static void load_phase(std::string_view phase, bool rendering_only = false) {
         if (result != BC_OK) {
             s.error = std::format("Mod entry returned {}", result);
             s.status = BC_UI_ERROR;
-            if (client_module)
-                client_module->cleanup_owner(s.id);
+#ifdef _WIN32
+            if (client_module) client_module->cleanup_owner(s.id);
+#endif
             log(std::format("Mod {} rejected: {}", s.manifest.id, result));
             continue;
         }
         if (phase == "startup") {
-            commit_startup(game_image, s.patches, s.files);
-            log(std::format("{}: startup transaction committed before EXE entry ({} immediates)",
-                            s.manifest.id, s.patches.size()));
+            commit_startup(game_image, s.patches, s.files, s.code_patches);
+            log(std::format("{}: startup transaction committed before game initialization ({} immediates, {} code windows)",
+                            s.manifest.id, s.patches.size(), s.code_patches.size()));
             for (const auto &f : s.files)
                 if (f.before != f.after)
                     log(s.manifest.id + ": server INI synchronized atomically; previous file backed up");
@@ -326,9 +362,14 @@ static void load_phase(std::string_view phase, bool rendering_only = false) {
             throw std::runtime_error("Required startup mod failed; refusing to start game");
     log(std::format("Mod phase {} complete: {}/{} loaded", phase, loaded.size(), scopes.size()));
 }
+#ifdef _WIN32
 #include "ClientHost.inc"
 #include "Shutdown.inc"
+#else
+#include "LinuxHost.inc"
+#endif
 } // namespace bc
+#ifdef _WIN32
 extern "C" __declspec(dllexport) uint32_t __cdecl BriefcasePrepare(uint32_t game_thread) noexcept {
     try {
         wchar_t path[32768]{};
@@ -344,8 +385,8 @@ extern "C" __declspec(dllexport) uint32_t __cdecl BriefcasePrepare(uint32_t game
         bc::logfile.open(client ? root / "Briefcase.log" : root / "Logs" / "BriefcaseNative.log",
                          std::ios::out | std::ios::trunc);
         bc::log(
-            client ? "BriefcaseNative 0.3.0; mode=client; asynchronous bootstrap; no UE4SS UI/console/Lua"
-                   : "BriefcaseNative 0.3.0; mode=server; preparing before EXE entry; no UI, console or Lua");
+            client ? "BriefcaseNative " BRIEFCASE_FRAMEWORK_VERSION "; mode=client; asynchronous bootstrap; no UE4SS UI/console/Lua"
+                   : "BriefcaseNative " BRIEFCASE_FRAMEWORK_VERSION "; mode=server; preparing before EXE entry; no UI, console or Lua");
         const auto base = reinterpret_cast<uint8_t *>(GetModuleHandleW(nullptr));
         const auto dos = reinterpret_cast<IMAGE_DOS_HEADER *>(base);
         const auto nt = reinterpret_cast<IMAGE_NT_HEADERS64 *>(base + dos->e_lfanew);
@@ -361,7 +402,7 @@ extern "C" __declspec(dllexport) uint32_t __cdecl BriefcasePrepare(uint32_t game
                           nt->OptionalHeader.SizeOfImage,
                           4,
                           27,
-                          "0.3.0",
+                          BRIEFCASE_FRAMEWORK_VERSION,
                           {}};
         auto hash = bc::sha256(exe);
         strcpy_s(bc::build_info.executable_sha256, hash.c_str());
@@ -432,3 +473,5 @@ extern "C" __declspec(dllexport) void __cdecl BriefcaseRecordBootstrap(double pr
     } catch (...) {
     }
 }
+
+#endif

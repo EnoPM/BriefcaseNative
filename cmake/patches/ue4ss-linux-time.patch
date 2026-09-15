@@ -1,0 +1,16 @@
+diff --git a/deps/first/Helpers/src/Time.cpp b/deps/first/Helpers/src/Time.cpp
+index 73b04d4..7ddd76b 100644
+--- a/deps/first/Helpers/src/Time.cpp
++++ b/deps/first/Helpers/src/Time.cpp
+@@ -35,7 +35,10 @@ namespace RC
+             try
+             {
+                 static const auto timezone = std::chrono::current_zone();
+-                const auto now = std::chrono::time_point_cast<std::chrono::system_clock::duration>(timezone->to_local(std::chrono::system_clock::now()));
++                // fmt 11 on libstdc++ 13 cannot format local_time<char16_t>; preserve
++                // the local wall-clock fields using its supported sys_time formatter.
++                const std::chrono::sys_time<std::chrono::system_clock::duration> now{
++                    timezone->to_local(std::chrono::system_clock::now()).time_since_epoch()};
+                 return fmt::vformat(fmt::detail::to_string_view(format), RC_STD_MAKE_FORMAT_ARGS(now));
+             }
+             catch (std::runtime_error&)

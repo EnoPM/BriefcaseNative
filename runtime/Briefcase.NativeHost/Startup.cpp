@@ -1,5 +1,13 @@
 #include "Startup.hpp"
+#include "ExecutableImage.hpp"
+#include "Platform.hpp"
+#ifdef _WIN32
 #include <Windows.h>
+#else
+#include "../Briefcase.Admin/Service.hpp"
+#include <sys/mman.h>
+#include <unistd.h>
+#endif
 #include <Zydis/Zydis.h>
 #include <cstring>
 #include <fstream>
@@ -7,29 +15,6 @@
 #include <stdexcept>
 namespace bc {
 namespace fs = std::filesystem;
-void assert_plain_path(const fs::path &path) {
-    for (auto p = fs::absolute(path).lexically_normal(); !p.empty();) {
-        auto a = GetFileAttributesW(p.c_str());
-        if (a != INVALID_FILE_ATTRIBUTES && (a & FILE_ATTRIBUTE_REPARSE_POINT))
-            throw std::runtime_error("Reparse point forbidden");
-        auto parent = p.parent_path();
-        if (parent == p)
-            break;
-        p = parent;
-    }
-}
-std::string read_bounded(const fs::path &path, size_t limit) {
-    assert_plain_path(path);
-    if (fs::file_size(path) > limit)
-        throw std::runtime_error("File size limit exceeded");
-    std::ifstream in(path, std::ios::binary);
-    if (!in)
-        throw std::runtime_error("Cannot read file");
-    std::string out((std::istreambuf_iterator<char>(in)), {});
-    if (out.size() > limit || in.bad())
-        throw std::runtime_error("Cannot read bounded file");
-    return out;
-}
 bool is_mov_i32(std::span<const uint8_t> window, uint32_t operand_offset) {
     ZydisDecoder decoder{};
     if (!ZYAN_SUCCESS(ZydisDecoderInit(&decoder, ZYDIS_MACHINE_MODE_LONG_64, ZYDIS_STACK_WIDTH_64)))
@@ -54,15 +39,6 @@ std::vector<ImmediateChange> validate_patches(uint8_t *image, uint32_t image_siz
                                               std::span<const BcImmediatePatch> requests) {
     if (requests.empty() || requests.size() > 64)
         throw std::runtime_error("Patch batch size invalid");
-    const auto dos = reinterpret_cast<const IMAGE_DOS_HEADER *>(image);
-    if (dos->e_magic != IMAGE_DOS_SIGNATURE || dos->e_lfanew < 0 ||
-        static_cast<uint64_t>(dos->e_lfanew) + sizeof(IMAGE_NT_HEADERS64) > image_size)
-        throw std::runtime_error("Invalid PE image");
-    const auto nt = reinterpret_cast<const IMAGE_NT_HEADERS64 *>(image + dos->e_lfanew);
-    const auto first = IMAGE_FIRST_SECTION(nt);
-    if (nt->Signature != IMAGE_NT_SIGNATURE || nt->FileHeader.NumberOfSections > 96 ||
-        reinterpret_cast<const uint8_t *>(first + nt->FileHeader.NumberOfSections) > image + image_size)
-        throw std::runtime_error("Invalid PE sections");
     std::vector<ImmediateChange> result;
     std::set<uint32_t> occupied;
     for (const auto &req : requests) {
@@ -70,14 +46,7 @@ std::vector<ImmediateChange> validate_patches(uint8_t *image, uint32_t image_siz
             req.window_size < 5 || req.operand_offset + uint64_t(4) > req.window_size ||
             req.window_rva + uint64_t(req.window_size) > image_size)
             throw std::runtime_error("Invalid immediate descriptor");
-        bool inText = false;
-        for (unsigned n = 0; n < nt->FileHeader.NumberOfSections; ++n) {
-            const auto &s = first[n];
-            if (std::memcmp(s.Name, ".text\0\0\0", 8) == 0 && (s.Characteristics & IMAGE_SCN_MEM_EXECUTE) &&
-                req.window_rva >= s.VirtualAddress &&
-                req.window_rva + uint64_t(req.window_size) <= s.VirtualAddress + uint64_t(s.Misc.VirtualSize))
-                inText = true;
-        }
+        const bool inText = executable_range(image, image_size, req.window_rva, req.window_size, true);
         if (!inText || std::memcmp(image + req.window_rva, req.expected, req.window_size) != 0 ||
             !is_mov_i32({req.expected, req.window_size}, req.operand_offset))
             throw std::runtime_error("Expected .text window / MOV imm32 mismatch");
@@ -91,8 +60,62 @@ std::vector<ImmediateChange> validate_patches(uint8_t *image, uint32_t image_siz
     }
     return result;
 }
+static bool scalar_window(std::span<const uint8_t> bytes, bool replacement) {
+    ZydisDecoder decoder{};
+    ZydisDecoderInit(&decoder, ZYDIS_MACHINE_MODE_LONG_64, ZYDIS_STACK_WIDTH_64);
+    std::set<size_t> boundaries{bytes.size()};
+    std::vector<size_t> destinations;
+    for(size_t at=0;at<bytes.size();) {
+        boundaries.insert(at);
+        ZydisDecodedInstruction instruction{};
+        ZydisDecodedOperand operands[ZYDIS_MAX_OPERAND_COUNT]{};
+        if(!ZYAN_SUCCESS(ZydisDecoderDecodeFull(&decoder,bytes.data()+at,bytes.size()-at,&instruction,operands)))
+            return false;
+        if(replacement) {
+            if(instruction.mnemonic != ZYDIS_MNEMONIC_MOV && instruction.mnemonic != ZYDIS_MNEMONIC_XOR &&
+               instruction.mnemonic != ZYDIS_MNEMONIC_CMP && instruction.mnemonic != ZYDIS_MNEMONIC_NOP &&
+               instruction.meta.category != ZYDIS_CATEGORY_CMOV &&
+               instruction.meta.category != ZYDIS_CATEGORY_COND_BR) return false;
+            if(instruction.meta.category==ZYDIS_CATEGORY_COND_BR) {
+                if(instruction.operand_count_visible!=1 || operands[0].type!=ZYDIS_OPERAND_TYPE_IMMEDIATE ||
+                   !operands[0].imm.is_relative || operands[0].imm.value.s<0) return false;
+                const auto destination=at+instruction.length+operands[0].imm.value.s;
+                if(destination>bytes.size()) return false;
+                destinations.push_back(size_t(destination));
+            }
+            for(unsigned n=0;n<instruction.operand_count_visible;++n) {
+                const auto& op=operands[n];
+                if(op.type!=ZYDIS_OPERAND_TYPE_REGISTER && op.type!=ZYDIS_OPERAND_TYPE_IMMEDIATE) return false;
+                if(op.type==ZYDIS_OPERAND_TYPE_REGISTER &&
+                   (op.reg.value==ZYDIS_REGISTER_RSP || op.reg.value==ZYDIS_REGISTER_ESP ||
+                    op.reg.value==ZYDIS_REGISTER_SP || op.reg.value==ZYDIS_REGISTER_SPL)) return false;
+            }
+        }
+        at+=instruction.length;
+    }
+    for(auto destination:destinations) if(!boundaries.contains(destination)) return false;
+    return true;
+}
+std::vector<CodeChange> validate_code_patches(uint8_t* image,uint32_t size,std::span<const BcCodePatch> requests) {
+    if(requests.empty() || requests.size()>64) throw std::runtime_error("Invalid code patch count");
+    std::vector<CodeChange> result;
+    std::set<uint32_t> occupied;
+    for(const auto& p:requests) {
+        if(p.size!=sizeof(p) || p.reserved || !p.expected || !p.replacement || !p.window_size ||
+           p.window_size>128 || !executable_range(image,size,p.window_rva,p.window_size,true) ||
+           std::memcmp(image+p.window_rva,p.expected,p.window_size) ||
+           !scalar_window({p.expected,p.window_size},false) ||
+           !scalar_window({p.replacement,p.window_size},true))
+            throw std::runtime_error("Code patch bytes/instructions mismatch");
+        for(uint32_t i=0;i<p.window_size;++i)
+            if(!occupied.insert(p.window_rva+i).second) throw std::runtime_error("Overlapping code patches");
+        result.push_back({p.window_rva,{p.expected,p.expected+p.window_size},{p.replacement,p.replacement+p.window_size}});
+    }
+    return result;
+}
 static void replace_file(const FileChange &file, bool rollback) {
     assert_plain_path(file.path);
+#ifdef _WIN32
     const auto temporary =
         fs::path(file.path.wstring() + L".briefcase." + std::to_wstring(GetCurrentProcessId()) + L".tmp");
     assert_plain_path(temporary);
@@ -111,19 +134,44 @@ static void replace_file(const FileChange &file, bool rollback) {
         DeleteFileW(temporary.c_str());
         throw std::runtime_error("Atomic INI replacement failed");
     }
+#else
+    admin::write_file(file.path, rollback ? file.before : file.after, true);
+#endif
 }
-static void write_i32(uint8_t *address, int32_t value) {
+static void write_code(uint8_t *address, const void* bytes, size_t length) {
+#ifdef _WIN32
     DWORD previous{}, unused{};
-    if (!VirtualProtect(address, 4, PAGE_EXECUTE_READWRITE, &previous))
+    if (!VirtualProtect(address, length, PAGE_EXECUTE_READWRITE, &previous))
         throw std::runtime_error("VirtualProtect failed");
-    std::memcpy(address, &value, 4);
-    const auto flushed = FlushInstructionCache(GetCurrentProcess(), address, 4);
-    const auto restored = VirtualProtect(address, 4, previous, &unused);
+    std::memcpy(address, bytes, length);
+    const auto flushed = FlushInstructionCache(GetCurrentProcess(), address, length);
+    const auto restored = VirtualProtect(address, length, previous, &unused);
     if (!flushed || !restored)
         throw std::runtime_error("Instruction cache/protection restoration failed");
+#else
+    const auto page_size = static_cast<uintptr_t>(sysconf(_SC_PAGESIZE));
+    const auto first = reinterpret_cast<uintptr_t>(address) & ~(page_size-1);
+    const auto last = (reinterpret_cast<uintptr_t>(address)+length+page_size-1) & ~(page_size-1);
+    // Startup transactions run before the game entry and before backend workers.
+    if(mprotect(reinterpret_cast<void*>(first),last-first,PROT_READ|PROT_WRITE|PROT_EXEC))
+        throw std::runtime_error("Cannot make startup code writable");
+    std::memcpy(address,bytes,length);
+    __builtin___clear_cache(reinterpret_cast<char*>(address),reinterpret_cast<char*>(address+length));
+    if(mprotect(reinterpret_cast<void*>(first),last-first,PROT_READ|PROT_EXEC))
+        throw std::runtime_error("Cannot restore startup code protection");
+#endif
 }
 void commit_startup(uint8_t *image, const std::vector<ImmediateChange> &patches,
-                    const std::vector<FileChange> &files) {
+                    const std::vector<FileChange> &files, const std::vector<CodeChange>& code) {
+    std::set<uint32_t> occupied;
+    for(const auto& patch:patches)
+        for(uint32_t i=0;i<4;++i) occupied.insert(patch.rva+i);
+    for(const auto& patch:code) {
+        if(std::memcmp(image+patch.rva,patch.before.data(),patch.before.size()))
+            throw std::runtime_error("Code changed before commit");
+        for(uint32_t i=0;i<patch.before.size();++i)
+            if(!occupied.insert(patch.rva+i).second) throw std::runtime_error("Overlapping transaction patches");
+    }
     for (const auto &patch : patches) {
         int32_t current;
         std::memcpy(&current, image + patch.rva, 4);
@@ -133,14 +181,14 @@ void commit_startup(uint8_t *image, const std::vector<ImmediateChange> &patches,
     for (const auto &file : files)
         if (read_bounded(file.path, 1048576) != file.before)
             throw std::runtime_error("INI changed before commit");
-    size_t appliedFiles = 0, appliedPatches = 0;
+    size_t appliedFiles = 0, appliedPatches = 0, appliedCode = 0;
     try {
         for (const auto &file : files) {
             if (file.before != file.after) {
-                const auto backup = fs::path(file.path.wstring() + L".briefcase." +
-                                             std::to_wstring(GetCurrentProcessId()) + L".bak");
+                const auto backup = fs::path(file.path.string() + ".briefcase." +
+                                             std::to_string(platform::process_id()) + ".bak");
                 assert_plain_path(backup);
-                if (!CopyFileW(file.path.c_str(), backup.c_str(), TRUE))
+                if (!fs::copy_file(file.path, backup, fs::copy_options::none))
                     throw std::runtime_error("INI backup failed");
                 replace_file(file, false);
             }
@@ -148,7 +196,7 @@ void commit_startup(uint8_t *image, const std::vector<ImmediateChange> &patches,
         }
         for (const auto &patch : patches) {
             ++appliedPatches; // Include the current word if restoring page protection fails.
-            write_i32(image + patch.rva, patch.after);
+            write_code(image + patch.rva, &patch.after, 4);
         }
         for (const auto &patch : patches) {
             int32_t actual;
@@ -156,15 +204,26 @@ void commit_startup(uint8_t *image, const std::vector<ImmediateChange> &patches,
             if (actual != patch.after)
                 throw std::runtime_error("Instruction readback failed");
         }
+        for(const auto& patch:code) {
+            ++appliedCode;
+            write_code(image+patch.rva,patch.after.data(),patch.after.size());
+            if(std::memcmp(image+patch.rva,patch.after.data(),patch.after.size()))
+                throw std::runtime_error("Code readback mismatch");
+        }
         for (const auto &file : files)
             if (read_bounded(file.path, 1048576) != file.after)
                 throw std::runtime_error("INI readback failed");
     } catch (...) {
         bool failed = false;
+        while(appliedCode) {
+            const auto& p=code[--appliedCode];
+            try { write_code(image+p.rva,p.before.data(),p.before.size()); }
+            catch(...) { failed=true; }
+        }
         while (appliedPatches) {
             const auto &p = patches[--appliedPatches];
             try {
-                write_i32(image + p.rva, p.before);
+                write_code(image + p.rva, &p.before, 4);
             } catch (...) {
                 failed = true;
             }

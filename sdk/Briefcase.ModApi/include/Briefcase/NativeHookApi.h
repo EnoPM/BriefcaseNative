@@ -7,6 +7,7 @@ extern "C" {
 #define BC_NATIVE_HOOK_SERVICE "briefcase.native-hooks"
 #define BC_CAP_NATIVE_HOOKS 1024ull
 #define BC_TRANSPORT_NATIVE 3u
+/* RVAs are relative to the PE module base or the first offset-zero ELF PT_LOAD. */
 typedef struct BcNativeSite {
     uint32_t size, exec_rva, branch_offset, exec_size;
     const uint8_t *exec_bytes;

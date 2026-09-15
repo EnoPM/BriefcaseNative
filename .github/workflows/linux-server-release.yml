@@ -1,0 +1,99 @@
+name: Add Linux server release
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version of the existing release at this commit
+        required: true
+        type: string
+      publish:
+        description: Publish the existing draft after Linux asset verification
+        required: true
+        default: false
+        type: boolean
+permissions:
+  contents: read
+concurrency:
+  group: briefcase-server-release
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      RUSTUP_TOOLCHAIN: 1.97.1
+      RELEASE_VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify framework source and version
+        run: |
+          python3 scripts/release/Assert-Source.py
+          python3 - <<'PY'
+          import os, re
+          from pathlib import Path
+          version=re.search(r'project\(BriefcaseNative VERSION (\d+\.\d+\.\d+)',Path('CMakeLists.txt').read_text())[1]
+          assert version==os.environ['RELEASE_VERSION'], 'Version mismatch'
+          PY
+      - name: Install native tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends clang-19 lld-19 cmake ninja-build libssl-dev pkg-config
+          rustup toolchain install 1.97.1 --profile minimal --no-self-update
+      - name: Build pinned headless Unreal libraries
+        env:
+          UPSTREAM_READ_TOKEN: ${{ secrets.UPSTREAM_READ_TOKEN }}
+        run: |
+          test -n "$UPSTREAM_READ_TOKEN" || { echo 'UPSTREAM_READ_TOKEN must have read access to the upstream Unreal submodule.' >&2; exit 1; }
+          # Credentials exist only in this process environment, never in Git config on disk.
+          export GIT_CONFIG_COUNT=2
+          export GIT_CONFIG_KEY_0=url.https://github.com/.insteadOf
+          export GIT_CONFIG_VALUE_0=git@github.com:
+          export GIT_CONFIG_KEY_1=http.https://github.com/.extraheader
+          encoded=$(printf 'x-access-token:%s' "$UPSTREAM_READ_TOKEN" | base64 -w0)
+          echo "::add-mask::$encoded"
+          export GIT_CONFIG_VALUE_1="AUTHORIZATION: basic $encoded"
+          bash scripts/linux/prepare-backend.sh artifacts/linux/ue4ss-reference artifacts/linux/ue4ss-build
+      - name: Build and test server
+        run: bash scripts/linux/build-server-host.sh artifacts/linux/ue4ss-reference artifacts/linux/ue4ss-build artifacts/linux/ue4ss-build/_deps
+      - name: Prepare verified Linux asset and public SDK
+        run: |
+          python3 scripts/linux/package-server.py --build build/linux-server-host --backend-source artifacts/linux/ue4ss-reference --backend-deps artifacts/linux/ue4ss-build/_deps --output dist/Releases
+          python3 scripts/linux/package-sdk.py --json-source build/linux-server-host/_deps/json-src --output dist/LinuxSDK
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: linux-server-release
+          path: |
+            dist/Releases/BriefcaseNative-Server-linux-x64-*.zip
+            dist/Releases/BriefcaseNative-Server-linux-x64-*.zip.sha256
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: linux-server-release
+          path: dist/Releases
+      - name: Attach Linux assets to matching release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_VERSION: ${{ inputs.version }}
+          PUBLISH_DRAFT: ${{ inputs.publish }}
+        run: |
+          args=()
+          if [[ "$PUBLISH_DRAFT" == true ]]; then args+=(--publish); fi
+          python3 scripts/linux/publish-release.py --repository "$GITHUB_REPOSITORY" --version "$RELEASE_VERSION" --commit "$GITHUB_SHA" "${args[@]}"

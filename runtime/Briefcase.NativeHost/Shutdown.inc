@@ -11,7 +11,7 @@ static void BC_CALL shutdown_mods(void *) noexcept {
         if (client_module)
             client_module->cleanup_owner(s.id);
         if (s.loaded && s.module) {
-            auto unload = reinterpret_cast<BcModUnload>(GetProcAddress(s.module, "BriefcaseModUnload"));
+            auto unload = reinterpret_cast<BcModUnload>(platform::symbol(s.module, "BriefcaseModUnload"));
             if (unload)
                 try {
                     unload();

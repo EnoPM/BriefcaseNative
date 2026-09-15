@@ -91,7 +91,7 @@ static const BcUnrealApi unreal_service = {sizeof(BcUnrealApi),
 static BcResult BC_CALL u_native(void *c, BcHandle fn, const char *sha, const BcNativeSite *site,
                                  uint32_t phase, BcHookCallback cb, void *user, BcHandle *out) noexcept {
     return unreal_call<BC_CAP_NATIVE_HOOKS | BC_CAP_HOOKS | BC_CAP_REFLECTION>(c, [&](uint64_t id) {
-        if (!sha || strnlen_s(sha, 65) != 64 || std::strcmp(sha, build_info.executable_sha256))
+        if (!sha || platform::bounded_length(sha, 65) != 64 || std::strcmp(sha, build_info.executable_sha256))
             return BC_VERSION_MISMATCH;
         return backend_native_hook(id, fn, site, phase, cb, user, out);
     });

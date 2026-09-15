@@ -1,0 +1,21 @@
+name: Linux server core
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - name: Verify framework source inventory
+        run: python3 scripts/release/Assert-Source.py
+      - name: Build and test the portable server foundation
+        run: bash scripts/linux/build-server-core.sh
+      - name: Verify that no graphical or Windows dependencies were linked
+        run: |
+          readelf -h build/linux-server-core/Briefcase.NativeHello.so
+          ldd -r build/linux-server-core/Briefcase.NativeHello.so
+          test ! -e build/linux-server-core/Briefcase.Client.Rendering.so
+          test ! -e build/linux-server-core/Briefcase.NativeHost.so

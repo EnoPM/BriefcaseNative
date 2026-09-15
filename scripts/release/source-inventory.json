@@ -2,6 +2,7 @@
   "schemaVersion": 1,
   "roots": [
     ".clang-format",
+    ".gitattributes",
     ".github",
     ".gitignore",
     "CMakeLists.txt",
@@ -25,8 +26,20 @@
       "sha256": "b429fbcd6111d1902d44e3adc9b28f7738779692f1d70be3ce0ca12f62021cbd"
     },
     {
+      "path": ".gitattributes",
+      "sha256": "2580e70f8ded73954bdee6c74ef010da836c6002e1a6461d3efb4d313f58e509"
+    },
+    {
+      "path": ".github/workflows/linux-server-core.yml",
+      "sha256": "3801301a9a35f91d3622dea154070e39ff7a035d10ec7e5182fbbfb6d0333d36"
+    },
+    {
+      "path": ".github/workflows/linux-server-release.yml",
+      "sha256": "a5d570174aec57d8e20510e38f87ef330e0ca22b6b43002ffba6dc7b2c4ff7a8"
+    },
+    {
       "path": ".github/workflows/release.yml",
-      "sha256": "7472a4b67962e74f615d710b42471282e35c5fa5eaeb1a2d890b69d4b7ace84c"
+      "sha256": "00734bb9954d977a4c3058315e7aea99bd10313a34b5b8dfc7960d8b7b474925"
     },
     {
       "path": ".gitignore",
@@ -34,19 +47,47 @@
     },
     {
       "path": "CMakeLists.txt",
-      "sha256": "8de0f9f1a42eda9601c83351ac69dba625b20b6af98553ba6a89900aa2523096"
+      "sha256": "fb565f52df4267181ca093aa51d7b1b1579a3621f50e93f1f142236342e9f62d"
     },
     {
       "path": "README.md",
-      "sha256": "1920657ab1adc7392051c9b6d2828541b3ccfbf4571fb64d876a57a740a7f78e"
+      "sha256": "25f8952fac367795834170465a5137458413d33d186b3b05521519b49f647c55"
     },
     {
       "path": "cmake/AdminCrypto.cmake",
       "sha256": "4ec2f06f62df870347f405c37ea037163e74587cfa4c0e1a3e5d27cce09b5256"
     },
     {
+      "path": "cmake/LinuxBackend.cmake",
+      "sha256": "dfee08f20c2952b21bc6aba0640fd4bf90f3c800aff16fd50bbe0bfbd0f0bce0"
+    },
+    {
+      "path": "cmake/LinuxServer.cmake",
+      "sha256": "1411a7abd665e84b293ea8037151486ca7f7cad42a0e11a8815166a720984f35"
+    },
+    {
+      "path": "cmake/PortableCore.cmake",
+      "sha256": "2a82bf6c46690882c4acf5505390d685f2a86f7068bcc7afbd6b981f720ce5ee"
+    },
+    {
       "path": "cmake/UE4SS.cmake",
       "sha256": "651b67a2db043fd6de4e4db0806a8bd54a4d1498bafabaded54c4f75d20a22ba"
+    },
+    {
+      "path": "cmake/patches/README.md",
+      "sha256": "e055d148178fdfd43bcbc1206a7b7441ff43962e961cbae62324c078dfd55c56"
+    },
+    {
+      "path": "cmake/patches/UE4SS-LICENSE.txt",
+      "sha256": "ddc030e25d0ea87aca4ae84c0ed3f868d69273c00c0c12ea1e26f1c6130f5d2e"
+    },
+    {
+      "path": "cmake/patches/ue4ss-linux-resolvers.patch",
+      "sha256": "583a71cdd409d6460bb9d88d4f00e0eb849fa2bc56a457bd3e2fee425c204b34"
+    },
+    {
+      "path": "cmake/patches/ue4ss-linux-time.patch",
+      "sha256": "ae047a0c8e196c91e700d5f72e6e5fa413754e7a554e109145769022dec6baaa"
     },
     {
       "path": "docs/Administration.md",
@@ -75,6 +116,10 @@
     {
       "path": "docs/Development.md",
       "sha256": "f069447ac6af1935eff1c3e074c8c919da7ab6534e1413849ab70e0103ebfb84"
+    },
+    {
+      "path": "docs/LinuxServer.md",
+      "sha256": "6a5ec812cfe86149c2082e2be500a95d6bbc68f4f1e598779f5c10030009533d"
     },
     {
       "path": "docs/Localization.md",
@@ -145,6 +190,10 @@
       "sha256": "1c0e48bd83ad8812c095f5ba515cba6ff20439309bba0424184c9d7d9171e50d"
     },
     {
+      "path": "loader/Briefcase.ServerLauncher/LinuxBootstrap.cpp",
+      "sha256": "08ab8366522beef9fdba0700cfe626ec375fc7d954ee06b0e610409487a948cd"
+    },
+    {
       "path": "loader/Briefcase.ServerLauncher/Main.cpp",
       "sha256": "8962d6bb84d0aea6bec874347791b97d473bedce1fc83033dfc74d61adba155f"
     },
@@ -182,11 +231,23 @@
     },
     {
       "path": "runtime/Briefcase.Admin/Management.cpp",
-      "sha256": "38c3a555acefbca1f4069c3562e336d999896e9593cade3ce28e26472dd7b36b"
+      "sha256": "3116dcb842bc63ce5cf6991ae59ab201fd19a84bd54805cc5ba87f398f352797"
     },
     {
       "path": "runtime/Briefcase.Admin/Management.hpp",
       "sha256": "3356f3a87f016390bf45392d7d3b60a14acbd68cb706ca3665eab5161cdeceb5"
+    },
+    {
+      "path": "runtime/Briefcase.Admin/PosixFiles.cpp",
+      "sha256": "0280bbd7b57f3332b28f6984b3baaa79a35b56b91030ee457654ab39ad7e54b7"
+    },
+    {
+      "path": "runtime/Briefcase.Admin/PosixIdentity.cpp",
+      "sha256": "425ec8b23e2bf89144f47c0c2a56ad65a9cfb4b492cf82f2e5cd312b0dfaca86"
+    },
+    {
+      "path": "runtime/Briefcase.Admin/PosixRestart.cpp",
+      "sha256": "dcf911699b172736d063e14759a10e15165d9a17deb8bc71d4fdb36953952ed1"
     },
     {
       "path": "runtime/Briefcase.Admin/Restart.cpp",
@@ -194,11 +255,11 @@
     },
     {
       "path": "runtime/Briefcase.Admin/Security.cpp",
-      "sha256": "e6fdaf370c7ce66e4aa87a77e373d683b4fd7b3c4aaa760f7b2bcca72ff69726"
+      "sha256": "576c4225e64ba2f78f32e99b0fa20d3714f345b9944c4dae51d41643c201ae2a"
     },
     {
       "path": "runtime/Briefcase.Admin/Service.cpp",
-      "sha256": "9aaa73bae72bf70262fd4307fa73a448098f1df9ea99305fad48a8fa266dbd28"
+      "sha256": "46e806476e2c459be909760f4185f9efb97a40dfbf001965dc2c590caa5cd7dc"
     },
     {
       "path": "runtime/Briefcase.Admin/Service.hpp",
@@ -210,7 +271,7 @@
     },
     {
       "path": "runtime/Briefcase.Admin/Transport.cpp",
-      "sha256": "357c6e30a299aef995bd12d7b25c1998ff8759f8c4eaa961f0f0d0e043fe4aae"
+      "sha256": "0e7ed13f1e1c44de6da11c15e288eec40bb2c7c4ce90ebe2af85ccf2adedf0d2"
     },
     {
       "path": "runtime/Briefcase.Admin/Transport.hpp",
@@ -314,7 +375,7 @@
     },
     {
       "path": "runtime/Briefcase.Client.Rendering/ClientBridge.h",
-      "sha256": "6acf3e9882e2cb8e101eee5b119c124599c01aff1456ac8ccef9b452ba14a042"
+      "sha256": "de9acfa38ecfd9b623b05b339a57f903d2255a55695f3b7c259ceef73e6b5ee0"
     },
     {
       "path": "runtime/Briefcase.Client.Rendering/Rendering.cpp",
@@ -354,7 +415,7 @@
     },
     {
       "path": "runtime/Briefcase.NativeHost/AdminHost.inc",
-      "sha256": "d6f55817517db7bbb0d18a76cc87e4a6d903fef662af7d3547e42066d3bb3907"
+      "sha256": "50c40317a36e90493689066c0ea5995947fd43f5ef2526586b3c69d36b3cefd4"
     },
     {
       "path": "runtime/Briefcase.NativeHost/ClientBuild.json",
@@ -370,7 +431,7 @@
     },
     {
       "path": "runtime/Briefcase.NativeHost/ClientServices.inc",
-      "sha256": "dabe84b4d2b024321d816607f6fff5c19391d251565571a7785f4dde43c48b1c"
+      "sha256": "0b094e258031b6bb26577a99327993b65ce9676a8e1918808b69e20f037be936"
     },
     {
       "path": "runtime/Briefcase.NativeHost/ClientStartup.hpp",
@@ -383,6 +444,18 @@
     {
       "path": "runtime/Briefcase.NativeHost/Configuration.hpp",
       "sha256": "ca10e864bd74bbc4210dabfb9b3b02bf12b88f09065bece82fe69fcc99e0c814"
+    },
+    {
+      "path": "runtime/Briefcase.NativeHost/ExecutableImage.cpp",
+      "sha256": "7653e0f66ef4f59d3a60a57934dec6f8e2223b6c39d52b7ce3c4a7455a6ba07e"
+    },
+    {
+      "path": "runtime/Briefcase.NativeHost/ExecutableImage.hpp",
+      "sha256": "1ce49f54fe6d8ce5cc6d23ac4b0c3bcec36f53a216724e97b0fcfeaa3853ab3c"
+    },
+    {
+      "path": "runtime/Briefcase.NativeHost/FileIO.cpp",
+      "sha256": "f82f59a0af1cfd95baa287056981e707675f360fc31000e60e670ba95b82ac99"
     },
     {
       "path": "runtime/Briefcase.NativeHost/GameProfile.hpp",
@@ -398,23 +471,39 @@
     },
     {
       "path": "runtime/Briefcase.NativeHost/Host.cpp",
-      "sha256": "ae7142d4d2d7d052b8a88f04c5890e2f74a6b2b89502ec71e08bf97e415f7fba"
+      "sha256": "9922f787e0e07b88267f35b3dabb37d41e60e0b8ce2679396cf759420796799c"
+    },
+    {
+      "path": "runtime/Briefcase.NativeHost/LinuxHost.inc",
+      "sha256": "2687254166e4d37f28bea88b31d642a921dd4090ec12b12e3017ef09935b1b16"
     },
     {
       "path": "runtime/Briefcase.NativeHost/Manifest.cpp",
-      "sha256": "46c95825bfb7ba20e7f3fd868423c6a3f048821f12522c285c91cd5f3bf79ca9"
+      "sha256": "a443d6db261df285f3aae87a66a16ef26b72f276ec76cc6c00a8a66154898ad5"
     },
     {
       "path": "runtime/Briefcase.NativeHost/Manifest.hpp",
       "sha256": "f3a1d6d243dd9d41d9ab94d46084ef4645177a205104417bc3f08a8461f2f664"
     },
     {
+      "path": "runtime/Briefcase.NativeHost/ModState.hpp",
+      "sha256": "9e1820be994294a5f5b707023ed26ef5fcf53e6407b23cf4e043aeeca54f3a88"
+    },
+    {
       "path": "runtime/Briefcase.NativeHost/NativeContract.cpp",
-      "sha256": "0e6bec01084ca35a57d410b7ab2bfaa038dd12a514d158effefe5ae5863c102b"
+      "sha256": "9895e621d37f1e87f20675e879bca10d92c94052b46e6a249ba44baccf1a1ad6"
     },
     {
       "path": "runtime/Briefcase.NativeHost/NativeContract.hpp",
       "sha256": "069498660109502cd10bf715ed6f445abd5f90cf33ccf1cf0449a227302c1623"
+    },
+    {
+      "path": "runtime/Briefcase.NativeHost/Platform.cpp",
+      "sha256": "b19b028e656965f068f9bacc1e393c1589b208cdd258e6af201dc3a8371eb2d6"
+    },
+    {
+      "path": "runtime/Briefcase.NativeHost/Platform.hpp",
+      "sha256": "d93a9b85bf2d1be43b93547fea8456b602a7754cda8a5f3b78e3b69383d63df1"
     },
     {
       "path": "runtime/Briefcase.NativeHost/PropertyPath.hpp",
@@ -429,28 +518,32 @@
       "sha256": "98f085a37c3e18628bedc41b70f62537d1953f62bb3887269d57c88b430088b3"
     },
     {
+      "path": "runtime/Briefcase.NativeHost/ServerAdmin.inc",
+      "sha256": "4e4fdd759159752056b7be8b236bf1227fd30a7b5c026d10e9de9f07c4c94a82"
+    },
+    {
       "path": "runtime/Briefcase.NativeHost/Services.inc",
-      "sha256": "13b4ef5d2bb9e40caa7f82e1d9fe2aaf989717f105a33d813e72639d02f7512f"
+      "sha256": "95bced11399c503b31a14a768d4f2f340957acbe5be9e5abfe5d83583bc6167c"
     },
     {
       "path": "runtime/Briefcase.NativeHost/Shutdown.inc",
-      "sha256": "59ab7a87417d8e0454df40b17f478dc9bd5cc3665be5e170c4c2d29ecb60a6d1"
+      "sha256": "f7a1fae2a735634a77f8d65bdf40213ab057680b719442831e241343dd39fc1c"
     },
     {
       "path": "runtime/Briefcase.NativeHost/Startup.cpp",
-      "sha256": "065e7b95c53b20cab7639ee4a8a9bada9112dd13840491833cab38c379d4e53c"
+      "sha256": "414786f9f89f2433461dba088026eaa5d44c38a1dd7467aa737246fd0adf3a93"
     },
     {
       "path": "runtime/Briefcase.NativeHost/Startup.hpp",
-      "sha256": "0a243f6dcb85c5b8d4c0f5db619ff62e07b0fbd1d4dd803ffcbcbf4673c2e3c8"
+      "sha256": "ae755bcee19c56101d8161cfe4987cbd68ecef7cb581af8cb4c4366493742c23"
     },
     {
       "path": "runtime/Briefcase.NativeHost/UnrealServices.inc",
-      "sha256": "87656ce9f7d74c379fede95bb78b33b2c9db29d77cf5dd8adb8be94c2a8f810a"
+      "sha256": "b881ae3d5e439d7884b033d1cb3084cbb59fedd6b42220de5b72531d523e10cc"
     },
     {
       "path": "runtime/Briefcase.UnrealBackend/Backend.cpp",
-      "sha256": "0575750252dea1e56f0dc7e1733be5b9977304b4e7d05c00bca8dd0889fb6b5b"
+      "sha256": "48ae84e1680f8402a3ba4356009192f6d0ea372f687b9dd09906d3fa8183a4b0"
     },
     {
       "path": "runtime/Briefcase.UnrealBackend/Backend.hpp",
@@ -466,11 +559,15 @@
     },
     {
       "path": "runtime/Briefcase.UnrealBackend/HookBridge.inc",
-      "sha256": "1ebfce82e513639a0b1cbea6dd31bb74bdc6b174405c0d21e5d8536982b46375"
+      "sha256": "1d41d42a0a914788a2040fd634a9d9c7f60d141e5463e98101ae37f55e1b6efb"
+    },
+    {
+      "path": "runtime/Briefcase.UnrealBackend/LinuxBootstrap.inc",
+      "sha256": "545af9bb22fbdd50cafd88be2daa92230aa3011afad5e21952fe49c30be41c18"
     },
     {
       "path": "runtime/Briefcase.UnrealBackend/NativeDetours.inc",
-      "sha256": "4ec76f421d33e7ece7a8c49b11c23f51b7ba9ddec182043f06f4b498e7566a5e"
+      "sha256": "5c5a01a0e5bab32070a8e279e4331f4dc67ab13fba63f618ba00c6fb3e2b91b2"
     },
     {
       "path": "runtime/Briefcase.UnrealBackend/ObjectDeleteListener.hpp",
@@ -478,7 +575,7 @@
     },
     {
       "path": "runtime/Briefcase.UnrealBackend/Reflection.inc",
-      "sha256": "a84576213d505a2651cf011b62ea9bf862c298c4dfe5102dabc342e94865c2bb"
+      "sha256": "6ec4364abd61e0a9dad1741aac702cb6c6c1c86907c4415c19031a8995c917f7"
     },
     {
       "path": "runtime/Briefcase.UnrealBackend/UnrealServices.hpp",
@@ -601,6 +698,50 @@
       "sha256": "a66d8feb5fe8bbd8b41016da924df3bd46f5147642126cbf3b65c0656bfbfb27"
     },
     {
+      "path": "scripts/linux/build-server-core.sh",
+      "sha256": "ba7919abd685f16649b362d518279497117658ad7fcce5fac9ebfd0d1850bdb9"
+    },
+    {
+      "path": "scripts/linux/build-server-host.sh",
+      "sha256": "9d7e472d14c000757326564d89eedb191047555c127f6996c719ddd63544b5ed"
+    },
+    {
+      "path": "scripts/linux/deploy-server.py",
+      "sha256": "4bbdffe0d27ad0420cc2614f09077a50434a1c3843aa19a6930cb08eef649f8d"
+    },
+    {
+      "path": "scripts/linux/download-server.sh",
+      "sha256": "953a59cc7a8349ec9d65225bcfd5019cf7caafc5f5690121176879d56e08cde1"
+    },
+    {
+      "path": "scripts/linux/launch-server.sh",
+      "sha256": "a2a6b287ea53fc40476a149ba6146035558bfff652d3c2aa397e75fb0b0e52ee"
+    },
+    {
+      "path": "scripts/linux/package-sdk.py",
+      "sha256": "da37ce7822e59562286c60aacf95cb34a57c1ee89ad00b2312a56dd2366d27ee"
+    },
+    {
+      "path": "scripts/linux/package-server.py",
+      "sha256": "e085d256bae971f31a905e91a9875a14d20c2672c76ae232fdc05ffd952cd1e5"
+    },
+    {
+      "path": "scripts/linux/prepare-backend.sh",
+      "sha256": "ba32c447dff65db9c0f78f475fc3be4f07b9c8def3e29fab8c736d6fc4fc9e0f"
+    },
+    {
+      "path": "scripts/linux/publish-release.py",
+      "sha256": "3a68c23f7de2f58d94b2d902d2de34d91d3245bdbeaff0d63c91c4e00637458f"
+    },
+    {
+      "path": "scripts/linux/supervisor.py",
+      "sha256": "eba0afd011ce8010a794c1346c28da4b7b3b82b53ee8376eb816ad9dd5def33d"
+    },
+    {
+      "path": "scripts/linux/updater.py",
+      "sha256": "4be5d7a181c2ffd7a6c509c76a44a45ffc85186a231b00554f445a06f7ddb808"
+    },
+    {
       "path": "scripts/release/Assert-SDK.ps1",
       "sha256": "8270e9d066721b2c4aba842f1cdcf18d9758b7682b81b2e7e46460f7734312a3"
     },
@@ -674,7 +815,7 @@
     },
     {
       "path": "sdk/Briefcase.ModApi/include/Briefcase/ModApi.h",
-      "sha256": "245d50f9322a42114b0cd1dbc66299739a54c723f08a9dcc337c0832f2c312ae"
+      "sha256": "45db44371dae1bca6430184cd83f6b5ba38230b827f9668587ab419b744295df"
     },
     {
       "path": "sdk/Briefcase.ModApi/include/Briefcase/ModApi.hpp",
@@ -682,7 +823,7 @@
     },
     {
       "path": "sdk/Briefcase.ModApi/include/Briefcase/NativeHookApi.h",
-      "sha256": "4bafbe7f8def07d740ed746993b60e82939225502dfc0840a2dc0eee2e229a9b"
+      "sha256": "6297c89f1d1f900bcb5172b8951f403447231a6be888437f46589850ff3cea37"
     },
     {
       "path": "sdk/Briefcase.ModApi/include/Briefcase/ObjectHandle.hpp",
@@ -694,7 +835,7 @@
     },
     {
       "path": "sdk/Briefcase.ModApi/include/Briefcase/StartupApi.h",
-      "sha256": "2c08cb325e1dbe5535a8863d081295bb518a50da23be2a36a6f7e12631a5f37a"
+      "sha256": "3c19d1c85c097e6018c8e5acaf842e60967c085affab65de96bbcc132d6edfba"
     },
     {
       "path": "sdk/Briefcase.ModApi/include/Briefcase/Unreal.hpp",
@@ -706,7 +847,7 @@
     },
     {
       "path": "sdk/BriefcaseNativeSDKConfig.cmake.in",
-      "sha256": "61fe63c849261c4af6de08e275e0f9bc0b7358d1467c49145c29978ca470cf00"
+      "sha256": "15c2cd19b9900a217a81bd87fa2778ffc5ae76a6aaa091b4ad4642929f04ee28"
     },
     {
       "path": "sdk/templates/NativeMod/release.yml",
@@ -734,7 +875,7 @@
     },
     {
       "path": "tests/Abi.c",
-      "sha256": "fe77887a5e3e0da28423a68530ab089a6d8d0496652b9b4cd90b292003a2b467"
+      "sha256": "63071ded3fa7f644ffaec054553fea6d0341aee541f9f8437a47f95feee7c04d"
     },
     {
       "path": "tests/AdminClientContracts.cpp",
@@ -742,7 +883,7 @@
     },
     {
       "path": "tests/AdminContracts.cpp",
-      "sha256": "60ccd51eb1f4cb6cbdafbe065f179c48bf16271ae491425b6365472ccf5f8e4d"
+      "sha256": "209fe380b550586329baf2f2d8ff3ea5632388ddf30b6d59e6e00da50793924b"
     },
     {
       "path": "tests/AdminCryptoContracts.cpp",
@@ -750,7 +891,7 @@
     },
     {
       "path": "tests/AdminInterop.py",
-      "sha256": "1d6143d429a4207e1e84cf8e1068203a7dec0b6f460957983357bdf318454903"
+      "sha256": "35188408380930494dc794bf8d7d43cd13104be40c8457beae1ac40ad4571002"
     },
     {
       "path": "tests/AdminLiveProbe.cpp",
@@ -758,11 +899,11 @@
     },
     {
       "path": "tests/AdminManagementContracts.cpp",
-      "sha256": "d8ccaf3ce74cb47cfefc74af6988295597cb4aecd4856a1bde6eadfda03de754"
+      "sha256": "af99609d25a3c3220e6be6642a9e5aefd7a96fc3a2a70278666d3240018e64b4"
     },
     {
       "path": "tests/AdminPeerFixture.cpp",
-      "sha256": "637a550bf624cfa7859faab9fd6a984b2a0ac31eca94233793b38e384d08047c"
+      "sha256": "e7e46b0a7605b4b27787a1fc82b42a53aaeb3da7515ebc75e24b345a53e901c2"
     },
     {
       "path": "tests/AdminSetupContracts.ps1",
@@ -813,6 +954,46 @@
       "sha256": "c0e23d31ea11921275d8315b8fcf6672d20b3ebe9cf2cf4dbf45123c8b46e1f2"
     },
     {
+      "path": "tests/LibraryContracts.cpp",
+      "sha256": "804efb2b7f2458de855e08e640f95f530b1ceacd64e9e4ebbe1f36797ce55dc1"
+    },
+    {
+      "path": "tests/LinuxDetourContracts.cpp",
+      "sha256": "bf135282344df27e5ef582e78333b1dfbe184fd6ead09f7a3628f37c5ae29fb9"
+    },
+    {
+      "path": "tests/LinuxDownloadContracts.py",
+      "sha256": "6f4b8eeacf56cf6172dc7c57ab9bf41236cd455fde70a641dd99380712bcf47a"
+    },
+    {
+      "path": "tests/LinuxGameFixture.cpp",
+      "sha256": "94c39e769ef5864c5866173934a7e0c0d54d1934f06b27c20edcad58505e27c7"
+    },
+    {
+      "path": "tests/LinuxHostFixture.cpp",
+      "sha256": "73b53c160d1b934043e7cda88f9f1ead82e55fc842b29a38b181adef90b64853"
+    },
+    {
+      "path": "tests/LinuxLauncherContracts.py",
+      "sha256": "711f9adc1cbb8ab4ee102a09223661943ea0ff3bbde5e9de79890a11de5871a3"
+    },
+    {
+      "path": "tests/LinuxNativeContracts.cpp",
+      "sha256": "89732b744f8239df4bcd712dffae8aeca646a0ef0b7fa7ce2822ce335c600048"
+    },
+    {
+      "path": "tests/LinuxReleaseContracts.py",
+      "sha256": "cbf89ecab29b3ae0a0a2b885e8e434177351375e40c54791daece62c64ba502f"
+    },
+    {
+      "path": "tests/LinuxUnrealScanContracts.py",
+      "sha256": "f1b7c65879483f1800391dee0af4d38ad14caedc5b8e135c99731524dedc869f"
+    },
+    {
+      "path": "tests/LinuxUpdaterContracts.py",
+      "sha256": "8cf8a4808197897c7f79957c8486704c3d765cf351cbf10747f35d018d996d08"
+    },
+    {
       "path": "tests/LocalizationContracts.cpp",
       "sha256": "f8010d9e97fe1bf4d5ec0f3e8b54ce7d11320d829f5c09ff0faa00b921323df9"
     },
@@ -823,6 +1004,10 @@
     {
       "path": "tests/ObjectListenerContracts.cpp",
       "sha256": "64d251760f3047739a32582b2a70ce1e15ee2031ab1ee2f8cecc9d137a602c0b"
+    },
+    {
+      "path": "tests/PortableServerContracts.cpp",
+      "sha256": "dad4fcd61ce420f8718b85a008f64f35e28d21a254b7e9f2df93ece776835853"
     },
     {
       "path": "tests/ReflectionContracts.cpp",
@@ -858,7 +1043,7 @@
     },
     {
       "path": "tests/StartupContracts.cpp",
-      "sha256": "a360c93b40eb1a8bbd3ed437d2fc42c94b96943776db68e4c688be17b7ebbe3d"
+      "sha256": "69aeff66da622cdd9ef775fcbc7cf97da9f8b9541f2ea036d8849df65945999c"
     },
     {
       "path": "tests/TranslationSourceContracts.py",
@@ -9211,6 +9396,14 @@
     {
       "path": "tools/AdminSetup.cpp",
       "sha256": "808a95a8a95e737710d93141c6294e47c9051575b3c84084d53abf9199066615"
+    },
+    {
+      "path": "tools/LinuxAdminSetup.cpp",
+      "sha256": "3132b9e8dba77c1847d58691954b75761182d9d4ce8fc0459258b9d870a06f9e"
+    },
+    {
+      "path": "tools/LinuxUnrealScan.cpp",
+      "sha256": "c95f8d057aa545dc8e0c187a39ad0bfd71c97edabfa6865baf27f65f525083cb"
     },
     {
       "path": "tools/ServerRestart.cpp",

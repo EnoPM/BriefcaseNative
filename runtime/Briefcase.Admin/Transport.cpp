@@ -1,5 +1,18 @@
 #include "Transport.hpp"
+#ifdef _WIN32
 #include <Windows.h>
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#else
+#include <cerrno>
+#include <fcntl.h>
+#include <netdb.h>
+#include <netinet/tcp.h>
+#include <poll.h>
+#include <sys/socket.h>
+#include <unistd.h>
+#include <future>
+#endif
 #include <algorithm>
 #include <array>
 #include <cstring>
@@ -13,8 +26,6 @@
 #include <psa/crypto.h>
 #include <stdexcept>
 #include <thread>
-#include <winsock2.h>
-#include <ws2tcpip.h>
 namespace bc::admin {
 static void check(bool ok, const char *message) {
     if (!ok)
@@ -27,38 +38,71 @@ static void tls_check(int code, const char *what) {
         throw std::runtime_error(std::format("{} : {}", what, error));
     }
 }
+#ifdef _WIN32
+using SocketHandle = SOCKET;
+using SocketLength = int;
+static constexpr auto invalid_socket = INVALID_SOCKET;
+static constexpr int socket_failure = SOCKET_ERROR;
+static void close_socket(SocketHandle s) { closesocket(s); }
+static bool would_block() { return WSAGetLastError() == WSAEWOULDBLOCK; }
+static bool connect_pending() { return would_block(); }
+static constexpr int send_flags = 0;
+#else
+using SocketHandle = int;
+using SocketLength = socklen_t;
+static constexpr int invalid_socket = -1, socket_failure = -1;
+static void close_socket(SocketHandle s) { close(s); }
+static bool would_block() { return errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR; }
+static bool connect_pending() { return errno == EINPROGRESS || would_block(); }
+static constexpr int send_flags = MSG_NOSIGNAL;
+#endif
 static void winsock() {
+#ifdef _WIN32
     static const bool initialized = [] {
         WSADATA w{};
         check(WSAStartup(MAKEWORD(2, 2), &w) == 0, "Winsock unavailable.");
         return true;
     }();
+#endif
 }
 struct Socket {
-    SOCKET s{INVALID_SOCKET};
+    SocketHandle s{invalid_socket};
     ~Socket() {
-        if (s != INVALID_SOCKET)
-            closesocket(s);
+        if (s != invalid_socket)
+            close_socket(s);
     }
 };
-static void nonblocking(SOCKET s) {
+static void nonblocking(SocketHandle s) {
+#ifdef _WIN32
     u_long on = 1;
     check(ioctlsocket(s, FIONBIO, &on) == 0, "Unable to set socket mode.");
-    BOOL yes = TRUE;
-    setsockopt(s, IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<char *>(&yes), sizeof(yes));
+#else
+    const int flags = fcntl(s, F_GETFL, 0);
+    check(flags >= 0 && fcntl(s, F_SETFL, flags | O_NONBLOCK) == 0 &&
+          fcntl(s, F_SETFD, FD_CLOEXEC) == 0, "Unable to set socket mode.");
+#endif
+    int yes = 1;
+    setsockopt(s, IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<char*>(&yes), sizeof(yes));
 }
-static void wait_socket(SOCKET s, bool writing, const std::atomic<bool> &stop, Clock::time_point deadline) {
+static void wait_socket(SocketHandle s, bool writing, const std::atomic<bool> &stop, Clock::time_point deadline) {
     for (;;) {
         if (stop.load())
             throw std::runtime_error("Connection cancelled.");
         if (Clock::now() >= deadline)
             throw std::runtime_error("Connection timed out.");
+#ifdef _WIN32
         fd_set f;
         FD_ZERO(&f);
         FD_SET(s, &f);
         timeval t{0, 100000};
         int r = select(0, writing ? nullptr : &f, writing ? &f : nullptr, nullptr, &t);
         check(r != SOCKET_ERROR, "Network error.");
+#else
+        pollfd descriptor{s, static_cast<short>(writing ? POLLOUT : POLLIN), 0};
+        int r = poll(&descriptor, 1, 100);
+        if (r < 0 && errno == EINTR) continue;
+        check(r >= 0 && !(descriptor.revents & POLLNVAL), "Network error.");
+#endif
         if (r > 0)
             return;
     }
@@ -100,17 +144,17 @@ struct Stream::Impl {
     }
     static int send_bytes(void *context, const unsigned char *buffer, size_t length) noexcept {
         auto *p = static_cast<Impl *>(context);
-        int n = ::send(p->socket.s, reinterpret_cast<const char *>(buffer), int(length), 0);
-        if (n == SOCKET_ERROR)
-            return WSAGetLastError() == WSAEWOULDBLOCK ? MBEDTLS_ERR_SSL_WANT_WRITE
+        int n = ::send(p->socket.s, reinterpret_cast<const char *>(buffer), int(length), send_flags);
+        if (n == socket_failure)
+            return would_block() ? MBEDTLS_ERR_SSL_WANT_WRITE
                                                        : MBEDTLS_ERR_NET_SEND_FAILED;
         return n;
     }
     static int recv_bytes(void *context, unsigned char *buffer, size_t length) noexcept {
         auto *p = static_cast<Impl *>(context);
         int n = ::recv(p->socket.s, reinterpret_cast<char *>(buffer), int(length), 0);
-        if (n == SOCKET_ERROR)
-            return WSAGetLastError() == WSAEWOULDBLOCK ? MBEDTLS_ERR_SSL_WANT_READ
+        if (n == socket_failure)
+            return would_block() ? MBEDTLS_ERR_SSL_WANT_READ
                                                        : MBEDTLS_ERR_NET_RECV_FAILED;
         return n;
     }
@@ -137,7 +181,7 @@ struct Stream::Impl {
         else
             tls_check(result, "TLS connection refused");
     }
-    void handshake(bool server, const std::wstring &hostname = {}) {
+    void handshake(bool server, const std::string &hostname = {}) {
         tls_check(mbedtls_ssl_config_defaults(&config, server ? MBEDTLS_SSL_IS_SERVER : MBEDTLS_SSL_IS_CLIENT,
                                               MBEDTLS_SSL_TRANSPORT_STREAM, MBEDTLS_SSL_PRESET_DEFAULT),
                   "Unable to configure TLS");
@@ -221,7 +265,7 @@ Stream::Stream(std::unique_ptr<Impl> i) : p(std::move(i)) {}
 Stream::~Stream() = default;
 Stream::Stream(Stream &&) noexcept = default;
 Stream &Stream::operator=(Stream &&) noexcept = default;
-static std::pair<std::wstring, std::wstring> split_endpoint(const std::string &s) {
+static std::pair<std::string, std::string> split_endpoint(const std::string &s) {
     check(!s.empty() && s.size() <= 255, "Invalid administration address.");
     std::string host, port;
     if (s.front() == '[') {
@@ -242,13 +286,14 @@ static std::pair<std::wstring, std::wstring> split_endpoint(const std::string &s
     check(std::all_of(host.begin(), host.end(),
                       [](unsigned char c) { return c > 32 && c < 127 && c != '/' && c != '\\'; }),
           "Invalid host.");
-    return {{host.begin(), host.end()}, {port.begin(), port.end()}};
+    return {host, port};
 }
 Stream Stream::connect(const Credentials &c, const std::string &endpoint, const std::string &pin,
                        const std::atomic<bool> &stop) {
     check(unhex(pin).size() == 32, "Server SHA256 fingerprint required.");
     winsock();
     auto [host, port] = split_endpoint(endpoint);
+#ifdef _WIN32
     struct Resolution {
         ADDRINFOEXW *result{};
         HANDLE event{}, cancel{};
@@ -267,7 +312,8 @@ Stream Stream::connect(const Credentials &c, const std::string &endpoint, const 
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_protocol = IPPROTO_TCP;
-    auto status = GetAddrInfoExW(host.c_str(), port.c_str(), NS_DNS, nullptr, &hints, &r.result, nullptr,
+    const std::wstring wide_host(host.begin(), host.end()), wide_port(port.begin(), port.end());
+    auto status = GetAddrInfoExW(wide_host.c_str(), wide_port.c_str(), NS_DNS, nullptr, &hints, &r.result, nullptr,
                                  &r.overlapped, nullptr, &r.cancel);
     if (status == WSA_IO_PENDING) {
         const auto end = Clock::now() + std::chrono::seconds(5);
@@ -281,6 +327,35 @@ Stream Stream::connect(const Credentials &c, const std::string &endpoint, const 
         status = GetAddrInfoExOverlappedResult(&r.overlapped);
     }
     check(status == 0, "Host not found.");
+#else
+    // getaddrinfo is not cancellable; bounded detached workers own their result
+    // until resolution completes, while callers can stop promptly.
+    struct Resolution { addrinfo* result{}; ~Resolution() { if (result) freeaddrinfo(result); } };
+    static std::atomic<unsigned> resolving{};
+    auto promise = std::make_shared<std::promise<std::shared_ptr<Resolution>>>();
+    auto future = promise->get_future();
+    if (resolving.fetch_add(1) >= 4) {
+        --resolving;
+        throw std::runtime_error("DNS resolver busy.");
+    }
+    try {
+        std::thread([promise, host, port] {
+            struct Done { ~Done() { --resolving; } } done;
+            try {
+                auto r = std::make_shared<Resolution>();
+                addrinfo hints{};
+                hints.ai_family = AF_UNSPEC; hints.ai_socktype = SOCK_STREAM; hints.ai_protocol = IPPROTO_TCP;
+                check(getaddrinfo(host.c_str(), port.c_str(), &hints, &r->result) == 0, "Host not found.");
+                promise->set_value(r);
+            } catch (...) { promise->set_exception(std::current_exception()); }
+        }).detach();
+    } catch (...) { --resolving; throw; }
+    auto deadline = Clock::now() + std::chrono::seconds(5);
+    while (future.wait_for(std::chrono::milliseconds(50)) != std::future_status::ready)
+        check(!stop && Clock::now() < deadline, "DNS resolution cancelled or timed out.");
+    auto resolution = future.get();
+    auto& r = *resolution;
+#endif
     auto p = std::make_unique<Impl>();
     p->credentials = c.impl;
     p->stop = &stop;
@@ -289,13 +364,13 @@ Stream Stream::connect(const Credentials &c, const std::string &endpoint, const 
     for (auto *a = r.result; a; a = a->ai_next) {
         Socket sock;
         sock.s = socket(a->ai_family, a->ai_socktype, a->ai_protocol);
-        if (sock.s == INVALID_SOCKET)
+        if (sock.s == invalid_socket)
             continue;
         nonblocking(sock.s);
         int code = ::connect(sock.s, a->ai_addr, int(a->ai_addrlen));
-        if (code == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK)
+        if (code == socket_failure && !connect_pending())
             continue;
-        if (code == SOCKET_ERROR) {
+        if (code == socket_failure) {
             try {
                 wait_socket(sock.s, true, stop, end);
             } catch (...) {
@@ -303,15 +378,16 @@ Stream Stream::connect(const Credentials &c, const std::string &endpoint, const 
                     throw;
                 continue;
             }
-            int err = 0, len = sizeof(err);
+            int err = 0;
+            SocketLength len = sizeof(err);
             if (getsockopt(sock.s, SOL_SOCKET, SO_ERROR, reinterpret_cast<char *>(&err), &len) != 0 || err)
                 continue;
         }
         p->socket.s = sock.s;
-        sock.s = INVALID_SOCKET;
+        sock.s = invalid_socket;
         break;
     }
-    check(p->socket.s != INVALID_SOCKET, "Administration server unreachable.");
+    check(p->socket.s != invalid_socket, "Administration server unreachable.");
     p->expected_pin = unhex(pin);
     p->handshake(false, host);
     return Stream(std::move(p));
@@ -354,28 +430,34 @@ Listener::Listener(const std::string &address, uint16_t port, const std::atomic<
     : p(std::make_unique<Impl>()) {
     winsock();
     p->stop = &stop;
-    ADDRINFOA hints{};
+    addrinfo hints{};
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_NUMERICHOST | AI_NUMERICSERV;
-    ADDRINFOA *result{};
+    addrinfo *result{};
     check(getaddrinfo(address.c_str(), std::to_string(port).c_str(), &hints, &result) == 0,
           "A numeric listen address is required.");
     struct Free {
-        ADDRINFOA *p;
+        addrinfo *p;
         ~Free() { freeaddrinfo(p); }
     } free{result};
     p->socket.s = socket(result->ai_family, SOCK_STREAM, IPPROTO_TCP);
-    check(p->socket.s != INVALID_SOCKET, "Unable to create socket.");
+    check(p->socket.s != invalid_socket, "Unable to create socket.");
+#ifdef _WIN32
     BOOL exclusive = TRUE;
     check(setsockopt(p->socket.s, SOL_SOCKET, SO_EXCLUSIVEADDRUSE, reinterpret_cast<char *>(&exclusive),
                      sizeof(exclusive)) == 0,
           "Unable to reserve the port.");
+#else
+    int reuse = 1;
+    check(setsockopt(p->socket.s, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) == 0,
+          "Unable to configure listening socket.");
+#endif
     check(bind(p->socket.s, result->ai_addr, int(result->ai_addrlen)) == 0 && listen(p->socket.s, 4) == 0,
           "Administration port unavailable.");
     nonblocking(p->socket.s);
     sockaddr_storage actual{};
-    int size = sizeof(actual);
+    SocketLength size = sizeof(actual);
     check(getsockname(p->socket.s, reinterpret_cast<sockaddr *>(&actual), &size) == 0, "Port not found.");
     p->port = ntohs(actual.ss_family == AF_INET ? reinterpret_cast<sockaddr_in *>(&actual)->sin_port
                                                 : reinterpret_cast<sockaddr_in6 *>(&actual)->sin6_port);
@@ -386,10 +468,10 @@ uint16_t Listener::port() const {
 }
 std::unique_ptr<Stream> Listener::accept(const Credentials &credentials) {
     sockaddr_storage addr{};
-    int size = sizeof(addr);
+    SocketLength size = sizeof(addr);
     auto s = ::accept(p->socket.s, reinterpret_cast<sockaddr *>(&addr), &size);
-    if (s == INVALID_SOCKET) {
-        if (WSAGetLastError() == WSAEWOULDBLOCK)
+    if (s == invalid_socket) {
+        if (would_block())
             return {};
         throw std::runtime_error("Unable to accept network connection.");
     }

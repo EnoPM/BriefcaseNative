@@ -1,4 +1,15 @@
+#include "Platform.hpp"
+#include "ExecutableImage.hpp"
+#ifndef _WIN32
+#include <polyhook2/Detour/x64Detour.hpp>
+#endif
+#ifdef _WIN32
 #include <Windows.h>
+#else
+#include <Helpers/String.hpp>
+#include <unistd.h>
+#include <thread>
+#endif
 
 #include "Backend.hpp"
 #include "ClientConnection.hpp"
@@ -9,8 +20,12 @@
 #include "PropertyPath.hpp"
 #include "ReflectionContract.hpp"
 #include "UnrealServices.hpp"
+#ifdef _WIN32
 #include <DynamicOutput/Output.hpp>
 #include <MinHook.h>
+#else
+#include <DynamicOutput/DynamicOutput.hpp>
+#endif
 #include <Unreal/FProperty.hpp>
 #include <Unreal/GameplayStatics.hpp>
 #include <Unreal/AActor.hpp>
@@ -43,11 +58,11 @@
 #include <unordered_map>
 namespace bc {
 using namespace RC::Unreal;
-static DWORD game_thread_id;
+static uint32_t game_thread_id;
 static std::atomic<bool> ready{}, pending{};
 static std::atomic<int> init_state{};
 static std::atomic<double> measured_initialization_ms{};
-static ULONGLONG initialize_after;
+static uint64_t initialize_after;
 static uint64_t sleep_original{};
 
 static thread_local bool pumping{};
@@ -89,7 +104,7 @@ static void object_deleted(const UObjectBase *object, int32_t) noexcept {
 static void object_array_shutdown() noexcept {
     log("UObject delete listener unregistered during array shutdown");
     if (auto callback = shutdown_handler.load(std::memory_order_acquire);
-        GetCurrentThreadId() == game_thread_id && callback) {
+        platform::thread_id() == game_thread_id && callback) {
         try {
             callback(shutdown_user);
         } catch (...) {
@@ -102,16 +117,20 @@ static void object_array_shutdown() noexcept {
 static ObjectDeleteListener delete_listener{object_deleted, object_array_shutdown};
 class LogDevice final : public RC::Output::OutputDevice {
     void receive(RC::File::StringViewType message) const override {
+#ifdef _WIN32
         int size = WideCharToMultiByte(CP_UTF8, 0, message.data(), static_cast<int>(message.size()), nullptr,
                                        0, nullptr, nullptr);
         std::string text(size, '\0');
         WideCharToMultiByte(CP_UTF8, 0, message.data(), static_cast<int>(message.size()), text.data(), size,
                             nullptr, nullptr);
         bc::log("UE4SS: " + text);
+#else
+        bc::log("UE4SS: " + RC::to_utf8_string(message));
+#endif
     }
 };
 static void pump() noexcept {
-    if (GetCurrentThreadId() != game_thread_id || pumping || dispatch_depth ||
+    if (platform::thread_id() != game_thread_id || pumping || dispatch_depth ||
         !ready.load(std::memory_order_acquire) ||
         (!pending.load(std::memory_order_acquire) && !deleted_pending.load(std::memory_order_acquire)))
         return;
@@ -148,11 +167,12 @@ static void pump() noexcept {
     }
     pumping = false;
 }
+#ifdef _WIN32
 static void initialize_on_game_thread() noexcept {
     pumping = true;
     const auto start = std::chrono::steady_clock::now();
     try {
-        log(std::format("Backend initialization on game thread {}", GetCurrentThreadId()));
+        log(std::format("Backend initialization on game thread {}", platform::thread_id()));
         RC::Output::DefaultTargets::get_default_devices_ref().push_back(std::make_unique<LogDevice>());
         Hook::RegisterProcessEventPreCallback(reflected_event_pre);
         Hook::RegisterProcessEventPostCallback([](UObject *self, UFunction *function, void *parameters) {
@@ -185,7 +205,7 @@ static void initialize_on_game_thread() noexcept {
     pumping = false;
 }
 static void WINAPI hooked_sleep(DWORD ms) {
-    if (GetCurrentThreadId() == game_thread_id && !pumping) {
+    if (platform::thread_id() == game_thread_id && !pumping) {
         int expected = 0;
         if (GetTickCount64() >= initialize_after && init_state.compare_exchange_strong(expected, 1))
             initialize_on_game_thread();
@@ -235,6 +255,10 @@ void backend_start(uint32_t thread, uint32_t delay_ms) {
     log(std::format("Game-thread IAT bootstrap armed for thread {}; delay {} ms", thread, delay_ms));
 }
 
+#else
+#include "LinuxBootstrap.inc"
+#endif
+
 uint32_t backend_status() noexcept {
     return uint32_t(init_state.load());
 }
@@ -245,7 +269,7 @@ bool backend_ready() noexcept {
     return ready.load(std::memory_order_acquire);
 }
 static BcResult thread_check() {
-    if (GetCurrentThreadId() != game_thread_id)
+    if (platform::thread_id() != game_thread_id)
         return BC_WRONG_THREAD;
     return backend_ready() ? BC_OK : BC_NOT_READY;
 }
@@ -254,6 +278,7 @@ BcResult backend_find(uint64_t owner, std::string_view path, BcHandle *out) {
         return error;
     if (!out || path.empty() || path.find('\0') != path.npos)
         return BC_INVALID_ARGUMENT;
+#ifdef _WIN32
     int size = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path.data(), static_cast<int>(path.size()),
                                    nullptr, 0);
     if (!size)
@@ -262,6 +287,10 @@ BcResult backend_find(uint64_t owner, std::string_view path, BcHandle *out) {
     MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path.data(), static_cast<int>(path.size()),
                         wide.data(), size);
     auto *object = UObjectGlobals::StaticFindObject<UObject *>(nullptr, nullptr, wide.c_str());
+#else
+    auto text = RC::ensure_str(path);
+    auto *object = UObjectGlobals::StaticFindObject<UObject *>(nullptr, nullptr, text.c_str());
+#endif
     if (!object)
         return BC_NOT_FOUND;
     if (!UObjectArray::IsValid(object->GetObjectItem(), false))
@@ -302,7 +331,11 @@ BcResult backend_post(BcTask task, void *user, uint64_t owner) {
 }
 // clang-format off: private implementation fragments depend on this order.
 #include "Reflection.inc"
+#ifdef _WIN32
 #include "ClientConnection.inc"
+#else
+BcResult backend_client_connect(std::string_view, std::string&) { return BC_DENIED; }
+#endif
 #include "HookBridge.inc"
 #include "NativeDetours.inc"
 // clang-format on

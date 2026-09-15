@@ -1,7 +1,11 @@
 #include "data/ServerSettingsFixtures.hpp"
 #include "../runtime/Briefcase.Admin/Service.hpp"
 #include "../runtime/Briefcase.NativeHost/Configuration.hpp"
+#ifdef _WIN32
 #include <Windows.h>
+#else
+#include <fstream>
+#endif
 #include <future>
 #include <iostream>
 using namespace bc::admin;
@@ -22,17 +26,22 @@ template <class F> static void rejected(F fn, const std::string &code) {
 }
 int main() {
     try {
-        const auto root = fs::current_path() / ("admin-fixture-" + hex(random_bytes(6)));
+#ifdef _WIN32
+        const auto fixture_base = fs::current_path();
+#else
+        const auto fixture_base = fs::temp_directory_path();
+#endif
+        const auto root = fixture_base / ("admin-fixture-" + hex(random_bytes(6)));
         fs::create_directories(root / "Briefcase");
         struct Cleanup {
-            fs::path path;
+            fs::path path, base;
             ~Cleanup() {
                 std::error_code e;
-                if (path.parent_path() == fs::current_path() &&
+                if (path.parent_path() == base &&
                     path.filename().string().starts_with("admin-fixture-"))
                     fs::remove_all(path, e);
             }
-        } cleanup{root};
+        } cleanup{root, fixture_base};
         const auto briefcase = root / "Briefcase";
         const std::string password = "Fixture-only-password-2026!";
         const auto started = Clock::now();
@@ -145,6 +154,7 @@ int main() {
                     {"writeId", hex(random_bytes(16))},
                     {"values", cap_before["saved"]}};
         denied["values"]["itemLimit"] = 11;
+        #ifdef _WIN32
         HANDLE held =
             CreateFileW(cap_path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr);
         check(held != INVALID_HANDLE_VALUE, "lock configuration file");
@@ -157,8 +167,21 @@ int main() {
         CloseHandle(held);
         check(configs->read("sample.settings-alpha") == cap_before,
               "failed replacement changed configuration");
+        #else
+        std::ifstream held(cap_path);
+        const auto previous = read_file(cap_path);
+        configs->write(denied);
+        const std::string held_text((std::istreambuf_iterator<char>(held)), {});
+        check(held_text == previous && read_file(cap_path) != previous,
+              "atomic replacement must preserve an existing reader snapshot");
+        const auto secret = briefcase / "Admin/server.json";
+        fs::permissions(secret, fs::perms::owner_read | fs::perms::owner_write |
+                                fs::perms::group_read, fs::perm_options::replace);
+        rejected([&] { Settings::load(secret); }, "permissions");
+        fs::permissions(secret, fs::perms::owner_read | fs::perms::owner_write, fs::perm_options::replace);
+        #endif
         auto link = briefcase / "cap-hardlink.json";
-        check(CreateHardLinkW(link.c_str(), cap_path.c_str(), nullptr), "create fixture hard link");
+        fs::create_hard_link(cap_path, link);
         rejected([&] { configs->read("sample.settings-alpha"); }, "unsafe_path");
         fs::remove(link);
         // Two administrators editing the same revision: exactly one may commit.

@@ -44,7 +44,7 @@ static void dispatch_hooks(HookPayload &payload, uint32_t phase) noexcept {
 template <size_t Slot> static void reflected_thunk(UObject *self, FFrame &frame, void *result) {
     auto *target = native_targets[Slot].get();
     const auto original = target->original;
-    if (GetCurrentThreadId() != game_thread_id || !backend_ready() || !target->active ||
+    if (platform::thread_id() != game_thread_id || !backend_ready() || !target->active ||
         (!event_stack.empty() && event_stack.back() == std::pair(self, target->function->object))) {
         original(self, frame, result);
         return;
@@ -93,7 +93,7 @@ static void restore_unused_transports() {
         }
 }
 static void reflected_event_pre(UObject *self, UFunction *function, void *parameters) noexcept {
-    if (GetCurrentThreadId() != game_thread_id || !backend_ready())
+    if (platform::thread_id() != game_thread_id || !backend_ready())
         return;
     try {
         event_stack.push_back({self, function});
@@ -107,7 +107,7 @@ static void reflected_event_pre(UObject *self, UFunction *function, void *parame
     }
 }
 static void reflected_event_post(UObject *self, UFunction *function, void *parameters) noexcept {
-    if (GetCurrentThreadId() != game_thread_id || event_stack.empty() ||
+    if (platform::thread_id() != game_thread_id || event_stack.empty() ||
         event_stack.back() != std::pair(self, function))
         return;
     const auto i = target_by_function.find(function);
@@ -203,7 +203,7 @@ BcResult backend_unhook(uint64_t owner, BcHandle token) {
 BcResult backend_read_argument(uint64_t owner, BcHandle call, const char *name, BcValue *out) {
     if (auto e = thread_check(); e != BC_OK)
         return e;
-    if (!name || strnlen_s(name, 257) > 256 || !out)
+    if (!name || platform::bounded_length(name, 257) > 256 || !out)
         return BC_INVALID_ARGUMENT;
     auto i = calls.find(call);
     if (i == calls.end() || i->second.owner != owner)
@@ -223,7 +223,7 @@ BcResult backend_read_argument(uint64_t owner, BcHandle call, const char *name, 
 BcResult backend_write_argument(uint64_t owner, BcHandle call, const char *name, const BcValue *value) {
     if (auto e = thread_check(); e != BC_OK)
         return e;
-    if (!name || strnlen_s(name, 257) > 256 || !value)
+    if (!name || platform::bounded_length(name, 257) > 256 || !value)
         return BC_INVALID_ARGUMENT;
     auto i = calls.find(call);
     if (i == calls.end() || i->second.owner != owner)
@@ -271,7 +271,7 @@ static void dispatch_deleted(const std::vector<HandleTable<UObject>::Revoked> &e
     }
 }
 void backend_cleanup_owner(uint64_t owner) {
-    if (GetCurrentThreadId() != game_thread_id)
+    if (platform::thread_id() != game_thread_id)
         throw std::runtime_error("Owner cleanup requires game thread");
     {
         std::lock_guard lock(queue_mutex);

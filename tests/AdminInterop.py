@@ -29,7 +29,7 @@ def main():
     started = time.monotonic()
     exe = str(Path(sys.argv[1]).resolve())
     proc = subprocess.Popen([exe],cwd=Path(exe).parent,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,
-                            text=True,creationflags=subprocess.CREATE_NO_WINDOW)
+                            text=True,creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     try:
         lines = queue.Queue()
         threading.Thread(target=lambda: lines.put(proc.stdout.readline()),daemon=True).start()

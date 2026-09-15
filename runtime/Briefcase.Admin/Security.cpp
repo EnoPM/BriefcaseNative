@@ -153,12 +153,15 @@ static std::string timestamp(std::chrono::system_clock::time_point point) {
     auto day = floor<days>(point);
     year_month_day date(day);
     hh_mm_ss clock(floor<seconds>(point - day));
-    char result[16]{};
-    std::snprintf(result, sizeof(result), "%04d%02u%02u%02lld%02lld%02lld", int(date.year()),
+    require(date.ok() && int(date.year()) >= 0 && int(date.year()) <= 9999,
+            "Certificate date outside supported range.");
+    char result[32]{};
+    const auto size = std::snprintf(result, sizeof(result), "%04d%02u%02u%02lld%02lld%02lld", int(date.year()),
                   unsigned(date.month()), unsigned(date.day()), static_cast<long long>(clock.hours().count()),
                   static_cast<long long>(clock.minutes().count()),
                   static_cast<long long>(clock.seconds().count()));
-    return result;
+    require(size == 14, "Invalid certificate timestamp.");
+    return std::string(result, static_cast<size_t>(size));
 }
 KeyPair create_key_pair() {
     crypto_init();

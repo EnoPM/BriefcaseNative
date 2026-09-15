@@ -3,7 +3,7 @@ static uint8_t *game_image;
 static fs::path server_config_root;
 static bool startup_phase = true;
 static Scope *loading_scope{};
-static std::atomic<DWORD> loading_thread{};
+static std::atomic<uint32_t> loading_thread{};
 static BcResult copy_string(std::string_view text, char *out, uint32_t capacity, uint32_t *required) {
     if (!required || text.size() >= 65536)
         return BC_INVALID_ARGUMENT;
@@ -18,7 +18,7 @@ static BcResult BC_CALL config_load(void *c, const char *schema, uint32_t length
                                     uint32_t capacity, uint32_t *required) noexcept {
     try {
         auto *s = scope(c, BC_CAP_CONFIG);
-        if (GetCurrentThreadId() != loading_thread || !s || loading_scope != s)
+        if (platform::thread_id() != loading_thread || !s || loading_scope != s)
             return BC_DENIED;
         if (!schema || !length || length > 65536)
             return BC_INVALID_ARGUMENT;
@@ -47,7 +47,9 @@ static BcResult BC_CALL config_load(void *c, const char *schema, uint32_t length
                 save(path, s->config_text);
             save(data / "config.schema.json", document.dump(2) + "\n");
             s->config_schema = schemaText;
+#ifdef _WIN32
             if(environment==Environment::client) s->client_settings.initialize(path,document,config);
+#endif
             log(s->manifest.id + ": configuration loaded once");
         } else if (s->config_schema != schemaText)
             return BC_INVALID_ARGUMENT;
@@ -60,7 +62,7 @@ static BcResult BC_CALL config_load(void *c, const char *schema, uint32_t length
     }
 }
 static FileChange &ini_file(Scope &s, const char *binding) {
-    if (!binding || strnlen_s(binding, 129) > 128)
+    if (!binding || platform::bounded_length(binding, 129) > 128)
         throw std::runtime_error("Invalid file binding");
     auto it = s.manifest.ini_bindings.find(binding);
     if (it == s.manifest.ini_bindings.end())
@@ -74,14 +76,14 @@ static FileChange &ini_file(Scope &s, const char *binding) {
     return s.files.back();
 }
 static bool ini_arguments(const char *section, const char *key, const char *value = "") {
-    return section && key && value && strnlen_s(section, 1025) <= 1024 && strnlen_s(key, 257) <= 256 &&
-           strnlen_s(value, 4097) <= 4096;
+    return section && key && value && platform::bounded_length(section, 1025) <= 1024 && platform::bounded_length(key, 257) <= 256 &&
+           platform::bounded_length(value, 4097) <= 4096;
 }
 static BcResult BC_CALL read_ini(void *c, const char *binding, const char *section, const char *key,
                                  char *out, uint32_t capacity, uint32_t *required) noexcept {
     try {
         auto *s = scope(c, BC_CAP_INI);
-        if (GetCurrentThreadId() != loading_thread || !s || loading_scope != s || !startup_phase)
+        if (platform::thread_id() != loading_thread || !s || loading_scope != s || !startup_phase)
             return BC_DENIED;
         if (!ini_arguments(section, key))
             return BC_INVALID_ARGUMENT;
@@ -97,7 +99,7 @@ static BcResult BC_CALL stage_ini(void *c, const char *binding, const char *sect
                                   const char *value) noexcept {
     try {
         auto *s = scope(c, BC_CAP_INI);
-        if (GetCurrentThreadId() != loading_thread || !s || loading_scope != s || !startup_phase)
+        if (platform::thread_id() != loading_thread || !s || loading_scope != s || !startup_phase)
             return BC_DENIED;
         if (!ini_arguments(section, key, value))
             return BC_INVALID_ARGUMENT;
@@ -115,13 +117,13 @@ static BcResult BC_CALL stage_i32(void *c, const char *sha, const BcImmediatePat
                                   uint32_t count) noexcept {
     try {
         auto *s = scope(c, BC_CAP_STARTUP_PATCH);
-        if (GetCurrentThreadId() != loading_thread || !s || loading_scope != s || !startup_phase)
+        if (platform::thread_id() != loading_thread || !s || loading_scope != s || !startup_phase)
             return BC_DENIED;
-        if (!sha || strnlen_s(sha, 65) != 64 || std::strcmp(sha, build_info.executable_sha256) != 0)
+        if (!sha || platform::bounded_length(sha, 65) != 64 || std::strcmp(sha, build_info.executable_sha256) != 0)
             return BC_VERSION_MISMATCH;
         if (!requests || !count || count > 64 || !s->patches.empty())
             return BC_INVALID_ARGUMENT;
-        s->patches = validate_patches(game_image, build_info.image_size, {requests, count});
+        s->patches = validate_patches(game_image, executable_image().size, {requests, count});
         for (const auto &p : s->patches)
             log(std::format("{}: validated MOV imm32 RVA=0x{:X}, {} -> {}", s->manifest.id, p.rva, p.before,
                             p.after));
@@ -133,7 +135,19 @@ static BcResult BC_CALL stage_i32(void *c, const char *sha, const BcImmediatePat
         return BC_INTERNAL;
     }
 }
+static BcResult BC_CALL stage_code(void* c,const char* sha,const BcCodePatch* requests,uint32_t count) noexcept {
+    try {
+        auto* s=scope(c,BC_CAP_STARTUP_PATCH);
+        if(platform::thread_id()!=loading_thread || !s || loading_scope!=s || !startup_phase) return BC_DENIED;
+        if(!sha || platform::bounded_length(sha,65)!=64 || std::strcmp(sha,build_info.executable_sha256)) return BC_VERSION_MISMATCH;
+        if(!requests || !count || count>64 || !s->code_patches.empty()) return BC_INVALID_ARGUMENT;
+        s->code_patches=validate_code_patches(game_image,executable_image().size,{requests,count});
+        return BC_OK;
+    } catch(const std::exception& e) { log(std::string("Code staging rejected: ")+e.what()); return BC_INVALID_ARGUMENT; }
+      catch(...) { return BC_INTERNAL; }
+}
 #include "UnrealServices.inc"
+#ifdef _WIN32
 static BcResult BC_CALL cs_snapshot(void *c,char *buffer,uint32_t capacity,uint64_t *revision) noexcept {
     try {
         auto *s=client_scope(c,BC_CAP_CONFIG);if(!s)return BC_DENIED;
@@ -149,21 +163,23 @@ static BcResult BC_CALL cs_acknowledge(void *c,uint64_t revision) noexcept {
 }
 static BcResult BC_CALL cs_report(void *c,const char *key,const char *text,uint32_t severity) noexcept {
  try {auto *s=client_scope(c,BC_CAP_CONFIG);if(!s)return BC_DENIED;
- if(!key||!text||severity>3||strnlen_s(key,129)>128||strnlen_s(text,513)>512)return BC_INVALID_ARGUMENT;
+ if(!key||!text||severity>3||platform::bounded_length(key,129)>128||platform::bounded_length(text,513)>512)return BC_INVALID_ARGUMENT;
  s->client_settings.report("mods."+s->manifest.id+"."+key,text,severity);return BC_OK;
  }catch(...){return BC_INTERNAL;}
 }
 static const BcClientSettingsApi client_settings_service{sizeof(BcClientSettingsApi),1,cs_snapshot,cs_acknowledge,cs_report};
+#endif
 static const BcConfigApi config_service = {sizeof(BcConfigApi), 1, config_load};
-static const BcStartupApi startup_service = {sizeof(BcStartupApi), 1, read_ini, stage_ini, stage_i32};
+static const BcStartupApi startup_service = {sizeof(BcStartupApi), 1, read_ini, stage_ini, stage_i32, stage_code};
 static BcResult BC_CALL api_service(void *c, const char *name, uint32_t version, const void **out) noexcept {
     if (!scope(c))
         return BC_DENIED;
-    if (!name || !out || strnlen_s(name, 129) > 128)
+    if (!name || !out || platform::bounded_length(name, 129) > 128)
         return BC_INVALID_ARGUMENT;
     *out = nullptr;
     if (version != 1)
         return BC_VERSION_MISMATCH;
+#ifdef _WIN32
     if(std::strcmp(name,BC_CLIENT_SETTINGS_SERVICE)==0) {
         auto *s=client_scope(c,BC_CAP_CONFIG);if(!s)return BC_DENIED;
         s->client_settings.enable_live();
@@ -177,6 +193,7 @@ static BcResult BC_CALL api_service(void *c, const char *name, uint32_t version,
         if(!client_scope(c,BC_CAP_CLIENT_INPUT)) return BC_DENIED;
         *out=&client_input_service; return BC_OK;
     }
+#endif
     if (std::strcmp(name, BC_NATIVE_HOOK_SERVICE) == 0) {
         if (!scope(c, BC_CAP_NATIVE_HOOKS))
             return BC_DENIED;

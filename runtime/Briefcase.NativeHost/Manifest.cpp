@@ -55,9 +55,9 @@ Manifest parse_manifest(const std::string &text) {
     m.environment = j.at("environment").get<std::string>();
     if (!valid_id(m.id) || m.name.empty() || m.author.empty())
         throw std::runtime_error("Invalid mod identity");
-    if (!std::regex_match(m.entry, std::regex("[A-Za-z0-9_.-]+\\.dll")) ||
+    if (!std::regex_match(m.entry, std::regex("[A-Za-z0-9_.-]+\\.(dll|so)")) ||
         m.entry.find("..") != std::string::npos)
-        throw std::runtime_error("Entry must be a DLL filename within its mod directory");
+        throw std::runtime_error("Entry must be a DLL or SO filename within its mod directory");
     if (m.environment != "server" && m.environment != "client" && m.environment != "both")
         throw std::runtime_error("Invalid environment");
     if (!j.at("minimumApi").is_number_unsigned() || j.at("minimumApi").get<uint64_t>() != BC_API_VERSION)

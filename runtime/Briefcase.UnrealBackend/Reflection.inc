@@ -16,8 +16,9 @@ struct Function {
 };
 static std::unordered_map<UFunction *, std::shared_ptr<Function>> functions;
 static std::unordered_map<uint64_t, std::unordered_set<UFunction *>> validated_functions;
+#ifdef _WIN32
 static std::wstring wide(const char *text, size_t limit = 4096) {
-    if (!text || strnlen_s(text, limit + 1) > limit)
+    if (!text || platform::bounded_length(text, limit + 1) > limit)
         throw std::runtime_error("Invalid UTF-8 input length");
     const int n = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text, -1, nullptr, 0);
     if (!n)
@@ -37,6 +38,15 @@ static std::string utf8(std::wstring_view text) {
                         n, nullptr, nullptr);
     return out;
 }
+#else
+static RC::StringType wide(const char* text, size_t limit = 4096) {
+    if (!text || platform::bounded_length(text, limit + 1) > limit)
+        throw std::runtime_error("Invalid UTF-8 input length");
+    return RC::ensure_str(std::string_view(text));
+}
+static std::string utf8(RC::StringViewType text) { return RC::to_utf8_string(text); }
+#endif
+
 static bool alive(UObject *object) {
     return object && UObjectArray::IsValid(object->GetObjectItem(), false);
 }
@@ -48,23 +58,23 @@ static uint32_t property_kind(FProperty *p) {
     const auto name = p->GetClass().GetName();
     if (p->GetArrayDim() != 1)
         return BC_VALUE_NONE;
-    if (name == L"IntProperty" && p->GetElementSize() == 4)
+    if (name == STR("IntProperty") && p->GetElementSize() == 4)
         return BC_VALUE_I32;
-    if (name == L"FloatProperty" && p->GetElementSize() == 4)
+    if (name == STR("FloatProperty") && p->GetElementSize() == 4)
         return BC_VALUE_F32;
-    if (name == L"BoolProperty" && p->GetElementSize() == 1)
+    if (name == STR("BoolProperty") && p->GetElementSize() == 1)
         return BC_VALUE_BOOL;
-    if ((name == L"ObjectProperty" || name == L"ClassProperty") && p->GetElementSize() == 8)
+    if ((name == STR("ObjectProperty") || name == STR("ClassProperty")) && p->GetElementSize() == 8)
         return BC_VALUE_OBJECT;
-    if ((name == L"ByteProperty" || name == L"EnumProperty") && p->GetElementSize() == 1)
+    if ((name == STR("ByteProperty") || name == STR("EnumProperty")) && p->GetElementSize() == 1)
         return BC_VALUE_U8;
-    if (name == L"StructProperty" && p->GetElementSize() == 12 &&
-        static_cast<FStructProperty *>(p)->GetStruct()->GetPathName() == L"/Script/CoreUObject.Vector")
+    if (name == STR("StructProperty") && p->GetElementSize() == 12 &&
+        static_cast<FStructProperty *>(p)->GetStruct()->GetPathName() == STR("/Script/CoreUObject.Vector"))
         return BC_VALUE_VECTOR;
-    if (name == L"StructProperty") {
+    if (name == STR("StructProperty")) {
         const auto type = static_cast<FStructProperty *>(p)->GetStruct()->GetPathName();
-        if (p->GetElementSize() == 12 && type == L"/Script/CoreUObject.Rotator") return BC_VALUE_ROTATOR;
-        if (p->GetElementSize() == 8 && type == L"/Script/CoreUObject.Vector2D") return BC_VALUE_VECTOR2;
+        if (p->GetElementSize() == 12 && type == STR("/Script/CoreUObject.Rotator")) return BC_VALUE_ROTATOR;
+        if (p->GetElementSize() == 8 && type == STR("/Script/CoreUObject.Vector2D")) return BC_VALUE_VECTOR2;
     }
     return BC_VALUE_NONE;
 }
@@ -96,7 +106,7 @@ static std::shared_ptr<Function> metadata(UFunction *fn) {
     const auto path = fn->GetPathName();
     // Compiled /Script metadata remains valid until engine shutdown. Dynamic Blueprint metadata is not
     // cached.
-    if (!path.starts_with(L"/Script/"))
+    if (!path.starts_with(STR("/Script/")))
         throw std::runtime_error("Only persistent /Script functions supported");
     auto *owner = Cast<UClass>(fn->GetOuterPrivate());
     if (!owner || fn->GetParmsSize() > 4096)
@@ -252,7 +262,7 @@ static BcResult write_value(uint64_t owner, FProperty *p, void *container, const
 BcResult backend_resolve(uint64_t owner, const char *path, const char *signature, BcHandle *out) {
     if (auto e = thread_check(); e != BC_OK)
         return e;
-    if (!out || !signature || strnlen_s(signature, 65537) > 65536)
+    if (!out || !signature || platform::bounded_length(signature, 65537) > 65536)
         return BC_INVALID_ARGUMENT;
     *out = 0;
     auto w = wide(path);
@@ -316,7 +326,7 @@ static BcResult access_property(uint64_t owner, BcHandle h, const char *name, Bc
     auto *obj = object_for(owner, h);
     if (!obj)
         return BC_STALE_HANDLE;
-    if (!name || strnlen_s(name, 257) > 256)
+    if (!name || platform::bounded_length(name, 257) > 256)
         return BC_INVALID_ARGUMENT;
     if (write && (obj->HasAnyFlags(RF_ClassDefaultObject) || obj->HasAnyFlags(RF_ArchetypeObject)))
         return BC_DENIED;
@@ -351,9 +361,9 @@ static BcResult access_property(uint64_t owner, BcHandle h, const char *name, Bc
                 return BC_UNSUPPORTED;
             return write_value(owner, found, data, *write);
         }
-        if (found->GetClass().GetName() != L"StructProperty" || found->GetArrayDim() != 1)
+        if (found->GetClass().GetName() != STR("StructProperty") || found->GetArrayDim() != 1)
             return BC_UNSUPPORTED;
-        auto *next = static_cast<FStructProperty *>(found)->GetStruct();
+        UScriptStruct *next = static_cast<FStructProperty *>(found)->GetStruct();
         if (!next || next->GetPropertiesSize() > found->GetElementSize())
             return BC_UNSUPPORTED;
         data = found->ContainerPtrToValuePtr<void>(data);
@@ -386,12 +396,12 @@ BcResult backend_invoke_outputs(uint64_t owner, BcHandle self, BcHandle h, const
         return BC_INVALID_ARGUMENT;
     std::set<std::string> names;
     for (uint32_t i = 0; i < count; ++i)
-        if (!args[i].name || strnlen_s(args[i].name, 257) > 256 || !names.insert(args[i].name).second)
+        if (!args[i].name || platform::bounded_length(args[i].name, 257) > 256 || !names.insert(args[i].name).second)
             return BC_INVALID_ARGUMENT;
     alignas(16) std::array<uint8_t, 4096> buffer{};
     std::set<std::string> output_names;
     for (uint32_t i = 0; i < output_count; ++i) {
-        if (!outputs[i].name || strnlen_s(outputs[i].name,257)>256 || !output_names.insert(outputs[i].name).second)
+        if (!outputs[i].name || platform::bounded_length(outputs[i].name,257)>256 || !output_names.insert(outputs[i].name).second)
             return BC_INVALID_ARGUMENT;
         outputs[i].value = {};
     }
@@ -445,7 +455,7 @@ BcResult backend_enumerate_actors(uint64_t owner, BcHandle context, const char *
     *count=0;
     const auto name=wide(path);
     auto *klass=UObjectGlobals::StaticFindObject<UClass *>(nullptr,nullptr,name.c_str());
-    auto *actor_class=UObjectGlobals::StaticFindObject<UClass *>(nullptr,nullptr,L"/Script/Engine.Actor");
+    auto *actor_class=UObjectGlobals::StaticFindObject<UClass *>(nullptr,nullptr,STR("/Script/Engine.Actor"));
     if(!klass || !actor_class || !klass->IsChildOf(actor_class))return BC_INVALID_ARGUMENT;
     auto *world=context?object_for(owner,context):nullptr;
     if(context && !world)return BC_STALE_HANDLE;
@@ -485,7 +495,7 @@ BcResult backend_enum(uint64_t, const char *path, const char *name, int64_t *out
     if (!out)
         return BC_INVALID_ARGUMENT;
     auto p = wide(path), n = wide(name, 256);
-    if (!p.starts_with(L"/Script/"))
+    if (!p.starts_with(STR("/Script/")))
         return BC_DENIED;
     auto *obj = UObjectGlobals::StaticFindObject<UObject *>(nullptr, nullptr, p.c_str());
     auto *type = alive(obj) ? Cast<UEnum>(obj) : nullptr;

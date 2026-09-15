@@ -20,3 +20,16 @@ if(NOT TARGET Briefcase::DeceiveInc)
  set_target_properties(Briefcase.DeceiveInc.SDK PROPERTIES POSITION_INDEPENDENT_CODE ON)
  add_library(Briefcase::DeceiveInc ALIAS Briefcase.DeceiveInc.SDK)
 endif()
+
+# Linux modules keep C++ allocation local; Unreal exports a different allocator.
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+ execute_process(COMMAND "${CMAKE_CXX_COMPILER}" -print-file-name=libstdc++.a
+   OUTPUT_VARIABLE _bc_cpp_runtime OUTPUT_STRIP_TRAILING_WHITESPACE COMMAND_ERROR_IS_FATAL ANY)
+ if(NOT EXISTS "${_bc_cpp_runtime}")
+  message(FATAL_ERROR "The Linux mod SDK requires the static libstdc++ runtime")
+ endif()
+ set_property(TARGET Briefcase::ModApi APPEND PROPERTY INTERFACE_LINK_OPTIONS
+   "-Wl,-Bsymbolic" "-Wl,--exclude-libs,ALL" "-static-libstdc++" "-static-libgcc")
+ set_property(TARGET Briefcase::ModApi APPEND PROPERTY INTERFACE_LINK_LIBRARIES
+   "-Wl,--whole-archive" "${_bc_cpp_runtime}" "-Wl,--no-whole-archive")
+endif()

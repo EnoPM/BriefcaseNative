@@ -1,6 +1,5 @@
 // Services have process lifetime, but all workers are stopped outside the game/render threads.
 static admin::Client *client_admin{};
-static admin::Server *server_admin{};
 static BcResult BC_CALL admin_select(uint64_t id) noexcept {
     try {
         if (!client_admin)
@@ -70,83 +69,7 @@ static BcResult BC_CALL admin_snapshot(char *buffer, uint32_t capacity, uint64_t
         return BC_INTERNAL;
     }
 }
-static void start_admin_server() noexcept {
-    try {
-        if (environment != Environment::server)
-            return;
-        const auto file = administration_root / "Admin" / "server.json";
-        if (!fs::exists(file)) {
-            log("Administration: disabled; no local Admin/server.json.");
-            return;
-        }
-        auto settings = admin::Settings::load(file);
-        auto configs = std::make_shared<admin::ConfigStore>();
-        for (const auto &s : scopes) {
-            if (s->loaded && admin::ConfigStore::allowed(s->manifest.id) && !s->config_schema.empty())
-                configs->add(s->manifest.id, s->manifest.directory / "Data" / "config.json",
-                             strict_json(s->config_schema), strict_json(s->config_text));
-        }
-        std::vector<Manifest> manifests;
-        for(auto &s:scopes) manifests.push_back(s->manifest);
-        auto management=std::make_shared<admin::Management>(administration_root,std::move(manifests));
-        auto status = [] {
-            uint32_t loaded = 0;
-            for (const auto &s : scopes)
-                if (s->loaded)
-                    ++loaded;
-            return nlohmann::json{
-                {"framework", build_info.framework_version},
-                {"environment", "server"},
-                {"administrationVersion",3},
-                {"processId",GetCurrentProcessId()},
-                {"gameBuild", std::format("{:08X} / {:08X}", build_info.pe_timestamp, build_info.image_size)},
-                {"gameSha256", build_info.executable_sha256},
-                {"unreal", "4.27"},
-                {"backendState", backend_status()},
-                {"uptimeSeconds", std::chrono::duration_cast<std::chrono::seconds>(
-                                      std::chrono::steady_clock::now() - start_time)
-                                      .count()},
-                {"loadedMods", loaded},
-                {"discoveredMods", scopes.size()},
-                {"bootstrapMs", bootstrap_ms}};
-        };
-        auto mods = [configs] {
-            auto list = nlohmann::json::array();
-            for (const auto &s : scopes) {
-                const auto &m = s->manifest;
-                auto dependencies = nlohmann::json::array();
-                for (const auto &d : m.dependencies)
-                    dependencies.push_back(
-                        {{"id", d.id},
-                         {"minimum", std::format("{}.{}.{}", d.minimum[0], d.minimum[1], d.minimum[2])}});
-                list.push_back(
-                    {{"id", m.id},
-                     {"name", m.name},
-                     {"author", m.author},
-                     {"version", std::format("{}.{}.{}", m.version[0], m.version[1], m.version[2])},
-                     {"environment", m.environment},
-                     {"state", s->loaded ? BC_UI_LOADED : s->status.load()},
-                     {"error", s->error},
-                     {"dependencies", dependencies},
-                     {"editable", configs->contains(m.id)}});
-            }
-            return list;
-        };
-        auto service = std::make_unique<admin::Server>(std::move(settings), configs, status, mods,
-                                                       [](std::string_view s) { log(s); },
-            [management](const std::string &op,const admin::Json &payload){
-                auto result=management->dispatch(op,payload);
-                if(op.ends_with(".write")||op=="server.restart")log("Administration: "+op+" accepted.");
-                return result;
-            },admin::commit_restart);
-        service->start();
-        server_admin = service.release();
-    } catch (const std::exception &e) {
-        log(std::string("Administration unavailable: ") + e.what());
-    } catch (...) {
-        log("Administration unavailable: unexpected initialization error.");
-    }
-}
+#include "ServerAdmin.inc"
 static void request_admin_stop() noexcept {
     if (client_admin)
         client_admin->request_stop();

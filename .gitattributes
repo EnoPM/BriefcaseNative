@@ -1,0 +1,2 @@
+scripts/linux/*.sh text eol=lf
+cmake/patches/*.patch text eol=lf whitespace=-blank-at-eol

@@ -3,6 +3,9 @@ struct DirectTarget {
     std::shared_ptr<Function> function;
     void *address{};
     void *original{};
+#ifndef _WIN32
+    std::unique_ptr<PLH::x64Detour> detour;
+#endif
     bool enabled{};
     unsigned depth{};
     BcNativeSite site{};
@@ -26,7 +29,12 @@ static void restore_direct_targets() noexcept {
     for (auto &t : direct_targets)
         if (t && t->enabled && !t->depth &&
             !direct_registry.contains(reinterpret_cast<uint64_t>(t->function->object))) {
-            if (MH_DisableHook(t->address) == MH_OK) {
+#ifdef _WIN32
+            const bool restored = MH_DisableHook(t->address) == MH_OK;
+#else
+            const bool restored = t->detour->unHook();
+#endif
+            if (restored) {
                 t->enabled = false;
                 if (std::memcmp(t->address, t->target_bytes.data(), t->target_bytes.size()) == 0)
                     log("Native original bytes restored: " + utf8(t->function->object->GetPathName()));
@@ -41,7 +49,7 @@ static void restore_direct_targets() noexcept {
             direct_restore_pending = true;
 }
 static void direct_dispatch(DirectTarget &t, UObject *self, void *parameters, uint32_t phase) noexcept {
-    if (GetCurrentThreadId() != game_thread_id || !ready || !alive(self) || !self->IsA(t.function->owner))
+    if (platform::thread_id() != game_thread_id || !ready || !alive(self) || !self->IsA(t.function->owner))
         return;
     ++dispatch_depth;
     HookPayload payload{self, t.function, parameters, nullptr, BC_TRANSPORT_NATIVE};
@@ -57,7 +65,7 @@ template <size_t Slot, class... Args> static void direct_thunk(UObject *self, Ar
     // Non-game-thread callers never access mod state, registries or Unreal metadata.
     using Original = void (*)(UObject *, Args...);
     auto original = reinterpret_cast<Original>(target.original);
-    if (GetCurrentThreadId() != game_thread_id) {
+    if (platform::thread_id() != game_thread_id) {
         original(self, args...);
         return;
     }
@@ -127,9 +135,8 @@ BcResult backend_native_hook(uint64_t owner, BcHandle h, const BcNativeSite *s, 
         if (kind != BC_VALUE_F32 && kind != BC_VALUE_BOOL && kind != BC_VALUE_OBJECT)
             return BC_UNSUPPORTED;
     }
-    auto *image = reinterpret_cast<uint8_t *>(GetModuleHandleW(nullptr));
-    auto *nt =
-        reinterpret_cast<IMAGE_NT_HEADERS64 *>(image + reinterpret_cast<IMAGE_DOS_HEADER *>(image)->e_lfanew);
+    const auto executable = executable_image();
+    auto* image = executable.base;
     DirectTarget *target{};
     size_t available = 32;
     for (size_t i = 0; i < direct_targets.size(); ++i) {
@@ -160,18 +167,25 @@ BcResult backend_native_hook(uint64_t owner, BcHandle h, const BcNativeSite *s, 
             current = reinterpret_cast<uintptr_t>(it->second->original);
         if (current != reinterpret_cast<uintptr_t>(image) + s->exec_rva)
             return BC_VERSION_MISMATCH;
-        validate_native_site(image, nt->OptionalHeader.SizeOfImage, *s);
+        validate_native_site(image, executable.size, *s);
         auto t = std::make_unique<DirectTarget>();
         t->function = fn;
         t->address = image + s->target_rva;
         t->site = *s;
         t->exec_bytes.assign(s->exec_bytes, s->exec_bytes + s->exec_size);
         t->target_bytes.assign(s->target_bytes, s->target_bytes + s->target_size);
+#ifdef _WIN32
         const auto init = MH_Initialize();
         if (init != MH_OK && init != MH_ERROR_ALREADY_INITIALIZED)
             return BC_INTERNAL;
         if (MH_CreateHook(t->address, direct_callback(available, kind), &t->original) != MH_OK)
             return BC_UNSUPPORTED;
+#else
+        t->detour = std::make_unique<PLH::x64Detour>(reinterpret_cast<uint64_t>(t->address),
+            reinterpret_cast<uint64_t>(direct_callback(available, kind)), reinterpret_cast<uint64_t*>(&t->original));
+        t->detour->setDetourScheme(PLH::x64Detour::INPLACE);
+        t->detour->setIsFollowCallOnFnAddress(false);
+#endif
         target = t.get();
         direct_targets[available] = std::move(t);
     }
@@ -209,7 +223,12 @@ BcResult backend_native_hook(uint64_t owner, BcHandle h, const BcNativeSite *s, 
         return BC_LIMIT;
     }
     if (!target->enabled) {
-        if (MH_EnableHook(target->address) != MH_OK) {
+#ifdef _WIN32
+        const bool enabled = MH_EnableHook(target->address) == MH_OK;
+#else
+        const bool enabled = target->detour->hook();
+#endif
+        if (!enabled) {
             direct_registry.erase(owner, internal);
             handles.release(owner, h);
             return BC_INTERNAL;

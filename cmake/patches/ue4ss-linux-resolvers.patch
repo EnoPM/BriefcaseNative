@@ -1,0 +1,92 @@
+diff --git a/patternsleuth/src/resolvers/unreal/fname.rs b/patternsleuth/src/resolvers/unreal/fname.rs
+index 9a695fb..36fc22d 100644
+--- a/patternsleuth/src/resolvers/unreal/fname.rs
++++ b/patternsleuth/src/resolvers/unreal/fname.rs
+@@ -206,6 +206,16 @@ pub struct FNameToString(pub u64);
+ impl_resolver_singleton!(collect, FNameToString);
+ 
+ impl_resolver_singleton!(ElfImage, FNameToString, |ctx| async {
++    // UE 4.27 Linux: void FName::ToString(FString&) const.
++    // Do not use the FString-returning overload: SysV places its hidden
++    // return pointer before this, unlike the void overload.
++    let candidates = ctx.scan(Pattern::new(
++        "55 41 57 41 56 41 55 41 54 53 48 81 EC 08 08 00 00 49 89 F4 49 89 FE 80 3D ?? ?? ?? ?? 00 75 ?? BF ?? ?? ?? ?? E8 ?? ?? ?? ?? C6 05 ?? ?? ?? ?? 01 41 8B 06"
++    ).unwrap()).await;
++    if !candidates.is_empty() {
++        return Ok(Self(ensure_one(candidates)?));
++    }
++
+     let strings = ctx.scan(util::utf16_pattern("SkySphereMesh\0")).await;
+     let str_addr = ensure_one(strings)?;
+     let pattern = Pattern::new(format!(
+diff --git a/patternsleuth/src/resolvers/unreal/ftext.rs b/patternsleuth/src/resolvers/unreal/ftext.rs
+index 04853fb..5c1c0b9 100644
+--- a/patternsleuth/src/resolvers/unreal/ftext.rs
++++ b/patternsleuth/src/resolvers/unreal/ftext.rs
+@@ -23,6 +23,11 @@ impl_resolver_singleton!(all, FTextFString, |ctx| async {
+         Indirect,
+     }
+     let patterns = [
++        // UE 4.27 Linux FText constructor reached from FromString.
++        (
++            Directness::Direct,
++            "55 41 57 41 56 41 55 41 54 53 48 83 EC 18 49 89 F5 49 89 FF BF 70 00 00 00 E8 ?? ?? ?? ?? 49 89 C6 48 C7 04 24 00 00 00 00 4D 8B 65 00 49 63 5D 08",
++        ),
+         (
+             Directness::Indirect,
+             "40 53 48 83 ec ?? 48 8b d9 e8 | ?? ?? ?? ?? 83 4b ?? 12 48 8b c3 48 83 ?? ?? 5b c3",
+diff --git a/patternsleuth/src/resolvers/unreal/gmalloc.rs b/patternsleuth/src/resolvers/unreal/gmalloc.rs
+index 5ab3d1a..218a710 100644
+--- a/patternsleuth/src/resolvers/unreal/gmalloc.rs
++++ b/patternsleuth/src/resolvers/unreal/gmalloc.rs
+@@ -34,6 +34,8 @@ impl_resolver_singleton!(all, GMalloc, |ctx| async {
+ pub struct GMallocPatterns(pub u64);
+ impl_resolver_singleton!(all, GMallocPatterns, |ctx| async {
+     let patterns = [
++        // UE 4.27 Linux: FMemory::Free, SysV this=rdi, pointer=rsi.
++        "53 48 85 FF 74 ?? 48 89 FB 48 8B 3D | ?? ?? ?? ?? 48 85 FF 75 ?? E8 ?? ?? ?? ?? 48 8B 3D ?? ?? ?? ?? 48 8B 07 48 8B 40 38 48 89 DE 5B FF E0",
+         "48 ?? ?? f0 ?? 0f b1 ?? | ?? ?? ?? ?? 74 ?? ?? 85 ?? 74 ?? ?? 8b", // Purgatory
+         "eb 03 ?? 8b ?? 48 8b ?? f0 ?? 0f b1 ?? | ?? ?? ?? ?? 74 ?? ?? 85 ?? 74 ?? ?? 8b", // Purg_notX
+         "e8 ?? ?? ?? ?? 48 8b ?? f0 ?? 0f b1 ?? | ?? ?? ?? ?? 74 ?? ?? 85 ?? 74 ?? ?? 8b", // Purg_withX
+diff --git a/patternsleuth/src/resolvers/unreal/kismet.rs b/patternsleuth/src/resolvers/unreal/kismet.rs
+index b6e3018..ba92bef 100644
+--- a/patternsleuth/src/resolvers/unreal/kismet.rs
++++ b/patternsleuth/src/resolvers/unreal/kismet.rs
+@@ -55,10 +55,14 @@ impl_resolver_singleton!(PEImage, GNatives, |ctx| async {
+ });
+ 
+ impl_resolver_singleton!(ElfImage, GNatives, |ctx| async {
+-    // On Linux, only use skip function approach
+-    ctx.resolve(GNativesViaSkipFunction::resolver())
+-        .await
+-        .map(|r| Self(r.0))
++    let (patterns, via_skip) = join!(
++        ctx.resolve(GNativesPatterns::resolver()),
++        ctx.resolve(GNativesViaSkipFunction::resolver()),
++    );
++    Ok(Self(*ensure_one(
++        [patterns.map(|r| r.0), via_skip.map(|r| r.0)]
++            .iter().filter_map(|r| r.as_ref().ok()),
++    )?))
+ });
+ 
+ #[derive(Debug, PartialEq)]
+@@ -81,8 +85,16 @@ impl_resolver_singleton!(PEImage, GNativesPatterns, |ctx| async {
+     ))?))
+ });
+ 
+-impl_resolver_singleton!(ElfImage, GNativesPatterns, |_ctx| async {
+-    bail_out!("GNativesPatterns not implemented for Linux");
++impl_resolver_singleton!(ElfImage, GNativesPatterns, |ctx| async {
++    // UE 4.27 Linux: FFrame::Step increments Code, reads one opcode, and
++    // dispatches through the absolute indexed GNatives pointer table.
++    let refs = ctx.scan(Pattern::new(
++        "48 89 F8 48 8B 4F 20 48 8D 79 01 48 89 78 20 0F B6 09 48 8B 0C CD | ?? ?? ?? ?? 48 89 F7 48 89 C6 FF E1"
++    ).unwrap()).await;
++    Ok(Self(try_ensure_one(refs.iter().map(|a| -> Result<_> {
++        let bytes = ctx.image().memory.range(*a..*a + 4)?;
++        Ok(u32::from_le_bytes(bytes.try_into().unwrap()) as u64)
++    }))?))
+ });
+ 
+ // Skip-function-based resolver

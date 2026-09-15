@@ -20,6 +20,15 @@ typedef struct BcImmediatePatch {
     int32_t replacement;
     uint32_t reserved;
 } BcImmediatePatch;
+/* Exact, same-length scalar instruction replacement, before game entry only.
+   Both windows must decode completely. Replacement permits only register-only
+   MOV/XOR/CMP/CMOV/NOP and forward conditional branches within the window;
+   no external jump, call, stack or memory access. */
+typedef struct BcCodePatch {
+    uint32_t size, window_rva, window_size, reserved;
+    const uint8_t *expected;
+    const uint8_t *replacement;
+} BcCodePatch;
 typedef struct BcConfigApi {
     uint32_t size, version;
     /* Schema: object with properties; each declares type, default, description.
@@ -35,6 +44,8 @@ typedef struct BcStartupApi {
                                  const char *value);
     BcResult(BC_CALL *stage_i32)(void *context, const char *sha256, const BcImmediatePatch *patches,
                                  uint32_t count);
+    BcResult(BC_CALL *stage_code)(void *context, const char *sha256,
+                                  const BcCodePatch *patches, uint32_t count);
 } BcStartupApi;
 /* Stage functions are legal only within startup BriefcaseModLoad. Host commits
    after BC_OK and discards/rolls back on failure, before the EXE entry executes.

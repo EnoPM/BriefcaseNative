@@ -53,7 +53,16 @@ jobs:
           cargo --version
 
       - name: Fetch pinned dependencies
-        run: ./scripts/build/Fetch-Dependencies.ps1
+        env:
+          UPSTREAM_READ_TOKEN: ${{ secrets.UPSTREAM_READ_TOKEN }}
+        run: |
+          if (-not $env:UPSTREAM_READ_TOKEN) { throw 'UPSTREAM_READ_TOKEN is required to read the Unreal submodule.' }
+          $encoded=[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes('x-access-token:'+$env:UPSTREAM_READ_TOKEN))
+          Write-Output "::add-mask::$encoded"
+          $env:GIT_CONFIG_COUNT='1'
+          $env:GIT_CONFIG_KEY_0='http.https://github.com/.extraheader'
+          $env:GIT_CONFIG_VALUE_0='AUTHORIZATION: basic '+$encoded
+          ./scripts/build/Fetch-Dependencies.ps1
 
       - name: Build Release x64
         run: ./scripts/build/Build.ps1

@@ -3,7 +3,11 @@
 using namespace bc::admin;
 int main() {
     try {
+#ifdef _WIN32
         const auto parent = fs::current_path();
+#else
+        const auto parent = fs::temp_directory_path();
+#endif
         const auto root = parent / ("admin-interop-" + hex(random_bytes(8)));
         fs::create_directory(root);
         struct Cleanup {

@@ -2,9 +2,11 @@
 #include "../Briefcase.Localization/Catalog.hpp"
 #include "../Briefcase.NativeHost/Configuration.hpp"
 #include "../Briefcase.NativeHost/Startup.hpp"
+#ifdef _WIN32
 #include <Windows.h>
-#include <fstream>
 #include <sddl.h>
+#endif
+#include <fstream>
 #include <set>
 namespace bc::admin {
 static void need(bool condition, const char *code, const char *message) {
@@ -21,6 +23,7 @@ static void fields(const Json &j, std::initializer_list<const char *> names) {
     for (auto name : names)
         need(j.contains(name), "invalid_request", "Missing request field.");
 }
+#ifdef _WIN32
 std::string read_file(const fs::path &path, size_t limit) {
     assert_plain_path(path);
     HANDLE file = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_DELETE, nullptr,
@@ -90,6 +93,7 @@ void write_file(const fs::path &path, std::string_view text, bool replace, bool 
         DeleteFileW(temporary.c_str());
     need(ok, "write_failed", "Atomic save failed. Previous values were preserved.");
 }
+#endif
 Json Settings::serialize() const {
     return {{"version", 1},
             {"serverId", server_id},
@@ -143,6 +147,11 @@ Settings Settings::parse(const Json &j) {
 }
 Settings Settings::load(const fs::path &path) {
     auto text = read_file(path);
+#ifndef _WIN32
+    const auto permissions = fs::status(path).permissions();
+    need((permissions & (fs::perms::group_all | fs::perms::others_all)) == fs::perms::none,
+         "permissions", "Administration configuration must be private (chmod 600).");
+#endif
     Json document;
     struct Wipe {
         std::string &text;

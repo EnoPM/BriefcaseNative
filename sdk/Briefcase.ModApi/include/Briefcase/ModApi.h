@@ -5,8 +5,15 @@
 extern "C" {
 #endif
 #define BC_API_VERSION 1u
+#if defined(_WIN32)
 #define BC_CALL __cdecl
 #define BC_EXPORT __declspec(dllexport)
+#elif defined(__linux__) && defined(__x86_64__)
+#define BC_CALL
+#define BC_EXPORT __attribute__((visibility("default")))
+#else
+#error Unsupported Briefcase platform
+#endif
 typedef int32_t BcResult;
 typedef uint64_t BcHandle;
 #define BC_OK 0

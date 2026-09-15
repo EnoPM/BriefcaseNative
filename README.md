@@ -19,6 +19,11 @@ The Unreal dependency requires authorized GitHub access; see docs/UE4SS.md.
 Packages are written to dist/Client and dist/Server. Public packages contain no PDB files.
 The client package includes only the native overlay sample. The server package contains no mods.
 
+The [Linux dedicated server port](docs/LinuxServer.md) includes the shared host,
+native hooks and startup patches, TLS administration, restart supervision and
+updates before launch. Separate Linux packaging and a manual release workflow
+are available; connected-player testing remains before a production release.
+
 ## Development installation
 
 Copy local.settings.example.json to local.settings.json and configure the dedicated test paths.

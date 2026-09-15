@@ -1,7 +1,5 @@
 static const BcClientModuleApi *client_module{};
 static std::atomic<bool> client_unreal_requested{}, client_shutdown_requested{};
-static uint32_t initial_game_thread{};
-static double bootstrap_ms{};
 static Scope *client_scope(void *context, uint64_t capability) {
     if (environment != Environment::client || !client_module)
         return nullptr;

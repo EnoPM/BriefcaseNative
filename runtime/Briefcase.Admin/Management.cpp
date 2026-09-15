@@ -2,7 +2,14 @@
 #include "../Briefcase.Localization/Catalog.hpp"
 #include "../Briefcase.NativeHost/Configuration.hpp"
 #include "../Briefcase.NativeHost/Startup.hpp"
+#ifdef _WIN32
 #include <Windows.h>
+#else
+#include <cerrno>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
 #include <algorithm>
 #include <cmath>
 #include <regex>
@@ -239,7 +246,12 @@ Json Management::config_schema() {
 Management::Management(fs::path root, std::vector<Manifest> manifests)
     : root(std::move(root)), manifests(std::move(manifests)) {
     auto game = this->root.parent_path().parent_path().parent_path();
-    ini = game / "Saved" / "Config" / "WindowsServer" / "TripwireServer.ini";
+#ifdef _WIN32
+    const auto platform_config = "WindowsServer";
+#else
+    const auto platform_config = "LinuxServer";
+#endif
+    ini = game / "Saved" / "Config" / platform_config / "TripwireServer.ini";
     profile = game / "CommunityBalanceProfile.json";
     config_active = ini_values(read_file(ini, 262144));
     selection_active = selection_read()["saved"];
@@ -537,6 +549,8 @@ Json Management::dispatch(const std::string &op, const Json &p) {
 Json log_tail(const fs::path &path, size_t maximum) {
     assert_plain_path(path);
     require(maximum > 0 && maximum <= 65536, "Invalid log limit.");
+    bool truncated = false;
+#ifdef _WIN32
     HANDLE h = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
                            nullptr, OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, nullptr);
     if (h == INVALID_HANDLE_VALUE)
@@ -557,7 +571,28 @@ Json log_tail(const fs::path &path, size_t maximum) {
     DWORD n{};
     require(ReadFile(h, text.data(), DWORD(text.size()), &n, nullptr), "Unable to read the log.");
     text.resize(n);
-    if (offset.QuadPart) {
+    truncated = offset.QuadPart != 0;
+#else
+    const int fd = ::open(path.c_str(), O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK);
+    if (fd < 0) return {{"text", "Log unavailable for this startup."}, {"truncated", false}};
+    struct Close { int fd; ~Close() { ::close(fd); } } close{fd};
+    struct stat info{};
+    require(fstat(fd, &info) == 0 && S_ISREG(info.st_mode) && info.st_nlink == 1 && info.st_size >= 0,
+            "Redirected or invalid log.");
+    const auto offset = std::max<off_t>(0, info.st_size - off_t(maximum));
+    truncated = offset != 0;
+    std::string text(size_t(info.st_size - offset), 0);
+    size_t total = 0;
+    while (total < text.size()) {
+        const auto count = pread(fd, text.data() + total, text.size() - total, offset + off_t(total));
+        if (count < 0 && errno == EINTR) continue;
+        require(count >= 0, "Unable to read the log.");
+        if (!count) break; // Log may have been truncated during the read.
+        total += size_t(count);
+    }
+    text.resize(total);
+#endif
+    if (truncated) {
         auto nl = text.find('\n');
         text = nl == text.npos ? std::string{} : text.substr(nl + 1);
     }
@@ -575,6 +610,6 @@ Json log_tail(const fs::path &path, size_t maximum) {
     }
     // Replace malformed UTF-8 in legacy game logs before sending JSON.
     out = Json::parse(Json(out).dump(-1, ' ', false, Json::error_handler_t::replace)).get<std::string>();
-    return {{"text", out}, {"truncated", offset.QuadPart != 0}};
+    return {{"text", out}, {"truncated", truncated}};
 }
 } // namespace bc::admin
