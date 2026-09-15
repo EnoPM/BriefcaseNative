@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "id": "briefcase.native-hello",
+  "name": "Briefcase Native Hello",
+  "author": "BriefcaseNative",
+  "version": "0.1.0",
+  "entry": "Briefcase.NativeHello.dll",
+  "minimumApi": 1,
+  "capabilities": ["log", "unreal.find", "game-thread"],
+  "dependencies": [],
+  "environment": "both"
+}

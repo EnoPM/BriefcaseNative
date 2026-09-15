@@ -1,0 +1,118 @@
+name: Publish server release
+run-name: Server ${{ inputs.version }} (${{ inputs.draft && 'draft' || 'publish' }})
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version in CMakeLists.txt (e.g. 0.3.0, without v)'
+        required: true
+        type: string
+      draft:
+        description: 'Keep the release as a draft'
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: briefcase-server-release
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: pwsh
+
+jobs:
+  build:
+    runs-on: windows-2025
+    timeout-minutes: 90
+    env:
+      RELEASE_VERSION: ${{ inputs.version }}
+      RUSTUP_TOOLCHAIN: 1.97.1
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify framework source inventory
+        run: python ./scripts/release/Assert-Source.py
+
+      - name: Validate version and source revision
+        run: ./scripts/release/Test-ReleaseVersion.ps1 -Version $env:RELEASE_VERSION -Commit $env:GITHUB_SHA
+
+      - name: Install the tested Rust toolchain
+        run: |
+          rustup toolchain install 1.97.1 --profile minimal --no-self-update
+          if ($LASTEXITCODE) { throw 'Rust toolchain installation failed.' }
+          rustc --version
+          cargo --version
+
+      - name: Fetch pinned dependencies
+        run: ./scripts/build/Fetch-Dependencies.ps1
+
+      - name: Build Release x64
+        run: ./scripts/build/Build.ps1
+
+      - name: Test and package
+        run: ./scripts/client/Package-Client.ps1
+
+      - name: Test release publication contracts
+        run: ./tests/ReleaseWorkflow.Contracts.ps1
+
+      - name: Test updater with Windows PowerShell
+        run: |
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./tests/Updater.Contracts.ps1
+          if ($LASTEXITCODE) { throw 'Windows PowerShell updater contracts failed.' }
+
+      - name: Store the server release assets
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: server-release
+          path: |
+            dist/Releases/BriefcaseNative-Server-windows-x64-${{ inputs.version }}.zip
+            dist/Releases/BriefcaseNative-Server-windows-x64-${{ inputs.version }}.zip.sha256
+            dist/Releases/BriefcaseNative-SDK-${{ inputs.version }}.zip
+            dist/Releases/BriefcaseNative-SDK-${{ inputs.version }}.zip.sha256
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+      - name: Store test results on failure
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-test-results
+          path: build/Testing/Temporary/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  publish:
+    needs: build
+    runs-on: windows-2025
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: server-release
+          path: dist/Releases
+
+      - name: Create and verify the GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_DRAFT: ${{ inputs.draft }}
+        run: |
+          ./scripts/release/Publish-Release.ps1 -Version $env:RELEASE_VERSION -Commit $env:GITHUB_SHA -Repository $env:GITHUB_REPOSITORY -Draft:($env:RELEASE_DRAFT -eq 'true')

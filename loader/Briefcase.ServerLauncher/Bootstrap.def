@@ -1,0 +1,3 @@
+LIBRARY Briefcase.ServerBootstrap
+EXPORTS
+    DetourFinishHelperProcess @1

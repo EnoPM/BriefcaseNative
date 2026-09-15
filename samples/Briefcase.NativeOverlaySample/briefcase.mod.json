@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "id": "briefcase.native-overlay-sample",
+  "name": "Briefcase Native Overlay Sample",
+  "author": "BriefcaseNative",
+  "version": "0.1.0",
+  "entry": "Briefcase.NativeOverlaySample.dll",
+  "minimumApi": 1,
+  "capabilities": ["log", "client.render"],
+  "dependencies": [],
+  "environment": "client",
+  "phase": "ready"
+}

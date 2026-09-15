@@ -1,0 +1,8 @@
+cmake_minimum_required(VERSION 3.20)
+project(BriefcaseAdminCrypto LANGUAGES C CXX)
+set(CMAKE_CXX_STANDARD 20)
+include(../../cmake/AdminCrypto.cmake)
+add_executable(Briefcase.AdminCryptoContracts ../AdminCryptoContracts.cpp)
+target_link_libraries(Briefcase.AdminCryptoContracts PRIVATE Briefcase.Admin.Crypto)
+enable_testing()
+add_test(NAME AdminCryptoContracts COMMAND Briefcase.AdminCryptoContracts)

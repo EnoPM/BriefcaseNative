@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "sample.startup",
+  "name": "Startup Sample",
+  "author": "BriefcaseNative",
+  "version": "0.2.0",
+  "entry": "Briefcase.StartupSample.dll",
+  "minimumApi": 1,
+  "loadPhase": "startup",
+  "environment": "server",
+  "capabilities": [
+    "log",
+    "config",
+    "startup.immediate",
+    "server-config.ini"
+  ],
+  "iniBindings": {
+    "server-settings": "TripwireServer.ini"
+  },
+  "dependencies": []
+}

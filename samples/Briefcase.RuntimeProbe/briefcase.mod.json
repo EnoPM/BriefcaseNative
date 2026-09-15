@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "briefcase.runtime-probe",
+  "name": "Briefcase Runtime Contract Probe",
+  "author": "BriefcaseNative",
+  "version": "0.2.0",
+  "entry": "Briefcase.RuntimeProbe.dll",
+  "minimumApi": 1,
+  "environment": "server",
+  "capabilities": [
+    "log",
+    "unreal.find",
+    "game-thread",
+    "unreal.reflection",
+    "unreal.invoke",
+    "unreal.hooks",
+    "unreal.lifecycle",
+    "unreal.write"
+  ],
+  "dependencies": []
+}

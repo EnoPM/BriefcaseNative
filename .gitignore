@@ -1,0 +1,16 @@
+/build/
+/dist/
+/artifacts/
+/local.settings.json
+/third_party/RE-UE4SS/
+/.vs/
+*.user
+*.pdb
+/.idea/
+/cmake-build-*/
+
+/repositories/
+
+__pycache__/
+*.pyc
+/private/

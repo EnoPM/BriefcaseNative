@@ -1,0 +1,19 @@
+LIBRARY version
+EXPORTS
+    GetFileVersionInfoA=bc_forward_0 @1
+    GetFileVersionInfoByHandle=bc_forward_1 @2
+    GetFileVersionInfoExA=bc_forward_2 @3
+    GetFileVersionInfoExW=bc_forward_3 @4
+    GetFileVersionInfoSizeA=bc_forward_4 @5
+    GetFileVersionInfoSizeExA=bc_forward_5 @6
+    GetFileVersionInfoSizeExW=bc_forward_6 @7
+    GetFileVersionInfoSizeW=bc_forward_7 @8
+    GetFileVersionInfoW=bc_forward_8 @9
+    VerFindFileA=bc_forward_9 @10
+    VerFindFileW=bc_forward_10 @11
+    VerInstallFileA=bc_forward_11 @12
+    VerInstallFileW=bc_forward_12 @13
+    VerLanguageNameA=bc_forward_13 @14
+    VerLanguageNameW=bc_forward_14 @15
+    VerQueryValueA=bc_forward_15 @16
+    VerQueryValueW=bc_forward_16 @17

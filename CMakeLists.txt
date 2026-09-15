@@ -1,0 +1,269 @@
+cmake_minimum_required(VERSION 3.28)
+project(BriefcaseNative VERSION 0.3.0 LANGUAGES C CXX ASM_MASM)
+if(NOT WIN32 OR NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
+  message(FATAL_ERROR "BriefcaseNative requires Windows x64.")
+endif()
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+# Keep compiler flags and transitive include paths available to editor tooling.
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
+add_compile_definitions(UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/EHsc>" "$<$<COMPILE_LANGUAGE:CXX>:/utf-8>")
+include(cmake/UE4SS.cmake)
+add_library(Briefcase.MinHook STATIC third_party/minhook-1.3.4/src/buffer.c third_party/minhook-1.3.4/src/hook.c third_party/minhook-1.3.4/src/trampoline.c third_party/minhook-1.3.4/src/hde/hde64.c)
+target_include_directories(Briefcase.MinHook PUBLIC third_party/minhook-1.3.4/include PRIVATE third_party/minhook-1.3.4/src)
+install(FILES third_party/minhook-1.3.4/LICENSE.txt DESTINATION Briefcase/Licenses RENAME MinHook.txt COMPONENT Briefcase)
+add_library(Briefcase.ModApi INTERFACE)
+target_include_directories(Briefcase.ModApi INTERFACE sdk/Briefcase.ModApi/include sdk/Briefcase.ClientModApi/include)
+add_library(Briefcase.Core STATIC runtime/Briefcase.NativeHost/Manifest.cpp runtime/Briefcase.NativeHost/Configuration.cpp runtime/Briefcase.NativeHost/Startup.cpp runtime/Briefcase.NativeHost/ReflectionContract.cpp runtime/Briefcase.NativeHost/NativeContract.cpp)
+target_include_directories(Briefcase.Core PUBLIC runtime/Briefcase.NativeHost)
+target_link_libraries(Briefcase.Core PUBLIC nlohmann_json::nlohmann_json Briefcase.ModApi Zydis)
+add_library(Briefcase.NativeHost SHARED runtime/Briefcase.NativeHost/Host.cpp runtime/Briefcase.UnrealBackend/Backend.cpp)
+target_link_libraries(Briefcase.NativeHost PRIVATE Briefcase.Core Briefcase.MinHook Unreal patternsleuth_bind bcrypt ws2_32 ntdll userenv dbghelp psapi)
+target_include_directories(Briefcase.NativeHost PRIVATE runtime/Briefcase.UnrealBackend)
+add_library(version SHARED loader/Briefcase.VersionProxy/proxy.cpp loader/Briefcase.VersionProxy/forwards.asm loader/Briefcase.VersionProxy/version.def)
+set_target_properties(version PROPERTIES PREFIX "")
+add_library(Briefcase.NativeHello SHARED samples/Briefcase.NativeHello/Hello.cpp)
+target_link_libraries(Briefcase.NativeHello PRIVATE Briefcase.ModApi)
+enable_testing()
+add_executable(Briefcase.Contracts tests/Contracts.cpp)
+target_link_libraries(Briefcase.Contracts PRIVATE Briefcase.Core)
+add_test(NAME NativeContracts COMMAND Briefcase.Contracts)
+add_library(Briefcase.Detours STATIC
+ third_party/detours-4.0.1/src/detours.cpp third_party/detours-4.0.1/src/modules.cpp
+ third_party/detours-4.0.1/src/disasm.cpp third_party/detours-4.0.1/src/image.cpp
+ third_party/detours-4.0.1/src/creatwth.cpp third_party/detours-4.0.1/src/disolx86.cpp
+ third_party/detours-4.0.1/src/disolx64.cpp third_party/detours-4.0.1/src/disolia64.cpp
+ third_party/detours-4.0.1/src/disolarm.cpp third_party/detours-4.0.1/src/disolarm64.cpp)
+set_target_properties(Briefcase.Detours PROPERTIES CXX_STANDARD 14 CXX_SCAN_FOR_MODULES OFF)
+target_compile_options(Briefcase.Detours PRIVATE /permissive)
+target_include_directories(Briefcase.Detours PUBLIC third_party/detours-4.0.1/src)
+add_library(Briefcase.ServerBootstrap SHARED loader/Briefcase.ServerLauncher/Bootstrap.cpp loader/Briefcase.ServerLauncher/Bootstrap.def)
+target_link_libraries(Briefcase.ServerBootstrap PRIVATE Briefcase.Detours)
+add_executable(Briefcase.ServerLauncher loader/Briefcase.ServerLauncher/Main.cpp)
+target_link_libraries(Briefcase.ServerLauncher PRIVATE Briefcase.Detours)
+# No console is created when users double-click the launcher.
+target_link_options(Briefcase.ServerLauncher PRIVATE /SUBSYSTEM:WINDOWS /ENTRY:wmainCRTStartup)
+install(TARGETS Briefcase.ServerLauncher RUNTIME DESTINATION . COMPONENT Briefcase)
+install(TARGETS Briefcase.ServerBootstrap RUNTIME DESTINATION Briefcase/Runtime COMPONENT Briefcase)
+install(FILES third_party/detours-4.0.1/LICENSE.md DESTINATION Briefcase/Licenses RENAME Detours.txt COMPONENT Briefcase)
+install(FILES scripts/update/Launch-Server.ps1 DESTINATION Briefcase/Updater COMPONENT Briefcase)
+install(TARGETS Briefcase.NativeHost RUNTIME DESTINATION Briefcase/Runtime COMPONENT Briefcase)
+install(TARGETS Briefcase.NativeHello RUNTIME DESTINATION Briefcase/Mods/briefcase.native-hello COMPONENT Samples)
+install(FILES samples/Briefcase.NativeHello/briefcase.mod.json DESTINATION Briefcase/Mods/briefcase.native-hello COMPONENT Samples)
+install(FILES scripts/deploy/StartBriefcaseNativeServer.ps1 DESTINATION . COMPONENT Briefcase)
+install(FILES third_party/RE-UE4SS/LICENSE DESTINATION Briefcase/Licenses RENAME UE4SS.txt COMPONENT Briefcase)
+install(FILES "${json_SOURCE_DIR}/LICENSE.MIT" DESTINATION Briefcase/Licenses RENAME nlohmann-json.txt COMPONENT Briefcase)
+install(FILES "${zydis_SOURCE_DIR}/LICENSE" DESTINATION Briefcase/Licenses RENAME Zydis.txt COMPONENT Briefcase)
+install(FILES "${polyhook2_SOURCE_DIR}/LICENSE" DESTINATION Briefcase/Licenses RENAME PolyHook2.txt COMPONENT Briefcase)
+add_executable(Briefcase.CAbi tests/Abi.c)
+set_target_properties(Briefcase.CAbi PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED ON)
+target_link_libraries(Briefcase.CAbi PRIVATE Briefcase.ModApi)
+add_test(NAME CAbiContract COMMAND Briefcase.CAbi)
+
+add_executable(Briefcase.EntryGateFixture tests/EntryGateFixture.cpp)
+add_test(NAME EntryGateBeforeExe COMMAND Briefcase.EntryGateFixture)
+add_executable(Briefcase.StartupContracts tests/StartupContracts.cpp)
+target_link_libraries(Briefcase.StartupContracts PRIVATE Briefcase.Core)
+add_test(NAME StartupContracts COMMAND Briefcase.StartupContracts)
+
+add_executable(Briefcase.ReflectionContracts tests/ReflectionContracts.cpp)
+target_link_libraries(Briefcase.ReflectionContracts PRIVATE Briefcase.Core)
+add_test(NAME ReflectionContracts COMMAND Briefcase.ReflectionContracts)
+
+add_library(Briefcase.RuntimeProbe SHARED samples/Briefcase.RuntimeProbe/Probe.cpp)
+target_link_libraries(Briefcase.RuntimeProbe PRIVATE Briefcase.ModApi)
+install(TARGETS Briefcase.RuntimeProbe RUNTIME DESTINATION Briefcase/Mods/briefcase.runtime-probe COMPONENT RuntimeProbe)
+install(FILES samples/Briefcase.RuntimeProbe/briefcase.mod.json DESTINATION Briefcase/Mods/briefcase.runtime-probe COMPONENT RuntimeProbe)
+
+add_executable(Briefcase.NativeHookContracts tests/NativeHookContracts.cpp)
+target_link_libraries(Briefcase.NativeHookContracts PRIVATE Briefcase.Core Briefcase.MinHook)
+add_test(NAME NativeHookContracts COMMAND Briefcase.NativeHookContracts)
+
+add_library(Briefcase.ClientModApi INTERFACE)
+target_link_libraries(Briefcase.ClientModApi INTERFACE Briefcase.ModApi)
+add_executable(Briefcase.ClientContracts tests/ClientContracts.cpp)
+target_link_libraries(Briefcase.ClientContracts PRIVATE Briefcase.Core)
+add_test(NAME ClientContracts COMMAND Briefcase.ClientContracts)
+add_executable(Briefcase.ClientInputFixture tests/ClientInputFixture.cpp)
+target_link_libraries(Briefcase.ClientInputFixture PRIVATE Briefcase.ClientModApi user32)
+add_test(NAME ClientInputFixture COMMAND Briefcase.ClientInputFixture)
+
+add_library(Briefcase.ImGui STATIC
+ third_party/imgui-1.91.9b/imgui.cpp third_party/imgui-1.91.9b/imgui_draw.cpp
+ third_party/imgui-1.91.9b/imgui_tables.cpp third_party/imgui-1.91.9b/imgui_widgets.cpp
+ third_party/imgui-1.91.9b/backends/imgui_impl_dx11.cpp)
+target_include_directories(Briefcase.ImGui PUBLIC third_party/imgui-1.91.9b third_party/imgui-1.91.9b/backends)
+target_link_libraries(Briefcase.ImGui PRIVATE d3d11 dxgi d3dcompiler)
+add_library(Briefcase.Client.Input STATIC runtime/Briefcase.Client.Input/Input.cpp)
+target_link_libraries(Briefcase.Client.Input PUBLIC Briefcase.ClientModApi PRIVATE user32)
+add_library(Briefcase.Client.Menu STATIC runtime/Briefcase.Client.Menu/Menu.cpp)
+target_link_libraries(Briefcase.Client.Menu PRIVATE Briefcase.ImGui Briefcase.ClientModApi)
+add_library(Briefcase.Client.Rendering SHARED runtime/Briefcase.Client.Rendering/Rendering.cpp)
+target_link_libraries(Briefcase.Client.Rendering PRIVATE Briefcase.ClientModApi Briefcase.Client.Input Briefcase.Client.Menu Briefcase.ImGui Briefcase.MinHook d3d11 dxgi user32)
+add_library(Briefcase.NativeOverlaySample SHARED samples/Briefcase.NativeOverlaySample/Overlay.cpp)
+target_link_libraries(Briefcase.NativeOverlaySample PRIVATE Briefcase.ClientModApi)
+install(TARGETS version RUNTIME DESTINATION . COMPONENT Client)
+install(TARGETS Briefcase.NativeHost RUNTIME DESTINATION Briefcase/Core COMPONENT Client)
+install(TARGETS Briefcase.Client.Rendering RUNTIME DESTINATION Briefcase/Core/Client COMPONENT Client)
+install(TARGETS Briefcase.NativeOverlaySample RUNTIME DESTINATION Briefcase/Mods/briefcase.native-overlay-sample COMPONENT Client)
+install(FILES samples/Briefcase.NativeOverlaySample/briefcase.mod.json DESTINATION Briefcase/Mods/briefcase.native-overlay-sample COMPONENT Client)
+install(FILES third_party/imgui-1.91.9b/LICENSE.txt DESTINATION Briefcase/Licenses RENAME DearImGui.txt COMPONENT Client)
+
+set_tests_properties(ClientContracts PROPERTIES WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
+add_executable(Briefcase.ClientRenderingFixture tests/ClientRenderingFixture.cpp)
+target_link_libraries(Briefcase.ClientRenderingFixture PRIVATE Briefcase.ClientModApi d3d11 dxgi windowscodecs ole32 user32)
+add_dependencies(Briefcase.ClientRenderingFixture Briefcase.Client.Rendering Briefcase.NativeOverlaySample)
+add_test(NAME ClientRenderingFixture COMMAND Briefcase.ClientRenderingFixture)
+set_tests_properties(ClientRenderingFixture PROPERTIES TIMEOUT 60)
+
+add_executable(Briefcase.ObjectListenerContracts tests/ObjectListenerContracts.cpp)
+target_link_libraries(Briefcase.ObjectListenerContracts PRIVATE Unreal)
+add_test(NAME ObjectListenerShutdown COMMAND Briefcase.ObjectListenerContracts)
+
+add_library(Briefcase.Client.Servers STATIC runtime/Briefcase.Client.Servers/ServerDirectory.cpp)
+target_link_libraries(Briefcase.Client.Servers PUBLIC Briefcase.ModApi PRIVATE nlohmann_json::nlohmann_json ws2_32)
+target_link_libraries(Briefcase.NativeHost PRIVATE Briefcase.Client.Servers)
+
+add_executable(Briefcase.ServerDirectoryContracts tests/ServerDirectoryContracts.cpp)
+target_link_libraries(Briefcase.ServerDirectoryContracts PRIVATE Briefcase.Client.Servers)
+add_test(NAME ServerDirectoryContracts COMMAND Briefcase.ServerDirectoryContracts)
+add_executable(Briefcase.ClientMenuFixture tests/ClientMenuFixture.cpp)
+target_link_libraries(Briefcase.ClientMenuFixture PRIVATE Briefcase.Client.Menu Briefcase.ImGui Briefcase.Client.Servers d3d11 windowscodecs ole32)
+add_test(NAME ClientMenuFixture COMMAND Briefcase.ClientMenuFixture)
+
+include(cmake/AdminCrypto.cmake)
+add_library(Briefcase.Admin.Transport STATIC runtime/Briefcase.Admin/Transport.cpp runtime/Briefcase.Admin/WindowsIdentity.cpp)
+target_link_libraries(Briefcase.Admin.Transport PUBLIC Briefcase.Admin.Crypto crypt32 ws2_32)
+
+add_executable(Briefcase.AdminTransportContracts tests/AdminTransportContracts.cpp)
+target_link_libraries(Briefcase.AdminTransportContracts PRIVATE Briefcase.Admin.Transport)
+add_test(NAME AdminTransportContracts COMMAND Briefcase.AdminTransportContracts)
+set_tests_properties(AdminTransportContracts PROPERTIES TIMEOUT 30)
+target_compile_definitions(Briefcase.Admin.Transport PRIVATE _WIN32_WINNT=0x0A00 NTDDI_VERSION=0x0A000006)
+
+add_library(Briefcase.Admin.Service STATIC runtime/Briefcase.Admin/Service.cpp runtime/Briefcase.Admin/Management.cpp runtime/Briefcase.Admin/Restart.cpp)
+target_link_libraries(Briefcase.Admin.Service PUBLIC Briefcase.Admin.Transport Briefcase.Core advapi32)
+
+add_executable(Briefcase.AdminContracts tests/AdminContracts.cpp)
+target_link_libraries(Briefcase.AdminContracts PRIVATE Briefcase.Admin.Service)
+add_test(NAME AdminContracts COMMAND Briefcase.AdminContracts)
+set_tests_properties(AdminContracts PROPERTIES TIMEOUT 45)
+
+add_library(Briefcase.Admin.Client STATIC runtime/Briefcase.Client.Admin/Client.cpp runtime/Briefcase.Client.Admin/Credentials.cpp)
+target_link_libraries(Briefcase.Admin.Client PUBLIC Briefcase.Admin.Service Briefcase.Client.Servers)
+target_link_libraries(Briefcase.NativeHost PRIVATE Briefcase.Admin.Client)
+target_link_libraries(Briefcase.Client.Menu PRIVATE nlohmann_json::nlohmann_json)
+
+target_link_libraries(Briefcase.ClientMenuFixture PRIVATE nlohmann_json::nlohmann_json)
+
+add_executable(Briefcase.AdminSetup tools/AdminSetup.cpp)
+target_link_libraries(Briefcase.AdminSetup PRIVATE Briefcase.Admin.Service Briefcase.Client.Servers)
+install(TARGETS Briefcase.AdminSetup RUNTIME DESTINATION Briefcase/Tools COMPONENT Briefcase)
+install(FILES third_party/mbedtls-3.6.7/LICENSE DESTINATION Briefcase/Licenses RENAME MbedTLS.txt COMPONENT Briefcase)
+install(FILES third_party/mbedtls-3.6.7/LICENSE DESTINATION Briefcase/Licenses RENAME MbedTLS.txt COMPONENT Client)
+
+add_executable(Briefcase.AdminPeerFixture tests/AdminPeerFixture.cpp)
+target_link_libraries(Briefcase.AdminPeerFixture PRIVATE Briefcase.Admin.Service)
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+add_test(NAME TranslationSourceContracts COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tests/TranslationSourceContracts.py")
+add_test(NAME AdminTlsInterop COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tests/AdminInterop.py" "$<TARGET_FILE:Briefcase.AdminPeerFixture>")
+set_tests_properties(AdminTlsInterop PROPERTIES TIMEOUT 45)
+
+add_executable(Briefcase.AdminClientContracts tests/AdminClientContracts.cpp)
+target_link_libraries(Briefcase.AdminClientContracts PRIVATE Briefcase.Admin.Client)
+add_test(NAME AdminClientContracts COMMAND Briefcase.AdminClientContracts)
+set_tests_properties(AdminClientContracts PROPERTIES TIMEOUT 30)
+
+install(FILES docs/Administration.md DESTINATION Briefcase/Docs COMPONENT Briefcase)
+install(FILES docs/Administration.md DESTINATION Briefcase/Docs COMPONENT Client)
+
+find_program(BRIEFCASE_POWERSHELL NAMES pwsh REQUIRED)
+add_test(NAME AdminSetupContracts COMMAND "${BRIEFCASE_POWERSHELL}" -NoProfile -File "${CMAKE_SOURCE_DIR}/tests/AdminSetupContracts.ps1" -Setup "$<TARGET_FILE:Briefcase.AdminSetup>")
+set_tests_properties(AdminSetupContracts PROPERTIES TIMEOUT 30)
+
+# Explicit local integration only; requires a configured live dedicated server.
+add_executable(Briefcase.AdminLiveProbe EXCLUDE_FROM_ALL tests/AdminLiveProbe.cpp)
+target_link_libraries(Briefcase.AdminLiveProbe PRIVATE Briefcase.Admin.Client)
+
+add_executable(Briefcase.AdminCryptoContracts tests/AdminCryptoContracts.cpp)
+target_link_libraries(Briefcase.AdminCryptoContracts PRIVATE Briefcase.Admin.Crypto)
+add_test(NAME AdminCryptoContracts COMMAND Briefcase.AdminCryptoContracts)
+set_tests_properties(AdminCryptoContracts PROPERTIES TIMEOUT 30)
+
+add_executable(Briefcase.ServerRestart tools/ServerRestart.cpp)
+target_link_libraries(Briefcase.ServerRestart PRIVATE Briefcase.Admin.Service)
+target_link_libraries(Briefcase.Admin.Service PUBLIC shell32)
+install(TARGETS Briefcase.ServerRestart RUNTIME DESTINATION Briefcase/Tools COMPONENT Briefcase)
+
+add_executable(Briefcase.AdminManagementContracts tests/AdminManagementContracts.cpp)
+target_link_libraries(Briefcase.AdminManagementContracts PRIVATE Briefcase.Admin.Client)
+add_test(NAME AdminManagementContracts COMMAND Briefcase.AdminManagementContracts)
+set_tests_properties(AdminManagementContracts PROPERTIES TIMEOUT 30)
+
+target_link_libraries(Briefcase.ClientMenuFixture PRIVATE Briefcase.Admin.Service)
+
+add_library(Briefcase.Localization STATIC runtime/Briefcase.Localization/Catalog.cpp)
+target_link_libraries(Briefcase.Localization PUBLIC Briefcase.Core)
+target_link_libraries(Briefcase.Admin.Service PUBLIC Briefcase.Localization)
+add_library(Briefcase.Client.Localization STATIC runtime/Briefcase.Localization/Client.cpp)
+target_link_libraries(Briefcase.Client.Localization PUBLIC Briefcase.Localization Briefcase.Admin.Service)
+target_link_libraries(Briefcase.NativeHost PRIVATE Briefcase.Client.Localization)
+target_link_libraries(Briefcase.Client.Menu PRIVATE Briefcase.Localization)
+target_link_libraries(Briefcase.Admin.Client PUBLIC Briefcase.Localization)
+install(DIRECTORY resources/Localization/ DESTINATION Briefcase/Localization COMPONENT Client)
+install(DIRECTORY resources/Localization/ DESTINATION Briefcase/Localization COMPONENT Briefcase)
+
+add_executable(Briefcase.LocalizationContracts tests/LocalizationContracts.cpp)
+target_link_libraries(Briefcase.LocalizationContracts PRIVATE Briefcase.Client.Localization Briefcase.ImGui)
+add_test(NAME LocalizationContracts COMMAND Briefcase.LocalizationContracts)
+set_tests_properties(LocalizationContracts PROPERTIES TIMEOUT 15)
+
+install(FILES docs/Localization.md DESTINATION Briefcase/Docs COMPONENT Client)
+install(FILES docs/Localization.md DESTINATION Briefcase/Docs COMPONENT Briefcase)
+
+add_library(Briefcase.Client.Settings STATIC runtime/Briefcase.Client.Settings/Store.cpp)
+target_link_libraries(Briefcase.Client.Settings PUBLIC Briefcase.Core)
+target_link_libraries(Briefcase.NativeHost PRIVATE Briefcase.Client.Settings)
+
+# Typed game SDK: compiled into the mod; all host calls still use the common C ABI.
+add_library(Briefcase.DeceiveInc STATIC sdk/Briefcase.DeceiveInc/src/Spy.cpp)
+target_include_directories(Briefcase.DeceiveInc PUBLIC sdk/Briefcase.DeceiveInc/include)
+target_sources(Briefcase.DeceiveInc
+  PUBLIC FILE_SET HEADERS BASE_DIRS sdk/Briefcase.DeceiveInc/include
+  FILES sdk/Briefcase.DeceiveInc/include/Briefcase/DeceiveInc/Spy.hpp
+  PRIVATE sdk/Briefcase.DeceiveInc/src/SpyContracts.hpp)
+target_link_libraries(Briefcase.DeceiveInc PUBLIC Briefcase.ModApi)
+
+add_executable(Briefcase.SpyContracts tests/SpyContracts.cpp)
+target_link_libraries(Briefcase.SpyContracts PRIVATE Briefcase.DeceiveInc nlohmann_json::nlohmann_json)
+target_compile_definitions(Briefcase.SpyContracts PRIVATE BRIEFCASE_SOURCE="${CMAKE_SOURCE_DIR}")
+add_test(NAME SpyContracts COMMAND Briefcase.SpyContracts)
+
+
+install(FILES docs/ClientModConfiguration.md docs/SpyApi.md DESTINATION Briefcase/Docs COMPONENT Client)
+
+
+# Offline updater stays outside the game runtime. Configuration is an example only.
+file(WRITE "${CMAKE_BINARY_DIR}/updater-build.json" "{\"frameworkVersion\":\"${PROJECT_VERSION}\"}\n")
+install(FILES scripts/update/Updater.ps1 scripts/update/Restart-Server.ps1 scripts/update/updater.example.json
+        DESTINATION Briefcase/Updater COMPONENT Briefcase)
+install(FILES "${CMAKE_BINARY_DIR}/updater-build.json" DESTINATION Briefcase/Updater RENAME build.json COMPONENT Briefcase)
+install(FILES docs/Updates.md DESTINATION Briefcase/Docs COMPONENT Briefcase)
+
+install(FILES docs/Repositories.md DESTINATION Briefcase/Docs COMPONENT Briefcase)
+
+add_library(Briefcase.LauncherMockHost SHARED tests/LauncherMockHost.cpp)
+add_executable(Briefcase.ServerLauncherContracts tests/ServerLauncherContracts.cpp)
+target_link_libraries(Briefcase.ServerLauncherContracts PRIVATE Briefcase.Detours)
+add_dependencies(Briefcase.ServerLauncherContracts Briefcase.ServerBootstrap Briefcase.LauncherMockHost)
+add_test(NAME ServerLauncherInjection COMMAND Briefcase.ServerLauncherContracts)
+set_tests_properties(ServerLauncherInjection PROPERTIES TIMEOUT 30)
+
+install(FILES docs/ServerLauncher.md DESTINATION Briefcase/Docs COMPONENT Briefcase)
+
+add_test(NAME ServerLauncherCoordinator COMMAND "${BRIEFCASE_POWERSHELL}" -NoProfile -File "${CMAKE_SOURCE_DIR}/tests/ServerLauncherIntegration.ps1" -Build "$<TARGET_FILE_DIR:Briefcase.ServerLauncher>")
+set_tests_properties(ServerLauncherCoordinator PROPERTIES TIMEOUT 30)
+
+add_test(NAME SourcePublicationContracts COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tests/SourcePublicationContracts.py")
