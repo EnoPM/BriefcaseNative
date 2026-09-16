@@ -2,7 +2,8 @@
 
 BriefcaseNative is a native mod framework for the Deceive Inc. dedicated server.
 It runs the server without opening its graphical interface, loads separately
-installed native mods and checks for framework updates before every launch.
+installed native mods and checks for framework and compatible mod updates before
+every launch.
 
 The public release currently supports Windows x64 and Ubuntu 24.04 x86_64
 dedicated servers. The client is not distributed yet.
@@ -110,6 +111,11 @@ Starting with BriefcaseNative 0.5.1, the launcher creates
 `Briefcase/updater.json` on first use and checks the official GitHub release before
 starting the server. Compatible updates are installed before launch. An unavailable
 network or release does not remove the installed version.
+
+Starting with BriefcaseNative 0.6.0, mods can opt into the same pre-launch check by declaring their public GitHub
+repository in `briefcase.mod.json`. Briefcase updates those mods before loading any
+of them and preserves their existing `Data/config.json`. This also applies to a
+restart requested through server administration.
 
 Existing updater preferences are preserved. To disable automatic checks, stop the
 server and set `enabled` to `false` in `Briefcase/updater.json`. Always launch the

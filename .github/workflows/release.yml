@@ -85,9 +85,7 @@ jobs:
           name: server-release
           path: |
             dist/Releases/BriefcaseNative-Server-windows-x64-${{ env.RELEASE_VERSION }}.zip
-            dist/Releases/BriefcaseNative-Server-windows-x64-${{ env.RELEASE_VERSION }}.zip.sha256
             dist/Releases/BriefcaseNative-SDK-${{ env.RELEASE_VERSION }}.zip
-            dist/Releases/BriefcaseNative-SDK-${{ env.RELEASE_VERSION }}.zip.sha256
           if-no-files-found: error
           compression-level: 0
           retention-days: 14

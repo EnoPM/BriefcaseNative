@@ -19,7 +19,7 @@ def package(project,build,backend,deps,output,json_source=None):
         dependencies=subprocess.check_output(["readelf","-d",str(stage/destination)],text=True)
         u.require(not re.search(r"imgui|libX11|libGL\.|libvulkan|libSDL|d3d|dxgi",dependencies,re.I),"Graphical dependency in server")
     put("Briefcase/Updater/build.json",(json.dumps(dict(frameworkVersion=version))+"\n").encode())
-    put("Briefcase/Updater/updater.example.json",(json.dumps(dict(schemaVersion=1,enabled=True,repository="EnoPM/BriefcaseNative",timeoutSeconds=20),indent=2)+"\n").encode())
+    put("Briefcase/Updater/updater.example.json",(json.dumps(dict(schemaVersion=1,enabled=True,updateMods=True,repository="EnoPM/BriefcaseNative",timeoutSeconds=20),indent=2)+"\n").encode())
     copy("Briefcase/Docs/LinuxServer.md",project/"docs/LinuxServer.md")
     for source in sorted((project/"resources/Localization").glob("*.json")):copy("Briefcase/Localization/"+source.name,source)
     licenses={
@@ -52,7 +52,6 @@ def package(project,build,backend,deps,output,json_source=None):
         for name,mode in sorted(modes.items()):
             info=zipfile.ZipInfo(name,(2020,1,1,0,0,0));info.create_system=3;info.external_attr=(stat.S_IFREG|mode)<<16;info.compress_type=zipfile.ZIP_DEFLATED
             zipped.writestr(info,(stage/name).read_bytes())
-    archive.with_suffix(".zip.sha256").write_text(u.digest_file(archive)+"  "+archive.name+"\n")
     return archive
 
 if __name__=="__main__":

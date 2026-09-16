@@ -16,6 +16,4 @@ Assert-UpdatePlainPath $archive
 if (Test-Path -LiteralPath $archive) { Remove-Item -LiteralPath $archive -Force }
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 [IO.Compression.ZipFile]::CreateFromDirectory($package, $archive, [IO.Compression.CompressionLevel]::Optimal, $false)
-$hash = (Get-FileHash -LiteralPath $archive).Hash.ToLowerInvariant()
-[IO.File]::WriteAllText(($archive + '.sha256'), "$hash  $([IO.Path]::GetFileName($archive))" + [Environment]::NewLine)
 Write-Output "Release asset prepared locally: $archive"

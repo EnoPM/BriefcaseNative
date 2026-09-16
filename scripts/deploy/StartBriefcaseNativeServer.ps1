@@ -63,7 +63,11 @@ if ($launchLock) {
         Write-UpdateJson $updateConfig (Get-Content -LiteralPath $updateExample -Raw|ConvertFrom-Json)
     }
     $launch.update = Invoke-ServerUpdate $win64
-    Write-UpdateJson (Join-Path $updateRoot 'last-result.json') @{state=$launch.update;checkedAt=(Get-Date).ToString('o')}
+    # A framework update may have replaced this module. Reload it before checking
+    # mods so the new framework and its mod package contract take effect together.
+    if ($launch.update -like 'installed *') { . $updater }
+    $launch.modUpdates = Invoke-ModUpdates $win64
+    Write-UpdateJson (Join-Path $updateRoot 'last-result.json') @{state=$launch.update;mods=$launch.modUpdates;checkedAt=(Get-Date).ToString('o')}
 }
 
 $gamePort = 50000

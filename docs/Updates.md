@@ -15,6 +15,7 @@ creates `Briefcase/updater.json` when absent, using:
 {
   "enabled": true,
   "repository": "EnoPM/BriefcaseNative",
+  "updateMods": true,
   "timeoutSeconds": 20
 }
 ```
@@ -40,22 +41,62 @@ release leaves the installed version running with a warning.
 `VERSION` at the repository root is the sole framework version source. It accepts
 only `MAJOR.MINOR.PATCH`. A release uses tag `vMAJOR.MINOR.PATCH` and includes:
 
-- `BriefcaseNative-Server-windows-x64-MAJOR.MINOR.PATCH.zip` and checksum;
-- `BriefcaseNative-Server-linux-x64-MAJOR.MINOR.PATCH.zip` and checksum;
-- the SDK ZIP and checksum.
+- `BriefcaseNative-Server-windows-x64-MAJOR.MINOR.PATCH.zip`;
+- `BriefcaseNative-Server-linux-x64-MAJOR.MINOR.PATCH.zip`;
+- the SDK ZIP.
 
 GitHub-generated source archives are not installers.
 
 The updater calls `GET /repos/{owner}/{repo}/releases/latest`. It rejects
 prereleases, automatic downgrades, ambiguous assets, redirects outside GitHub,
-archives without GitHub SHA-256 digests and incompatible game builds. A new game
+archives without GitHub SHA-256 digests and incompatible game builds. Separate
+`.sha256` assets are unnecessary because GitHub supplies the asset digest used by
+the updater and the publication workflow. A new game
 build must pass native contracts before its supported hash changes.
+
+## Mod updates
+
+Mod updates are available starting with BriefcaseNative 0.6.0.
+
+After the framework check, the launcher checks every installed server mod whose
+manifest explicitly contains:
+
+```json
+"update": {
+  "provider": "github-releases",
+  "repository": "OWNER/REPOSITORY"
+}
+```
+
+The latest stable release must use tag `vMAJOR.MINOR.PATCH` and contain exactly one
+platform archive named `REPOSITORY-windows-x64-MAJOR.MINOR.PATCH.zip` or
+`REPOSITORY-linux-x64-MAJOR.MINOR.PATCH.zip`. The archive contains
+`ModPackage.json`, whose identity, complete file inventory, sizes, modes and
+SHA-256 hashes are validated before installation. Only files below the matching
+`Briefcase/Mods/<mod-id>/` directory are accepted.
+
+Mod updates run before any mod loads, including `startup` mods such as PlayerCap.
+An administration restart returns to the launcher and performs the same checks.
+When the framework itself is replaced, its updated launcher code runs before mod
+checks continue. Set `updateMods` to `false` to disable only mod updates. Setting
+`enabled` to `false` disables both framework and mod network checks; recovery of an
+interrupted transaction still runs.
+
+`Data/config.json` is created when missing and otherwise preserved byte for byte.
+Managed binaries, manifests and licenses are replaced transactionally. A failed
+download or invalid release keeps the installed mod and allows the server to start;
+a failed recovery blocks startup rather than loading a mixed version. Results are
+recorded in `Briefcase/Updates/last-result.json`.
+
+The anonymous GitHub API supports public repositories. A private mod repository is
+left at its installed version unless its releases become publicly readable. Never
+put a GitHub token in a mod manifest.
 
 ## Installation and recovery
 
 An archive downloads and extracts into `Briefcase/Updates/<id>/stage` under path and
-size limits. `Package.json` lists every managed file and hash. Framework updates do
-not manage mods. Mod data, selection, administration configuration, passwords,
+size limits. `Package.json` lists every framework-managed file and hash. Mod updates
+use their separate package manifest and transaction. Mod data, selection, administration configuration, passwords,
 logs, updater settings and game configuration remain in place. Old managed files
 absent from the new package are removed after backup.
 
@@ -110,7 +151,7 @@ submodule. It requires no server password, local deployment path or
 The tag must point to the built commit. Existing tags on another commit and existing
 releases fail rather than being replaced. Assets first enter a draft. The reusable
 Linux workflow builds and appends Linux assets from the same commit. GitHub digests
-are compared with local files before the complete six-asset release becomes stable
+are compared with local files before the complete three-asset release becomes stable
 and latest. Manual draft mode retains the validated draft.
 
 If a job fails after draft creation, the draft remains for inspection. Delete an

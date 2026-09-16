@@ -30,7 +30,6 @@ def package(project, json_source, output):
             if file.is_file():
                 info=zipfile.ZipInfo(file.relative_to(stage).as_posix(),(2020,1,1,0,0,0))
                 zipped.writestr(info,file.read_bytes())
-    archive.with_suffix(".zip.sha256").write_text(hashlib.sha256(archive.read_bytes()).hexdigest()+"  "+archive.name+"\n")
     return stage
 if __name__=="__main__":
     parser=argparse.ArgumentParser()

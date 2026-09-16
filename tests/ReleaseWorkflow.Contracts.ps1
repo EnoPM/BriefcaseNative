@@ -12,10 +12,8 @@ Copy-Item -LiteralPath (Join-Path $project 'VERSION') -Destination $fixture
 $global:bcReleaseTestVersion=& (Join-Path $fixture 'scripts/release/Read-Version.ps1') -ProjectRoot $fixture
 $global:bcReleaseTestArchive=Join-Path $fixture "dist/Releases/BriefcaseNative-Server-windows-x64-$global:bcReleaseTestVersion.zip"
 Copy-Item -LiteralPath (Join-Path $project "dist/Releases/BriefcaseNative-Server-windows-x64-$global:bcReleaseTestVersion.zip") -Destination $global:bcReleaseTestArchive
-Copy-Item -LiteralPath (Join-Path $project "dist/Releases/BriefcaseNative-Server-windows-x64-$global:bcReleaseTestVersion.zip.sha256") -Destination ($global:bcReleaseTestArchive+'.sha256')
 $global:bcReleaseTestSdk=Join-Path $fixture "dist/Releases/BriefcaseNative-SDK-$global:bcReleaseTestVersion.zip"
 Copy-Item -LiteralPath (Join-Path $project "dist/Releases/BriefcaseNative-SDK-$global:bcReleaseTestVersion.zip") -Destination $global:bcReleaseTestSdk
-Copy-Item -LiteralPath (Join-Path $project "dist/Releases/BriefcaseNative-SDK-$global:bcReleaseTestVersion.zip.sha256") -Destination ($global:bcReleaseTestSdk+'.sha256')
 $global:bcReleaseTestCommit='a'*40
 $global:bcReleaseTestTag=$null
 $global:bcReleaseTestMode='ok'
@@ -41,7 +39,7 @@ function gh {
     }
     if($command.StartsWith('release view ')){return 'https://api.github.com/repos/fixture/repo/releases/123'}
     if($command -eq 'api https://api.github.com/repos/fixture/repo/releases/123'){
-        $assets=@(foreach($path in @($global:bcReleaseTestArchive,($global:bcReleaseTestArchive+'.sha256'),$global:bcReleaseTestSdk,($global:bcReleaseTestSdk+'.sha256'))){
+        $assets=@(foreach($path in @($global:bcReleaseTestArchive,$global:bcReleaseTestSdk)){
             $hash=(Get-FileHash -LiteralPath $path).Hash.ToLowerInvariant()
             if($global:bcReleaseTestMode -eq 'corrupt'){$hash='0'*64}
             @{name=[IO.Path]::GetFileName($path);state='uploaded';size=(Get-Item -LiteralPath $path).Length;digest="sha256:$hash"}
@@ -88,10 +86,6 @@ try {
     $global:bcReleaseTestCommands.Clear();$global:bcReleaseTestMode='exists'
     Reject {& $publish -Version $global:bcReleaseTestVersion -Commit $global:bcReleaseTestCommit -Repository fixture/repo}
     Check ($global:bcReleaseTestCommands.Count -eq 1) 'Existing release modified.'
-    $global:bcReleaseTestCommands.Clear()
-    [IO.File]::WriteAllText(($global:bcReleaseTestArchive+'.sha256'),'invalid')
-    Reject {& $publish -Version $global:bcReleaseTestVersion -Commit $global:bcReleaseTestCommit -Repository fixture/repo}
-    Check ($global:bcReleaseTestCommands.Count -eq 0) 'Upload started before checksum validation.'
     Write-Output "PASS $checks release workflow contracts; no remote calls."
 } finally {
     $env:GH_TOKEN=$oldToken

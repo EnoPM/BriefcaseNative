@@ -276,6 +276,233 @@ function Get-UpdateDownload([string]$Url, [string]$Destination, [int]$TimeoutSec
     }
 }
 
+function Select-ModUpdateAsset($Release, [string]$Repository, [string]$CurrentVersion, [string]$Platform) {
+    if ($Repository -cnotmatch '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$' -or $Platform -cnotmatch '^(windows|linux)-x64$') {
+        throw 'Invalid mod update identity.'
+    }
+    if ($Release.draft -or $Release.prerelease) { return $null }
+    $version = ConvertTo-ReleaseVersion $Release.tag_name
+    if ($version -le (ConvertTo-ReleaseVersion $CurrentVersion)) { return $null }
+    $repositoryName = $Repository.Substring($Repository.IndexOf('/') + 1)
+    $name = "$repositoryName-$Platform-$version.zip"
+    $matches = @($Release.assets | Where-Object { $_.name -ceq $name })
+    if ($matches.Count -ne 1) { throw "Release must contain exactly one asset named $name." }
+    $asset = $matches[0]
+    $expectedUrl = "https://github.com/$Repository/releases/download/$($Release.tag_name)/$name"
+    if ($asset.browser_download_url -cne $expectedUrl -or $asset.state -ne 'uploaded' -or
+        $asset.size -le 0 -or $asset.size -gt 536870912 -or $asset.digest -cnotmatch '^sha256:[a-f0-9]{64}$') {
+        throw 'Invalid mod release asset URL, size or GitHub SHA256 digest.'
+    }
+    return [pscustomobject]@{version="$version";url=$expectedUrl;size=[long]$asset.size;sha256=$asset.digest.Substring(7)}
+}
+
+function Read-ModUpdatePackage([string]$Stage, [string]$ModId, [string]$Version,
+                               [string]$Repository, [string]$Platform) {
+    if ($ModId -cnotmatch '^[a-z0-9]+([.-][a-z0-9]+)*$' -or
+        $Repository -cnotmatch '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$' -or $Platform -cnotmatch '^(windows|linux)-x64$') {
+        throw 'Invalid mod package identity.'
+    }
+    $null = ConvertTo-ReleaseVersion $Version
+    $packagePath = Resolve-UpdatePath $Stage 'ModPackage.json'
+    if ((Get-Item -LiteralPath $packagePath).Length -gt 2097152) { throw 'Mod package manifest too large.' }
+    $package = Get-Content -LiteralPath $packagePath -Raw | ConvertFrom-Json
+    if ($package.updateSchema -ne 1 -or $package.kind -cne 'briefcase-mod' -or
+        $package.platform -cne $Platform -or $package.modId -cne $ModId -or
+        $package.version -cne $Version -or $package.repository -cne $Repository) {
+        throw 'Incompatible mod package identity.'
+    }
+    $prefix = "Briefcase/Mods/$ModId/"
+    $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach ($file in @($package.files)) {
+        $path = Resolve-UpdatePath $Stage $file.path
+        $preserve = $false
+        if ($file.PSObject.Properties.Name -contains 'preserve') { $preserve = $file.preserve }
+        if ($file.path -cnotlike "$prefix*" -or $file.path.Length -le $prefix.Length -or
+            -not $seen.Add($path) -or ($preserve -and $file.path -cne ($prefix + 'Data/config.json'))) {
+            throw 'Invalid mod package path.'
+        }
+        if ($file.sha256 -cnotmatch '^[a-f0-9]{64}$' -or (Get-Item -LiteralPath $path).Length -ne $file.bytes -or
+            (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash -ine $file.sha256) {
+            throw 'Mod package file hash mismatch.'
+        }
+    }
+    $actual = @(Get-ChildItem -LiteralPath $Stage -Recurse -File)
+    if ($actual.Count -ne ($seen.Count + 1)) { throw 'Unlisted mod package content.' }
+    foreach ($file in $actual) {
+        if ($file.FullName -ine $packagePath -and -not $seen.Contains($file.FullName)) { throw 'Unlisted mod package file.' }
+    }
+    $modManifestPath = Resolve-UpdatePath $Stage ($prefix + 'briefcase.mod.json')
+    $mod = Get-Content -LiteralPath $modManifestPath -Raw | ConvertFrom-Json
+    if ($mod.schemaVersion -ne 1 -or $mod.id -cne $ModId -or $mod.version -cne $Version -or
+        $mod.environment -notin @('server','both') -or $mod.update.provider -cne 'github-releases' -or
+        $mod.update.repository -cne $Repository) { throw 'Packaged mod manifest mismatch.' }
+    $expectedExtension = if ($Platform -ceq 'windows-x64') { '.dll' } else { '.so' }
+    if ($mod.entry -cnotmatch '^[A-Za-z0-9_.-]+\.(dll|so)$' -or -not $mod.entry.EndsWith($expectedExtension, [StringComparison]::Ordinal)) {
+        throw 'Mod entry is incompatible with this platform.'
+    }
+    $entryPath = Resolve-UpdatePath $Stage ($prefix + $mod.entry)
+    if (-not $seen.Contains($entryPath)) { throw 'Mod entry is missing from package.' }
+    if ($Platform -ceq 'windows-x64') {
+        $stream = [IO.File]::OpenRead($entryPath)
+        try { if ($stream.ReadByte() -ne 0x4d -or $stream.ReadByte() -ne 0x5a) { throw 'Expected Windows mod DLL.' } }
+        finally { $stream.Dispose() }
+    }
+    return $package
+}
+
+function Test-ModUpdateTargetPath([string]$Relative, [string]$ModId) {
+    $prefix = "Briefcase/Mods/$ModId/"
+    return $Relative.Replace('\','/').StartsWith($prefix, [StringComparison]::Ordinal)
+}
+
+function Restore-ModUpdateTransaction([string]$Win64) {
+    $journalPath = Resolve-UpdatePath $Win64 'Briefcase/Updates/mod-transaction.json'
+    if (-not (Test-Path -LiteralPath $journalPath)) { return }
+    $journal = Get-Content -LiteralPath $journalPath -Raw | ConvertFrom-Json
+    if ($journal.state -ne 'installing') { return }
+    if ($journal.id -cnotmatch '^[a-f0-9]{32}$' -or $journal.modId -cnotmatch '^[a-z0-9]+([.-][a-z0-9]+)*$') {
+        throw 'Invalid mod recovery journal.'
+    }
+    foreach ($item in @($journal.files)) {
+        if (-not (Test-ModUpdateTargetPath $item.path $journal.modId)) { throw 'Invalid mod recovery path.' }
+        $null = Resolve-UpdatePath $Win64 $item.path
+        if ($item.existed) {
+            $saved = Resolve-UpdatePath $Win64 ("Briefcase/Updates/$($journal.id)/backup/" + $item.path)
+            if ((Get-FileHash -LiteralPath $saved).Hash -ine $item.previousHash) { throw 'Mod recovery backup damaged.' }
+        }
+    }
+    foreach ($item in @($journal.files)) {
+        $destination = Resolve-UpdatePath $Win64 $item.path
+        if ($item.existed) {
+            Copy-UpdateFile (Resolve-UpdatePath $Win64 ("Briefcase/Updates/$($journal.id)/backup/" + $item.path)) $destination
+        } elseif (Test-Path -LiteralPath $destination) { Remove-Item -LiteralPath $destination -Force }
+    }
+    $journal.state = 'rolled-back'
+    Write-UpdateJson $journalPath $journal
+}
+
+function Install-ModUpdatePackage([string]$Win64, [string]$Stage, $Manifest, [string]$Id) {
+    if ($Id -cnotmatch '^[a-f0-9]{32}$') { throw 'Invalid mod transaction identifier.' }
+    $modId = [string]$Manifest.modId
+    $prefix = "Briefcase/Mods/$modId/"
+    $metadataRelative = $prefix + '.briefcase-update.json'
+    $wanted = @{}
+    $managed = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    $paths = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    $null = $paths.Add($metadataRelative)
+    foreach ($file in @($Manifest.files)) {
+        $preserve = $false
+        if ($file.PSObject.Properties.Name -contains 'preserve') { $preserve = $file.preserve }
+        $destination = Resolve-UpdatePath $Win64 $file.path
+        if ($preserve) {
+            if (-not (Test-Path -LiteralPath $destination)) { $wanted[$file.path] = $file; $null = $paths.Add($file.path) }
+        } else { $wanted[$file.path] = $file; $null = $managed.Add($file.path); $null = $paths.Add($file.path) }
+    }
+    $metadataPath = Resolve-UpdatePath $Win64 $metadataRelative
+    if (Test-Path -LiteralPath $metadataPath) {
+        $old = Get-Content -LiteralPath $metadataPath -Raw | ConvertFrom-Json
+        if ($old.schemaVersion -ne 1 -or $old.modId -cne $modId) { throw 'Invalid installed mod update metadata.' }
+        foreach ($path in @($old.files)) {
+            if (-not (Test-ModUpdateTargetPath $path $modId)) { throw 'Invalid installed mod managed path.' }
+            if (-not $managed.Contains($path)) { $null = $paths.Add($path) }
+        }
+    }
+    $metadata = [ordered]@{schemaVersion=1;modId=$modId;repository=$Manifest.repository;version=$Manifest.version;platform=$Manifest.platform;files=@($managed)}
+    $plan = @()
+    foreach ($relative in $paths) {
+        $destination = Resolve-UpdatePath $Win64 $relative
+        $exists = Test-Path -LiteralPath $destination
+        $hash = ''
+        if ($exists) {
+            $backup = Resolve-UpdatePath $Win64 ("Briefcase/Updates/$Id/backup/" + $relative)
+            Copy-UpdateFile $destination $backup
+            $hash = (Get-FileHash -LiteralPath $destination).Hash
+            if ((Get-FileHash -LiteralPath $backup).Hash -ne $hash) { throw 'Mod backup verification failed.' }
+        }
+        $plan += [pscustomobject]@{path=$relative;existed=$exists;previousHash=$hash}
+    }
+    $journalPath = Resolve-UpdatePath $Win64 'Briefcase/Updates/mod-transaction.json'
+    $journal = [ordered]@{id=$Id;state='installing';modId=$modId;files=$plan}
+    Write-UpdateJson $journalPath $journal
+    try {
+        foreach ($item in $plan) {
+            if ($item.path -ceq $metadataRelative) { continue }
+            $destination = Resolve-UpdatePath $Win64 $item.path
+            if ($wanted.ContainsKey($item.path)) {
+                $source = Resolve-UpdatePath $Stage $item.path
+                Copy-UpdateFile $source $destination
+                if ((Get-FileHash -LiteralPath $source).Hash -ne (Get-FileHash -LiteralPath $destination).Hash) {
+                    throw 'Installed mod file verification failed.'
+                }
+            } elseif (Test-Path -LiteralPath $destination) { Remove-Item -LiteralPath $destination -Force }
+        }
+        Write-UpdateJson $metadataPath $metadata
+        $journal.state = 'committed'; Write-UpdateJson $journalPath $journal
+    } catch { Restore-ModUpdateTransaction $Win64; throw }
+}
+
+function Invoke-ModUpdates([string]$Win64) {
+    Restore-ModUpdateTransaction $Win64
+    $result = [ordered]@{state='completed';checked=0;updated=0;current=0;failed=0;mods=@()}
+    try {
+        $config = Get-Content -LiteralPath (Resolve-UpdatePath $Win64 'Briefcase/updater.json') -Raw | ConvertFrom-Json
+        if ($config.schemaVersion -ne 1 -or $config.enabled -isnot [bool] -or $config.timeoutSeconds -lt 1 -or $config.timeoutSeconds -gt 120) {
+            throw 'Invalid updater configuration.'
+        }
+        $updateMods = $true
+        if ($config.PSObject.Properties.Name -contains 'updateMods') {
+            if ($config.updateMods -isnot [bool]) { throw 'updateMods must be a Boolean.' }
+            $updateMods = $config.updateMods
+        }
+    } catch {
+        $result.state='failed-kept-installed'; $result.message=$_.Exception.Message
+        Write-Warning "Mod updates unavailable; installed mods retained. $($_.Exception.Message)"
+        return [pscustomobject]$result
+    }
+    if (-not $config.enabled -or -not $updateMods) { $result.state='disabled'; return [pscustomobject]$result }
+    $modsRoot = Resolve-UpdatePath $Win64 'Briefcase/Mods'
+    if (-not (Test-Path -LiteralPath $modsRoot)) { return [pscustomobject]$result }
+    $directories = @(Get-ChildItem -LiteralPath $modsRoot -Directory -Force)
+    if ($directories.Count -gt 256) { throw 'Too many installed mods.' }
+    foreach ($directory in $directories) {
+        $manifestPath = Join-Path $directory.FullName 'briefcase.mod.json'
+        if (-not (Test-Path -LiteralPath $manifestPath)) { continue }
+        $modId = $directory.Name
+        try {
+            Assert-UpdatePlainPath $directory.FullName
+            $installed = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+            if ($modId -cnotmatch '^[a-z0-9]+([.-][a-z0-9]+)*$' -or $installed.id -cne $modId -or
+                $installed.environment -notin @('server','both')) { throw 'Invalid installed server mod manifest.' }
+            if (-not ($installed.PSObject.Properties.Name -contains 'update')) { continue }
+            $repository = [string]$installed.update.repository
+            if ($installed.update.provider -cne 'github-releases' -or $repository -cnotmatch '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$') {
+                throw 'Invalid mod update source.'
+            }
+            $null = ConvertTo-ReleaseVersion $installed.version
+            $result.checked++
+            $work = Resolve-UpdatePath $Win64 ("Briefcase/Updates/" + [guid]::NewGuid().ToString('N'))
+            New-Item -ItemType Directory -Path $work -Force | Out-Null
+            $releasePath = Join-Path $work 'release.json'
+            Get-UpdateDownload "https://api.github.com/repos/$repository/releases/latest" $releasePath $config.timeoutSeconds 2097152
+            $asset = Select-ModUpdateAsset (Get-Content -LiteralPath $releasePath -Raw | ConvertFrom-Json) $repository $installed.version 'windows-x64'
+            if (-not $asset) { $result.current++; $result.mods += [pscustomobject]@{id=$modId;state='current';version=$installed.version}; continue }
+            $archive = Join-Path $work 'release.zip'
+            Get-UpdateDownload $asset.url $archive $config.timeoutSeconds $asset.size
+            if ((Get-Item -LiteralPath $archive).Length -ne $asset.size -or
+                (Get-FileHash -LiteralPath $archive).Hash -ine $asset.sha256) { throw 'Mod release archive digest mismatch.' }
+            $stage = Join-Path $work 'stage'; Expand-UpdateArchive $archive $stage
+            $package = Read-ModUpdatePackage $stage $modId $asset.version $repository 'windows-x64'
+            Install-ModUpdatePackage $Win64 $stage $package ([guid]::NewGuid().ToString('N'))
+            $result.updated++; $result.mods += [pscustomobject]@{id=$modId;state='updated';version=$asset.version}
+        } catch {
+            Restore-ModUpdateTransaction $Win64
+            $result.failed++; $result.mods += [pscustomobject]@{id=$modId;state='failed';message=$_.Exception.Message}
+            Write-Warning "Mod update unavailable for $modId; installed version retained. $($_.Exception.Message)"
+        }
+    }
+    return [pscustomobject]$result
+}
+
 function Invoke-ServerUpdate([string]$Win64) {
     # Caller holds launch.lock through startup. Recovery is mandatory even if updates have been disabled.
     Restore-UpdateTransaction $Win64
@@ -285,7 +512,7 @@ function Invoke-ServerUpdate([string]$Win64) {
         # Fresh ZIP installations need no manual configuration. Existing settings,
         # including an explicit opt-out or a custom repository, belong to the user.
         if (-not (Test-Path -LiteralPath $configPath)) {
-            Write-UpdateJson $configPath @{schemaVersion=1;enabled=$true;repository='EnoPM/BriefcaseNative';timeoutSeconds=20}
+            Write-UpdateJson $configPath @{schemaVersion=1;enabled=$true;updateMods=$true;repository='EnoPM/BriefcaseNative';timeoutSeconds=20}
         }
         $config = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json
         if ($config.schemaVersion -ne 1 -or $config.enabled -isnot [bool] -or $config.timeoutSeconds -lt 1 -or $config.timeoutSeconds -gt 120) {

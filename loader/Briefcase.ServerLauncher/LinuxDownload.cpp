@@ -6,6 +6,7 @@
 #include <curl/curl.h>
 #include <fcntl.h>
 #include <memory>
+#include <regex>
 #include <set>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -93,7 +94,7 @@ void download(const std::string& input, const fs::path& path, int timeout, uint6
         throw std::runtime_error("Too many HTTPS redirects");
     } catch (...) { unlink(path.c_str()); throw; }
 }
-void extract(const fs::path& file, const fs::path& stage) {
+void extract(const fs::path& file, const fs::path& stage, bool mod_package) {
     // Never delegate paths or filesystem creation to the archive library.
     require(fs::file_size(plain(file)) <= max_archive, "Archive exceeds limit");
     require(!fs::exists(plain(stage)) || fs::is_empty(stage), "Extraction directory must be empty");
@@ -116,7 +117,10 @@ void extract(const fs::path& file, const fs::path& stage) {
         require(raw_name != nullptr, "Missing ZIP path");
         const std::string name(raw_name);
         const auto target = package_path(stage, name);
-        require(managed(name) && seen.insert(name).second && seen.size() <= 4096, "Unexpected or repeated archive file");
+        const bool mod_path = name == "ModPackage.json" ||
+            std::regex_match(name, std::regex("Briefcase/Mods/[a-z0-9]+([.-][a-z0-9]+)*/[A-Za-z0-9_./-]+"));
+        require((mod_package ? mod_path : managed(name)) && seen.insert(name).second && seen.size() <= 4096,
+                "Unexpected or repeated archive file");
         require(archive_entry_filetype(entry) == AE_IFREG && !archive_entry_symlink(entry) && !archive_entry_hardlink(entry) &&
                 !archive_entry_is_encrypted(entry) && !(archive_entry_perm(entry) & 07000), "ZIP links, special files or privileged modes refused");
         const auto size = archive_entry_size(entry);

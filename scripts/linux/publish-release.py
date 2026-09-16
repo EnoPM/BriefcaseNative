@@ -9,8 +9,7 @@ def publish(project,repository,version,commit,publish_draft=False):
     u.require(re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+",repository) and re.fullmatch(r"[a-f0-9]{40}",commit),"Invalid release identity")
     source_version=u.source_version(project)
     u.require(version==source_version and command("git","rev-parse","HEAD")==commit,"Release/source mismatch")
-    archive=project/f"dist/Releases/BriefcaseNative-Server-linux-x64-{version}.zip";checksum=archive.with_suffix(".zip.sha256")
-    u.require(checksum.read_text().strip()==u.digest_file(archive)+"  "+archive.name,"Release checksum mismatch")
+    archive=project/f"dist/Releases/BriefcaseNative-Server-linux-x64-{version}.zip"
     with tempfile.TemporaryDirectory() as directory:
         stage=Path(directory);u.extract(archive,stage)
         u.package_manifest(stage,version,"b0b275eac71bb8314b8afb5b36368d882faefafc993d5eac05bb5956a7334ef7")
@@ -24,7 +23,7 @@ def publish(project,repository,version,commit,publish_draft=False):
         u.require(release["draft"],"Published release tag is missing locally")
         target=command("git","rev-parse",release["target_commitish"]+"^{commit}")
     u.require(target==commit,"Existing release targets a different commit")
-    files=(archive,checksum)
+    files=(archive,)
     u.require(not any(item["name"] in {file.name for file in files} for item in release["assets"]),"Linux assets already exist; replacement refused")
     command("gh","release","upload",tag,*(str(file) for file in files),"--repo",repository)
     uploaded=json.loads(command("gh","api",api))

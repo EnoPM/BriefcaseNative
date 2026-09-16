@@ -37,11 +37,11 @@
     },
     {
       "path": ".github/workflows/linux-server-release.yml",
-      "sha256": "1c891bd29af4c985b29ff79c63acb695a73b03c2b3e07c300de95b59fa1808d9"
+      "sha256": "9affcaffd0cd1300cd186058eac0048253d32473e9d35f2cdc8f9ef56f3ef609"
     },
     {
       "path": ".github/workflows/release.yml",
-      "sha256": "550f9c2e1d289307a5c9cbea7015f201fc31bdc7ac499c40d4b1c59589403820"
+      "sha256": "6569b21a1fa72e759e3abf13ba036d6419610f6d7f5941052ee4c947d5b31600"
     },
     {
       "path": ".gitignore",
@@ -57,7 +57,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "2a7e3a49a96c86868a3350f57a12c17c6af406f9a48686a1253764e66ae7d311"
+      "sha256": "d0f60366c4a20c9b221e919cb74f534694b49c5541e44fa2bb7f669827205b3f"
     },
     {
       "path": "VERSION",
@@ -185,7 +185,7 @@
     },
     {
       "path": "docs/Updates.md",
-      "sha256": "1c2a71b3801b945ac19f3cacfb7c0e5bd4c30e8766866bc637bbd85ed04be2d0"
+      "sha256": "75c3960cc1731f2dacde667dd8d0a4253157bdc1f939101b2cc3cd3a9ed052d5"
     },
     {
       "path": "loader/Briefcase.ServerLauncher/Bootstrap.cpp",
@@ -205,7 +205,7 @@
     },
     {
       "path": "loader/Briefcase.ServerLauncher/LinuxDownload.cpp",
-      "sha256": "439bffa8c0b512cd70f5741344cf5f1229f9efe4a4fd0793b004233019ca1a8f"
+      "sha256": "5e731025fefe3018a00be40f140065dc14baaa141b48e72fd00980ece639aa7e"
     },
     {
       "path": "loader/Briefcase.ServerLauncher/LinuxFiles.cpp",
@@ -213,15 +213,15 @@
     },
     {
       "path": "loader/Briefcase.ServerLauncher/LinuxMain.cpp",
-      "sha256": "f235c1fc5e5f3e83488656770fc0bacfc385277c241e7d6f7dbd9d27c6613920"
+      "sha256": "e2cdd3d6d9f177dee3666ebdd9c2be22be3f7cf76bf156256ddaeabe21ddc154"
     },
     {
       "path": "loader/Briefcase.ServerLauncher/LinuxUpdate.cpp",
-      "sha256": "d696d4b396299b7372f550ddaa3e2c0bc793f560c799d447ed6e78001427aa96"
+      "sha256": "3d746a3e2d71104c1452de7d5779fbf143a07eb25edb436fd0be9ce7998ffb72"
     },
     {
       "path": "loader/Briefcase.ServerLauncher/LinuxUpdate.hpp",
-      "sha256": "e984cb999254d3eea719012502e35ca7d377c9a34a51ef655c6caf583fd7d360"
+      "sha256": "513184bc2afc446009e5431558c89a42c01dce6828278e851295449716263f75"
     },
     {
       "path": "loader/Briefcase.ServerLauncher/Main.cpp",
@@ -721,7 +721,7 @@
     },
     {
       "path": "scripts/deploy/StartBriefcaseNativeServer.ps1",
-      "sha256": "0c0e2fe8e4aaf7a7c06a5a9068e55b985665759f40bbf4181b4f7f5b5fee106b"
+      "sha256": "257e92b2ebe19958a1da8e4b21a1ab3ac9d5c1bbe5ee801d85de70331777bac4"
     },
     {
       "path": "scripts/deploy/Stop-Server.ps1",
@@ -749,11 +749,11 @@
     },
     {
       "path": "scripts/linux/package-sdk.py",
-      "sha256": "e6f40a130c43b5f791ddf0b72212eb60cd9eb17bdce77361a0941e466c854137"
+      "sha256": "8c39b595a6e99dbac49a22da276438b12d159abff3689853bb47863b884b169d"
     },
     {
       "path": "scripts/linux/package-server.py",
-      "sha256": "a68f2432720cbb7c0884e79dea14bca41cb07cb839c1f9419b7dfe40e3d03f2d"
+      "sha256": "3b4d1193fa304c733561615753e605013d835503fc4467635c4323a312485838"
     },
     {
       "path": "scripts/linux/package_support.py",
@@ -765,7 +765,7 @@
     },
     {
       "path": "scripts/linux/publish-release.py",
-      "sha256": "6b48eaa42ff3ace256a34bcdf23ac1c39553cb371f8164f4394196a67d6e8b74"
+      "sha256": "4d772cfcffbb5b7df1942d0755b2e8bb20296b4f245124197d8057b691d64b9b"
     },
     {
       "path": "scripts/release/Assert-SDK.ps1",
@@ -777,11 +777,11 @@
     },
     {
       "path": "scripts/release/Package-SDK.ps1",
-      "sha256": "b81ed0719ba249cf4f50a27662adc3152f71e2748da57cf98a6953cb98da3ee8"
+      "sha256": "01adfec157d4459fa94b8c25267c5515f3fea045dbf9f18c09811ba3a6fe9fa1"
     },
     {
       "path": "scripts/release/Publish-Release.ps1",
-      "sha256": "d7bce0189bbad33929e7c283b03741cf96f6b1d51f313b7eec9a7a41c6d2b1a1"
+      "sha256": "092b9d532e16ee6b02c1300e5d146cc540ae9d563becf91216dd24b8755c98a1"
     },
     {
       "path": "scripts/release/Read-Version.ps1",
@@ -813,7 +813,7 @@
     },
     {
       "path": "scripts/update/Package-Release.ps1",
-      "sha256": "38450ac4f327ca68f569c09f8b1629c7e1600df53d0dcf8812297022eda15932"
+      "sha256": "bbd2f016ed082675c0603916f3280f0e3b48341c98e5a4463d2093d9acec0a27"
     },
     {
       "path": "scripts/update/Restart-Server.ps1",
@@ -821,11 +821,11 @@
     },
     {
       "path": "scripts/update/Updater.ps1",
-      "sha256": "a087b5fec4203bb6a41e5671563cad3275c2504e46508cb97a90beb8d2aabff6"
+      "sha256": "d85d7494972a2e314756dea4c2924b93bb173e9d192a98f6158bb0373771212a"
     },
     {
       "path": "scripts/update/updater.example.json",
-      "sha256": "65b70b6bddbbaffb7261fa1a161ef6bbee453ba9f5e8552a402f11c9341d4fcf"
+      "sha256": "6fb159f6974b975b0d19f02f098bcd06bd331dc00a49f07e2b516e12f3bb1231"
     },
     {
       "path": "sdk/Briefcase.ClientModApi/include/Briefcase/ClientModApi.h",
@@ -1017,7 +1017,7 @@
     },
     {
       "path": "tests/LinuxReleaseContracts.py",
-      "sha256": "368a68b8d55aa270038d84270293ac36ef4e293568841ac315a946b8f6d45447"
+      "sha256": "49e5df36bafa7f7904262d03f9cf4770e158315d001b7fb6c41be1cdde4ba051"
     },
     {
       "path": "tests/LinuxUnrealScanContracts.py",
@@ -1025,11 +1025,11 @@
     },
     {
       "path": "tests/LinuxUpdaterContracts.py",
-      "sha256": "39a6b8dabad6968947242dbb1987d61f8931482879c8e140da38b3b61c93c48d"
+      "sha256": "f4d009356f02e2c151a9f7ecd4a714f5f387d6a20c6cfe199e2b46cc55b9c33d"
     },
     {
       "path": "tests/LinuxUpdaterDriver.cpp",
-      "sha256": "055b76bb716259ce04a59612e224e3d79e1961665042a1198b2fd42960ed28e1"
+      "sha256": "2d49b3c54741e38f5da1a907fa3a6cf500ed07be1b2f2f2d06d8f42062884c17"
     },
     {
       "path": "tests/LocalizationContracts.cpp",
@@ -1053,7 +1053,7 @@
     },
     {
       "path": "tests/ReleaseWorkflow.Contracts.ps1",
-      "sha256": "73f57162b6d4ee25e43f5c7ac54def7d72733d22195f15e7831895a719e1260f"
+      "sha256": "8878478beda630c1d4e43c8256056c7bd58c583142b1833acd072b71eed996b0"
     },
     {
       "path": "tests/RestartUpdater.Contracts.ps1",
@@ -1089,7 +1089,7 @@
     },
     {
       "path": "tests/Updater.Contracts.ps1",
-      "sha256": "ae8d91664ae085870798c92a8f6cb7f2468ea0cc24a78da4851c62b60ec9eddc"
+      "sha256": "39ba47248a287c7e89cb2b816695c1ae0e4ac945e17b28668d1f27610e8958b8"
     },
     {
       "path": "tests/data/ClientSettingsFixture.hpp",

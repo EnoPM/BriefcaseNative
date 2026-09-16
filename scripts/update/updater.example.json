@@ -1,6 +1,7 @@
 {
   "schemaVersion": 1,
   "enabled": true,
+  "updateMods": true,
   "repository": "EnoPM/BriefcaseNative",
   "timeoutSeconds": 20
 }

@@ -172,7 +172,7 @@ Check ((Invoke-ServerUpdate $win64) -eq 'installed 0.4.0') 'Fresh installation d
 Check ($script:requests -eq 2) 'Fresh installation skipped its update check.'
 $defaults=Read 'Briefcase/updater.json'|ConvertFrom-Json
 $template=Get-Content -LiteralPath (Join-Path $project 'scripts/update/updater.example.json') -Raw|ConvertFrom-Json
-foreach ($key in @('schemaVersion','enabled','repository','timeoutSeconds')) {
+foreach ($key in @('schemaVersion','enabled','updateMods','repository','timeoutSeconds')) {
     Check ($defaults.$key -ceq $template.$key) "First-launch default differs from shipped example: $key"
 }
 $original=Read 'Briefcase/updater.json'
@@ -187,6 +187,8 @@ Check ((Read 'Briefcase/updater.json') -ceq $original) 'Disabled updater setting
 Put $configPath '{invalid user config'
 Check ((Invoke-ServerUpdate $win64 3>$null) -eq 'failed-kept-installed') 'Invalid user config not handled.'
 Check ((Read 'Briefcase/updater.json') -ceq '{invalid user config') 'Invalid existing configuration silently replaced.'
+$invalidModResult=Invoke-ModUpdates $win64 3>$null
+Check ($invalidModResult.state -ceq 'failed-kept-installed') 'Invalid config blocked startup during mod update checks.'
 
 Write-UpdateJson $configPath @{schemaVersion=1;enabled=$true;repository='Custom/Repo';timeoutSeconds=47}
 $original=Read 'Briefcase/updater.json'
@@ -201,4 +203,47 @@ function Get-UpdateDownload { throw 'Simulated GitHub outage' }
 Check ((Invoke-ServerUpdate $win64 3>$null) -eq 'failed-kept-installed') 'Offline launch must keep installed version.'
 Check ((Read 'Briefcase/updater.json'|ConvertFrom-Json).enabled -eq $true) 'Offline first launch did not save defaults.'
 Check ((Read 'Briefcase.ServerLauncher.exe') -eq 'new') 'Offline attempt changed binary.'
+
+# Installed mods opt in through their manifest. They update before launch while
+# local configuration remains untouched.
+$modId='test.early';$modRepository='Example/Test.Early';$modRoot=Join-Path $win64 "Briefcase/Mods/$modId"
+$installedMod=@{schemaVersion=1;id=$modId;name='Early';author='Test';version='1.0.0';entry='Test.Early.dll';minimumApi=1;loadPhase='startup';environment='server';capabilities=@('log');dependencies=@();update=@{provider='github-releases';repository=$modRepository}}
+Write-UpdateJson (Join-Path $modRoot 'briefcase.mod.json') $installedMod
+Put (Join-Path $modRoot 'Test.Early.dll') 'MZold'
+Put (Join-Path $modRoot 'Data/config.json') '{"local":true}'
+$modStage=Join-Path $fixture 'mod-stage';$modPrefix="Briefcase/Mods/$modId"
+$packagedMod=$installedMod.Clone();$packagedMod.version='1.1.0'
+Write-UpdateJson (Join-Path $modStage "$modPrefix/briefcase.mod.json") $packagedMod
+Put (Join-Path $modStage "$modPrefix/Test.Early.dll") 'MZnew'
+Put (Join-Path $modStage "$modPrefix/Data/config.json") '{"local":false}'
+Put (Join-Path $modStage "$modPrefix/Licenses/Test.txt") 'license'
+$modRows=@(Get-ChildItem -LiteralPath (Join-Path $modStage 'Briefcase') -Recurse -File|ForEach-Object{
+    $relative=$_.FullName.Substring($modStage.Length+1).Replace('\','/')
+    $row=@{path=$relative;bytes=$_.Length;sha256=(Get-FileHash -LiteralPath $_.FullName).Hash.ToLowerInvariant();mode=420}
+    if($relative -ceq "$modPrefix/Data/config.json"){$row.preserve=$true};$row
+})
+Write-UpdateJson (Join-Path $modStage 'ModPackage.json') @{updateSchema=1;kind='briefcase-mod';platform='windows-x64';modId=$modId;version='1.1.0';repository=$modRepository;files=$modRows}
+$null=Read-ModUpdatePackage $modStage $modId '1.1.0' $modRepository 'windows-x64'
+$modArchive=Join-Path $fixture 'Test.Early-windows-x64-1.1.0.zip'
+[IO.Compression.ZipFile]::CreateFromDirectory($modStage,$modArchive)
+$modRelease=[pscustomobject]@{tag_name='v1.1.0';draft=$false;prerelease=$false;assets=@([pscustomobject]@{
+    name='Test.Early-windows-x64-1.1.0.zip';state='uploaded';size=(Get-Item $modArchive).Length;
+    digest='sha256:'+((Get-FileHash $modArchive).Hash.ToLowerInvariant());browser_download_url='https://github.com/Example/Test.Early/releases/download/v1.1.0/Test.Early-windows-x64-1.1.0.zip'})}
+Write-UpdateJson $configPath @{schemaVersion=1;enabled=$true;updateMods=$true;repository='';timeoutSeconds=20}
+$script:modRequests=0
+function Get-UpdateDownload([string]$Url,[string]$Destination,[int]$TimeoutSeconds,[long]$MaxBytes){
+    $script:modRequests++
+    if($Url.EndsWith('/latest')){Write-UpdateJson $Destination $modRelease}else{Copy-Item -LiteralPath $modArchive -Destination $Destination}
+}
+$modResult=Invoke-ModUpdates $win64
+Check ($modResult.checked -eq 1 -and $modResult.updated -eq 1 -and $script:modRequests -eq 2) 'Startup mod was not updated.'
+Check ((Read "$modPrefix/Test.Early.dll") -ceq 'MZnew') 'Updated mod binary missing.'
+Check ((Read "$modPrefix/Data/config.json") -ceq '{"local":true}') 'Mod configuration was overwritten.'
+Check ((Read "$modPrefix/briefcase.mod.json"|ConvertFrom-Json).version -ceq '1.1.0') 'Updated mod manifest missing.'
+Check ((Read "$modPrefix/.briefcase-update.json"|ConvertFrom-Json).version -ceq '1.1.0') 'Mod update metadata missing.'
+$modResult=Invoke-ModUpdates $win64
+Check ($modResult.current -eq 1 -and $script:modRequests -eq 3) 'Current mod downloaded again.'
+Write-UpdateJson $configPath @{schemaVersion=1;enabled=$true;updateMods=$false;repository='';timeoutSeconds=20}
+$before=$script:modRequests;$modResult=Invoke-ModUpdates $win64
+Check ($modResult.state -ceq 'disabled' -and $script:modRequests -eq $before) 'Mod update opt-out ignored.'
 Write-Output "PASS updater contracts: $checks checks (release selection, ZIP boundaries, integrity, preservation, recovery, offline startup)."

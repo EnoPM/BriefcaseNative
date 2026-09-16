@@ -55,6 +55,4 @@ try {
   try{$inputStream.CopyTo($outputStream)}finally{$inputStream.Dispose();$outputStream.Dispose()}
  }
 } finally {$zip.Dispose()}
-$hash=(Get-FileHash -LiteralPath $archive).Hash.ToLowerInvariant()
-[IO.File]::WriteAllText(($archive+'.sha256'),"$hash  $([IO.Path]::GetFileName($archive))"+[Environment]::NewLine)
 Write-Output "SDK prepared: $archive"

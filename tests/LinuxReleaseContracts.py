@@ -19,7 +19,6 @@ class ReleaseContracts(Contracts):
         with zipfile.ZipFile(archive,"w") as z:
             for file in stage.rglob("*"):
                 if file.is_file():z.write(file,file.relative_to(stage).as_posix())
-        checksum=archive.with_suffix(".zip.sha256");checksum.write_text(u.digest_file(archive)+"  "+archive.name+"\n")
         commit="a"*40;api="https://api.github.com/repos/Example/Framework/releases/12";calls=[]
         release=dict(tag_name="v1.0.0",draft=True,prerelease=False,assets=[],html_url="https://github.com/Example/Framework/releases/tag/v1.0.0")
         def cli(*args):
@@ -28,7 +27,7 @@ class ReleaseContracts(Contracts):
             if args[:3]==("gh","release","view"):return api
             if args[:2]==("gh","api"):return json.dumps(release)
             if args[:3]==("gh","release","upload"):
-                release["assets"]=[dict(name=file.name,state="uploaded",size=file.stat().st_size,digest="sha256:"+u.digest_file(file)) for file in (archive,checksum)]
+                release["assets"]=[dict(name=archive.name,state="uploaded",size=archive.stat().st_size,digest="sha256:"+u.digest_file(archive))]
                 return ""
             if args[:3]==("gh","release","edit"):return ""
             raise AssertionError(args)
@@ -38,9 +37,6 @@ class ReleaseContracts(Contracts):
             calls.clear()
             with self.assertRaises(u.UpdateError):publisher.publish(project,"Example/Framework","1.0.0",commit)
             self.assertFalse(any(call[:3]==("gh","release","upload") for call in calls))
-            calls.clear();checksum.write_text("wrong")
-            with self.assertRaises(u.UpdateError):publisher.publish(project,"Example/Framework","1.0.0",commit)
-            self.assertFalse(any(call[0]=="gh" for call in calls))
 
 if __name__=="__main__":
     # Only the publication-specific test; updater contracts have their own CTest entry.

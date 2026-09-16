@@ -23,8 +23,12 @@ std::string identifier();
 void allowed_url(const std::string& url);
 void download(const std::string& url, const fs::path& path, int timeout, uint64_t maximum);
 std::optional<Json> select_asset(const Json& release, const std::string& repository, const std::string& current);
-void extract(const fs::path& archive, const fs::path& stage);
+std::optional<Json> select_mod_asset(const Json& release, const std::string& repository,
+                                     const std::string& current, const std::string& platform);
+void extract(const fs::path& archive, const fs::path& stage, bool mod_package = false);
 Json package_manifest(const fs::path& stage, const std::string& version, const std::string& game_hash);
+Json mod_package_manifest(const fs::path& stage, const std::string& id, const std::string& version,
+                          const std::string& repository, const std::string& platform);
 
 // Dependencies are injectable for deterministic offline contracts. The executable
 // always uses the real HTTPS downloader; no environment switch bypasses validation.
@@ -36,7 +40,10 @@ public:
     void install(const fs::path& stage, const Json& manifest,
                  const std::function<void(size_t)>& after_write = {});
     std::string update(const std::function<void(const std::string&)>& log);
+    Json update_mods(const std::function<void(const std::string&)>& log);
 private:
+    void recover_mod();
+    void install_mod(const fs::path& stage, const Json& manifest);
     fs::path root_;
     Download fetch_;
 };

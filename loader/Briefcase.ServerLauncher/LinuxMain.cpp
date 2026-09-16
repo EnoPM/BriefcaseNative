@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
 #include <fcntl.h>
 #include <poll.h>
 #include <regex>
@@ -131,6 +132,9 @@ int supervise(const fs::path& game, const std::vector<std::string>& arguments) {
             execv(target.c_str(), argv.data());
             throw std::runtime_error("Cannot restart updated launcher");
         }
+        const auto mods = Updater(root).update_mods([&](const std::string& message) { log(root, message); });
+        write_json(package_path(root, "Briefcase/Updates/last-result.json"),
+                   {{"framework", result}, {"mods", mods}, {"checkedAt", std::time(nullptr)}});
         int pair[2]; require(socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, pair) == 0, "Cannot create restart channel");
         Fd parent(pair[0]);
         pid_t pid;

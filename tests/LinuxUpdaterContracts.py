@@ -50,7 +50,7 @@ class Contracts(unittest.TestCase):
         path=self.base/'release.json';write_json(path,release)
         self.assertEqual(self.run_native('update',self.root,path,archive,'EnoPM/BriefcaseNative','20'),'installed')
         config=self.root/'Briefcase/updater.json'
-        expected=dict(schemaVersion=1,enabled=True,repository='EnoPM/BriefcaseNative',timeoutSeconds=20)
+        expected=dict(schemaVersion=1,enabled=True,updateMods=True,repository='EnoPM/BriefcaseNative',timeoutSeconds=20)
         self.assertEqual(json.loads(config.read_text()),expected);self.assert_version('1.1.0')
         template=Path(__file__).resolve().parents[1]/'scripts/update/updater.example.json'
         self.assertEqual(json.loads(template.read_text()),expected)
@@ -133,6 +133,46 @@ class Contracts(unittest.TestCase):
             path=self.root/name;path.write_text('legacy');m['files'].append(dict(path=name))
         write_json(self.root/'Package.json',m);second,m=self.package('1.1.0');self.installed(second,m)
         self.assertFalse((self.root/'StartBriefcaseNativeServer.sh').exists());self.assertFalse(list((self.root/'Briefcase/Updater').glob('*.py')))
+    def test_startup_mod_update_preserves_configuration(self):
+        mod_id='test.early';repository='Example/Test.Early';prefix=Path('Briefcase/Mods')/mod_id
+        installed=dict(schemaVersion=1,id=mod_id,name='Early',author='Test',version='1.0.0',entry='Test.Early.so',minimumApi=1,
+                       loadPhase='startup',environment='server',capabilities=['log'],dependencies=[],
+                       update=dict(provider='github-releases',repository=repository))
+        write_json(self.root/prefix/'briefcase.mod.json',installed)
+        (self.root/prefix/'Test.Early.so').write_bytes(b'old')
+        write_json(self.root/prefix/'Data/config.json',dict(local=True))
+        stage=self.base/'mod-stage';packaged=dict(installed);packaged['version']='1.1.0'
+        write_json(stage/prefix/'briefcase.mod.json',packaged)
+        elf=b'\x7fELF\x02\x01'+b'\0'*12+b'\x3e\0new';(stage/prefix/'Test.Early.so').write_bytes(elf)
+        write_json(stage/prefix/'Data/config.json',dict(local=False))
+        (stage/prefix/'Licenses/Test.txt').parent.mkdir(parents=True);(stage/prefix/'Licenses/Test.txt').write_text('license')
+        rows=[]
+        for file in sorted((stage/'Briefcase').rglob('*')):
+            if not file.is_file():continue
+            name=file.relative_to(stage).as_posix();row=dict(path=name,bytes=file.stat().st_size,sha256=digest(file),mode=0o644)
+            if name==f'{prefix.as_posix()}/Data/config.json':row['preserve']=True
+            rows.append(row)
+        package=dict(updateSchema=1,kind='briefcase-mod',platform='linux-x64',modId=mod_id,version='1.1.0',repository=repository,files=rows)
+        write_json(stage/'ModPackage.json',package)
+        self.run_native('modmanifest',stage,mod_id,'1.1.0',repository)
+        archive=self.archive(stage);name='Test.Early-linux-x64-1.1.0.zip'
+        release=dict(tag_name='v1.1.0',draft=False,prerelease=False,assets=[dict(name=name,state='uploaded',size=archive.stat().st_size,
+                     digest='sha256:'+digest(archive),browser_download_url='https://github.com/Example/Test.Early/releases/download/v1.1.0/'+name)])
+        release_path=self.base/'mod-release.json';write_json(release_path,release)
+        write_json(self.root/'Briefcase/updater.json',dict(schemaVersion=1,enabled=True,updateMods=True,repository='',timeoutSeconds=7))
+        result=json.loads(self.run_native('mods',self.root,release_path,archive,repository,'7'))
+        self.assertEqual((result['checked'],result['updated'],result['failed']),(1,1,0))
+        self.assertEqual((self.root/prefix/'Test.Early.so').read_bytes(),elf)
+        self.assertEqual(json.loads((self.root/prefix/'Data/config.json').read_text()),dict(local=True))
+        self.assertEqual(json.loads((self.root/prefix/'briefcase.mod.json').read_text())['version'],'1.1.0')
+        self.assertEqual(json.loads((self.root/prefix/'.briefcase-update.json').read_text())['version'],'1.1.0')
+        result=json.loads(self.run_native('mods',self.root,release_path,archive,repository,'7'))
+        self.assertEqual(result['current'],1)
+    def test_invalid_configuration_keeps_installed_mods(self):
+        (self.root/'Briefcase').mkdir(parents=True,exist_ok=True)
+        (self.root/'Briefcase/updater.json').write_text('{invalid')
+        result=json.loads(self.run_native('mods',self.root))
+        self.assertEqual(result['state'],'failed-kept-installed')
 if __name__=='__main__':
     assert DRIVER,'Native updater test executable required'
     unittest.main()

@@ -35,6 +35,17 @@ int main(int argc, char** argv) {
                 atomic(path, read(url.ends_with("latest") ? argv[3] : argv[4], maximum));
             });
             std::puts(updater.update([](const std::string&) {}).c_str());
+        } else if (command == "modmanifest") {
+            std::puts(mod_package_manifest(argv[2], argv[3], argv[4], argv[5], "linux-x64").dump().c_str());
+        } else if (command == "mods") {
+            Updater updater(argv[2], [&](const std::string& url, const fs::path& path, int timeout, uint64_t maximum) {
+                require(argc == 7, "Missing mod download fixture");
+                require(timeout == std::stoi(argv[6]), "Unexpected mod timeout");
+                if (url.ends_with("latest"))
+                    require(url == "https://api.github.com/repos/" + std::string(argv[5]) + "/releases/latest", "Unexpected mod repository");
+                atomic(path, read(url.ends_with("latest") ? argv[3] : argv[4], maximum));
+            });
+            std::puts(updater.update_mods([](const std::string&) {}).dump().c_str());
         } else if (command == "download") download(argv[2], argv[3], 10, max_archive);
         else throw std::runtime_error("Unknown test command");
         return 0;
