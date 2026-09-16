@@ -12,6 +12,14 @@ if(NOT TARGET Briefcase::ModApi)
  set_target_properties(Briefcase::Json PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${_bc_sdk}/third_party/include")
 endif()
 set(BriefcaseNativeSDK_VERSION "@VERSION@")
+set(BriefcaseNativeSDK_ENVIRONMENT "@ENVIRONMENT@")
+
+if(BriefcaseNativeSDK_ENVIRONMENT STREQUAL "client" AND NOT TARGET Briefcase::ClientModApi)
+ add_library(Briefcase::ClientModApi INTERFACE IMPORTED)
+ set_target_properties(Briefcase::ClientModApi PROPERTIES
+   INTERFACE_INCLUDE_DIRECTORIES "${_bc_sdk}/include"
+   INTERFACE_LINK_LIBRARIES Briefcase::ModApi)
+endif()
 
 # Optional typed game API, compiled into the consuming module through the public C ABI.
 if(NOT TARGET Briefcase::DeceiveInc)

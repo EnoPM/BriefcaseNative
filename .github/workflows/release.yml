@@ -90,7 +90,8 @@ jobs:
           path: |
             dist/Releases/BriefcaseNative-Server-windows-x64-${{ env.RELEASE_VERSION }}.zip
             dist/Releases/BriefcaseNative-Client-windows-x64-${{ env.RELEASE_VERSION }}.zip
-            dist/Releases/BriefcaseNative-SDK-${{ env.RELEASE_VERSION }}.zip
+            dist/Releases/BriefcaseNative-SDK-Server-${{ env.RELEASE_VERSION }}.zip
+            dist/Releases/BriefcaseNative-SDK-Client-${{ env.RELEASE_VERSION }}.zip
           if-no-files-found: error
           compression-level: 0
           retention-days: 14
@@ -125,9 +126,11 @@ jobs:
       - name: Create and verify the GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_DRAFT: ${{ inputs.draft }}
         run: |
           $version = ./scripts/release/Read-Version.ps1
-          ./scripts/release/Publish-Release.ps1 -Version $version -Commit $env:GITHUB_SHA -Repository $env:GITHUB_REPOSITORY -Draft
+          $draft = $env:RELEASE_DRAFT -eq 'true'
+          ./scripts/release/Publish-Release.ps1 -Version $version -Commit $env:GITHUB_SHA -Repository $env:GITHUB_REPOSITORY -Draft:$draft
 
   linux:
     needs: publish
@@ -135,5 +138,7 @@ jobs:
       contents: write
     uses: ./.github/workflows/linux-server-release.yml
     with:
-      publish: ${{ !inputs.draft }}
+      # Windows and SDK assets have already been published by the preceding job.
+      # Linux attaches its independently verified archive when it is ready.
+      publish: false
     secrets: inherit

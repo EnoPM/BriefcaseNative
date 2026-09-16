@@ -22,12 +22,18 @@ $clientStage=Join-Path $project ('artifacts/client-release-verify-'+[guid]::NewG
 Expand-PackageArchive $client $clientStage
 $supportedClient=(Get-Content -LiteralPath (Join-Path $project 'runtime/Briefcase.NativeHost/ClientBuild.json') -Raw|ConvertFrom-Json).sha256
 $null=Read-ClientPackage $clientStage $Version $supportedClient
-$sdk=Join-Path $project "dist/Releases/BriefcaseNative-SDK-$Version.zip"
-& (Join-Path $PSScriptRoot 'Assert-SDK.ps1') -Archive $sdk -Version $Version
+$sdks=@(
+ [pscustomobject]@{Environment='server';Path=(Join-Path $project "dist/Releases/BriefcaseNative-SDK-Server-$Version.zip")},
+ [pscustomobject]@{Environment='client';Path=(Join-Path $project "dist/Releases/BriefcaseNative-SDK-Client-$Version.zip")}
+)
+foreach($sdk in $sdks){
+ & (Join-Path $PSScriptRoot 'Assert-SDK.ps1') -Archive $sdk.Path -Version $Version -Environment $sdk.Environment
+}
+$sdkPaths=@($sdks.Path)
 if(-not $env:GH_TOKEN){throw 'GH_TOKEN is required for publication.'}
 $tag="v$Version"
 # Never replace an existing release. Assemble as a draft so incomplete assets stay invisible to updaters.
-& gh release create $tag $archive $client $sdk --repo $Repository --target $Commit --title "BriefcaseNative $Version" --generate-notes --draft
+& gh release create $tag $archive $client @sdkPaths --repo $Repository --target $Commit --title "BriefcaseNative $Version" --generate-notes --draft
 if($LASTEXITCODE){throw 'Release creation/upload failed. Inspect any draft left on GitHub before retrying.'}
 # Drafts may not have a tag yet: resolve their REST URL through the CLI's draft-aware lookup.
 $apiUrl=& gh release view $tag --repo $Repository --json apiUrl --jq .apiUrl
@@ -43,7 +49,7 @@ if($uploaded.Count -ne 1 -or $uploaded[0].state -ne 'uploaded' -or $uploaded[0].
     $uploaded[0].size -ne (Get-Item -LiteralPath $archive).Length){
     throw 'GitHub asset verification failed. Release remains a draft.'
 }
-foreach($file in @($client,$sdk)){
+foreach($file in (@($client)+$sdkPaths)){
  $asset=@($release.assets|Where-Object {$_.name -ceq [IO.Path]::GetFileName($file)})
  $digest='sha256:'+(Get-FileHash -LiteralPath $file).Hash.ToLowerInvariant()
  if($asset.Count -ne 1 -or $asset[0].state -ne 'uploaded' -or $asset[0].digest -cne $digest -or $asset[0].size -ne (Get-Item -LiteralPath $file).Length){throw 'SDK upload verification failed; release remains a draft'}

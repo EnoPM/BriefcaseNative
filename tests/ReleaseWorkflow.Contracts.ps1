@@ -14,8 +14,12 @@ $global:bcReleaseTestArchive=Join-Path $fixture "dist/Releases/BriefcaseNative-S
 Copy-Item -LiteralPath (Join-Path $project "dist/Releases/BriefcaseNative-Server-windows-x64-$global:bcReleaseTestVersion.zip") -Destination $global:bcReleaseTestArchive
 $global:bcReleaseTestClient=Join-Path $fixture "dist/Releases/BriefcaseNative-Client-windows-x64-$global:bcReleaseTestVersion.zip"
 Copy-Item -LiteralPath (Join-Path $project "dist/Releases/BriefcaseNative-Client-windows-x64-$global:bcReleaseTestVersion.zip") -Destination $global:bcReleaseTestClient
-$global:bcReleaseTestSdk=Join-Path $fixture "dist/Releases/BriefcaseNative-SDK-$global:bcReleaseTestVersion.zip"
-Copy-Item -LiteralPath (Join-Path $project "dist/Releases/BriefcaseNative-SDK-$global:bcReleaseTestVersion.zip") -Destination $global:bcReleaseTestSdk
+$global:bcReleaseTestSdks=@(foreach($environment in @('Server','Client')){
+    $name="BriefcaseNative-SDK-$environment-$global:bcReleaseTestVersion.zip"
+    $target=Join-Path $fixture "dist/Releases/$name"
+    Copy-Item -LiteralPath (Join-Path $project "dist/Releases/$name") -Destination $target
+    $target
+})
 $global:bcReleaseTestCommit='a'*40
 $global:bcReleaseTestTag=$null
 $global:bcReleaseTestMode='ok'
@@ -23,6 +27,10 @@ $global:bcReleaseTestCommands=[Collections.Generic.List[string]]::new()
 $checks=0
 function Check([bool]$Value,[string]$Message){if(-not $Value){throw $Message};$script:checks++}
 function Reject([scriptblock]$Action){$caught=$false;try{& $Action|Out-Null}catch{$caught=$true};Check $caught 'Unsafe release accepted.'}
+$workflow=Get-Content -LiteralPath (Join-Path $project '.github/workflows/release.yml') -Raw
+Check ($workflow -match "RELEASE_DRAFT: \$\{\{ inputs\.draft \}\}" -and
+       $workflow -match '-Draft:\$draft' -and
+       $workflow -match '(?s)linux:.*?needs: publish.*?publish: false') 'Windows release is not published before the Linux attachment job.'
 function git {
     $global:LASTEXITCODE=0
     if($args -contains '--verify'){
@@ -41,7 +49,7 @@ function gh {
     }
     if($command.StartsWith('release view ')){return 'https://api.github.com/repos/fixture/repo/releases/123'}
     if($command -eq 'api https://api.github.com/repos/fixture/repo/releases/123'){
-        $assets=@(foreach($path in @($global:bcReleaseTestArchive,$global:bcReleaseTestClient,$global:bcReleaseTestSdk)){
+        $assets=@(foreach($path in (@($global:bcReleaseTestArchive,$global:bcReleaseTestClient)+$global:bcReleaseTestSdks)){
             $hash=(Get-FileHash -LiteralPath $path).Hash.ToLowerInvariant()
             if($global:bcReleaseTestMode -eq 'corrupt'){$hash='0'*64}
             @{name=[IO.Path]::GetFileName($path);state='uploaded';size=(Get-Item -LiteralPath $path).Length;digest="sha256:$hash"}
@@ -80,6 +88,9 @@ try {
     Check ($global:bcReleaseTestCommands[0] -match '--draft$') 'Release visible before verification.'
     Check ($global:bcReleaseTestCommands[0] -match "--target $global:bcReleaseTestCommit") 'Release targets wrong commit.'
     Check ($global:bcReleaseTestCommands[0] -match [regex]::Escape([IO.Path]::GetFileName($global:bcReleaseTestClient))) 'Client asset omitted from release creation.'
+    foreach($sdk in $global:bcReleaseTestSdks){
+        Check ($global:bcReleaseTestCommands[0] -match [regex]::Escape([IO.Path]::GetFileName($sdk))) 'Environment SDK omitted from release creation.'
+    }
     $global:bcReleaseTestCommands.Clear()
     & $publish -Version $global:bcReleaseTestVersion -Commit $global:bcReleaseTestCommit -Repository fixture/repo|Out-Null
     Check ($global:bcReleaseTestCommands[-1] -match '--draft=false --latest$') 'Verified release not published.'

@@ -1,0 +1,13 @@
+diff --git a/cmake/modules/CompilerOptions/clang.cmake b/cmake/modules/CompilerOptions/clang.cmake
+index e3ac834..2e0901b 100644
+--- a/cmake/modules/CompilerOptions/clang.cmake
++++ b/cmake/modules/CompilerOptions/clang.cmake
+@@ -3,7 +3,7 @@ if(WIN32)
+     set(DEFAULT_COMPILER_FLAGS "-g;-gcodeview;-fcolor-diagnostics;-Wno-unknown-pragmas;-Wno-unused-parameter;-fms-extensions;-Wignored-attributes" PARENT_SCOPE)
+ else()
+     # Native Linux: DWARF debug info, position-independent code for the shared object
+-    set(DEFAULT_COMPILER_FLAGS "-g;-gdwarf;-fPIC;-fcolor-diagnostics;-Wno-unknown-pragmas;-Wno-unused-parameter;-fms-extensions;-Wignored-attributes" PARENT_SCOPE)
++    set(DEFAULT_COMPILER_FLAGS "-g;-gdwarf;-fPIC;-fcolor-diagnostics;-Wno-unknown-pragmas;-Wno-unused-parameter;-fms-extensions;-Wno-ignored-attributes" PARENT_SCOPE)
+ endif()
+
+ set(LINKER_FLAGS "-g" PARENT_SCOPE)

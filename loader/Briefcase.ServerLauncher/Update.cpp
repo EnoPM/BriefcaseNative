@@ -87,7 +87,6 @@ std::optional<Json> select_asset(const Json& release, const std::string& reposit
                 matches(hash, "sha256:[a-f0-9]{64}"), "Invalid GitHub asset metadata");
         selected = Json{{"version", target}, {"url", url}, {"size", asset.at("size")}, {"sha256", hash.substr(7)}};
     }
-    require(selected.has_value(), "Release has no matching server asset");
     return selected;
 }
 std::optional<Json> select_mod_asset(const Json& release, const std::string& repository,
@@ -112,7 +111,6 @@ std::optional<Json> select_mod_asset(const Json& release, const std::string& rep
         selected = Json{{"version", target}, {"url", url}, {"size", asset.at("size")},
                         {"sha256", hash.substr(7)}};
     }
-    require(selected.has_value(), "Release has no matching mod asset");
     return selected;
 }
 Json package_manifest(const fs::path& stage, const std::string& expected, const std::string& game_hash) {

@@ -41,7 +41,7 @@
     },
     {
       "path": ".github/workflows/release.yml",
-      "sha256": "590411afbd798ac231873a794766f7d2ad0494de194f9abaae516e1c72ffe3b2"
+      "sha256": "754df0b7cfafb4b47e27285f6d459540e45a148c1b65ebf367d1475c85845053"
     },
     {
       "path": ".gitignore",
@@ -53,7 +53,7 @@
     },
     {
       "path": "CONTRIBUTING.md",
-      "sha256": "3a6bea2ffdf62196b6b8992001d04004a96f169e4b225cae866cbef64e0dbdd7"
+      "sha256": "4c6657b184e01bb0549c2deff90b2ce14eea06fba9fa7189354a98c8241540f3"
     },
     {
       "path": "README.md",
@@ -85,11 +85,15 @@
     },
     {
       "path": "cmake/patches/README.md",
-      "sha256": "e055d148178fdfd43bcbc1206a7b7441ff43962e961cbae62324c078dfd55c56"
+      "sha256": "5e25e45f13b70a25342ffd93e13540f7dfe355ec6e6cd5a1b679fb9ba4c01e94"
     },
     {
       "path": "cmake/patches/UE4SS-LICENSE.txt",
       "sha256": "ddc030e25d0ea87aca4ae84c0ed3f868d69273c00c0c12ea1e26f1c6130f5d2e"
+    },
+    {
+      "path": "cmake/patches/ue4ss-linux-clang-warnings.patch",
+      "sha256": "93970d92fcebaadcf70bca100c8f7cd338515a9adf9db5b60560d9d020080ee2"
     },
     {
       "path": "cmake/patches/ue4ss-linux-resolvers.patch",
@@ -185,7 +189,7 @@
     },
     {
       "path": "docs/Updates.md",
-      "sha256": "7346620b4d6c8a20ab9693d9624218f7eea2485ad5c4ad1ebd1d4fb10891ab95"
+      "sha256": "e740825eb725a4c537f1ed90ade4ec2b633ee1a4915c4275f656eb3264271a48"
     },
     {
       "path": "loader/Briefcase.ClientLauncher/Main.cpp",
@@ -225,7 +229,7 @@
     },
     {
       "path": "loader/Briefcase.ServerLauncher/Update.cpp",
-      "sha256": "f012bb58befd43e9fabf7a385abcb26ed6edf9c84b809be0df41acbaa5305e20"
+      "sha256": "2abbbdc5293660f19177f922019d99abd5bc83366237ad667d7421bfa845a7e6"
     },
     {
       "path": "loader/Briefcase.ServerLauncher/Update.hpp",
@@ -757,7 +761,7 @@
     },
     {
       "path": "scripts/linux/package-sdk.py",
-      "sha256": "8c39b595a6e99dbac49a22da276438b12d159abff3689853bb47863b884b169d"
+      "sha256": "a36bfacdf8af5ab435741baf89f5462e2096bb137690216c330ad67f4759b187"
     },
     {
       "path": "scripts/linux/package-server.py",
@@ -769,7 +773,7 @@
     },
     {
       "path": "scripts/linux/prepare-backend.sh",
-      "sha256": "306e42a8c7f3b10ece6528e9c0233e22e1e73aeb58c5310a413e3761e83470ea"
+      "sha256": "da1354f973a18f0279e16c7430743af6dce780a3af3ca99b27f49403b23456b4"
     },
     {
       "path": "scripts/linux/publish-release.py",
@@ -777,7 +781,7 @@
     },
     {
       "path": "scripts/release/Assert-SDK.ps1",
-      "sha256": "d314a2dfa384dcfa4a021f48098f45297f933ddd3f005b2ae51a484afe20d327"
+      "sha256": "b41ab2b43fae39f0cbaa4302fc0ca841bfb8392a184ca94da8ef1f882877a28f"
     },
     {
       "path": "scripts/release/Assert-Source.py",
@@ -785,7 +789,7 @@
     },
     {
       "path": "scripts/release/Package-SDK.ps1",
-      "sha256": "38dc1c10f7ded48ca8cf89f808e085accedc315a2ba78c6f395b6ccb04700ab9"
+      "sha256": "c173bce28e6ec5748e87a76f751f7d23ecb86da0f7fe40ce5cd3eb870935dd05"
     },
     {
       "path": "scripts/release/Package-Tools.ps1",
@@ -793,7 +797,7 @@
     },
     {
       "path": "scripts/release/Publish-Release.ps1",
-      "sha256": "604ace2d0649e88b88e57142d32ef9e87a4128b1f6c5d85bdb0b737ffbe45354"
+      "sha256": "e2db91151e741ed50f43ee713e6bcd3fc2f8fcc4e3899b8e40518281b5c36b4a"
     },
     {
       "path": "scripts/release/Read-Version.ps1",
@@ -881,7 +885,7 @@
     },
     {
       "path": "sdk/BriefcaseNativeSDKConfig.cmake.in",
-      "sha256": "15c2cd19b9900a217a81bd87fa2778ffc5ae76a6aaa091b4ad4642929f04ee28"
+      "sha256": "f0a5947e8a14311f22473b20bbdab7a4b8188e2f90d0382fd1c259f6c0fd5e1f"
     },
     {
       "path": "sdk/templates/NativeMod/release.yml",
@@ -1025,7 +1029,7 @@
     },
     {
       "path": "tests/LinuxUpdaterContracts.py",
-      "sha256": "7f87c0df2489a2cddd8124499e442544e8878df30a0a2e71b588b2e8265af2c8"
+      "sha256": "f2f5965fef1fc590e8d9248eb7713d28fb0dbd48b0016fa37b7a9e3af652cd67"
     },
     {
       "path": "tests/LinuxUpdaterDriver.cpp",
@@ -1053,7 +1057,7 @@
     },
     {
       "path": "tests/ReleaseWorkflow.Contracts.ps1",
-      "sha256": "54516719ed8bc0c934f757dc267463af923a0466098b180663357a08abb59c6a"
+      "sha256": "906d6c8a886b95170121c3e9666baf1a2b36b3820393bc4bee60e81ec51128ae"
     },
     {
       "path": "tests/ServerDirectoryContracts.cpp",
@@ -1085,7 +1089,7 @@
     },
     {
       "path": "tests/WindowsUpdaterContracts.py",
-      "sha256": "677fc8f5bf510047fc080ab15e63e3013a23285ec9e0bbc826422609d997e4f1"
+      "sha256": "905038d5ee61cc361aa9bf3aa27a2a113b6b4926788ccac65feb8061636a67a3"
     },
     {
       "path": "tests/WindowsUpdaterDriver.cpp",

@@ -44,7 +44,8 @@ only `MAJOR.MINOR.PATCH`. A release uses tag `vMAJOR.MINOR.PATCH` and includes:
 - `BriefcaseNative-Server-windows-x64-MAJOR.MINOR.PATCH.zip`;
 - `BriefcaseNative-Server-linux-x64-MAJOR.MINOR.PATCH.zip`;
 - `BriefcaseNative-Client-windows-x64-MAJOR.MINOR.PATCH.zip`;
-- the SDK ZIP.
+- `BriefcaseNative-SDK-Server-MAJOR.MINOR.PATCH.zip`;
+- `BriefcaseNative-SDK-Client-MAJOR.MINOR.PATCH.zip`.
 
 GitHub-generated source archives are not installers.
 
@@ -54,6 +55,12 @@ archives without GitHub SHA-256 digests and incompatible game builds. Separate
 `.sha256` assets are unnecessary because GitHub supplies the asset digest used by
 the updater and the publication workflow. A new game
 build must pass native contracts before its supported hash changes.
+
+Windows assets are published before the longer Linux build finishes. When the
+latest stable release does not yet contain an asset for the current platform, the
+launcher keeps the installed framework without reporting a failed update. A later
+startup installs that version after its platform asset has been attached. Mod
+updates use the same platform-aware behavior.
 
 ## Mod updates
 
@@ -155,15 +162,17 @@ submodule. It requires no server password, local deployment path or
 `local.settings.json`. Third-party actions are official and pinned by full SHA.
 
 The tag must point to the built commit. Existing tags on another commit and existing
-releases fail rather than being replaced. Assets first enter a draft. The reusable
-Linux workflow builds and appends Linux assets from the same commit. GitHub digests
-are compared with local files before the complete three-asset release becomes stable
-and latest. Manual draft mode retains the validated draft.
+releases fail rather than being replaced. Windows server, Windows client and both
+SDK archives first enter a draft; GitHub digests are checked before that release is
+published as stable and latest. The reusable Linux workflow then builds, verifies
+and appends its server archive from the same commit. Manual draft mode keeps the
+release as a validated draft while Linux attaches its archive.
 
-If a job fails after draft creation, the draft remains for inspection. Delete an
-incomplete draft before retrying. Never replace a distributed release; publish a
-new version. Release artifacts remain available for 14 days and failed CTest
-reports for 7 days.
+If the Windows publication fails after draft creation, the draft remains for
+inspection. If Linux fails, the already published Windows release remains usable
+and the failed job identifies the missing platform asset. Delete an incomplete
+draft before retrying. Never replace a distributed release; publish a new version.
+Release artifacts remain available for 14 days and failed CTest reports for 7 days.
 
 Local workflow validation uses `actionlint` and
 `tests/ReleaseWorkflow.Contracts.ps1`, which simulates GitHub commands without

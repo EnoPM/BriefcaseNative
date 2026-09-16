@@ -4,6 +4,9 @@ These small changes are applied to pinned upstream sources by
 scripts/linux/prepare-backend.sh. They do not contain Unreal headers or the
 restricted Unreal implementation.
 
+- ue4ss-linux-clang-warnings.patch: keeps Clang from emitting one warning for
+  every Windows-only `__declspec(dllexport)` declaration in the Linux build.
+  Other compiler warnings remain enabled.
 - ue4ss-linux-time.patch: fmt 11 chrono compatibility in the UE4SS helper library.
   Upstream: NullPrism/RE-UE4SS-Linux at
   7894d53f6e13011a16445f28e6f7cd46d58c72cc; MIT licence retained in

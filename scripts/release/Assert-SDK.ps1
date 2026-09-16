@@ -1,4 +1,8 @@
-[CmdletBinding()]param([Parameter(Mandatory=$true)][string]$Archive,[Parameter(Mandatory=$true)][string]$Version)
+[CmdletBinding()]param(
+ [Parameter(Mandatory=$true)][string]$Archive,
+ [Parameter(Mandatory=$true)][string]$Version,
+ [Parameter(Mandatory=$true)][ValidateSet('server','client')][string]$Environment
+)
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
 $project=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
@@ -6,7 +10,8 @@ $project=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $stage=Join-Path $project ('artifacts/check-sdk-'+[guid]::NewGuid().ToString('N'))
 Expand-PackageArchive $Archive $stage
 $manifest=Get-Content -LiteralPath (Join-Path $stage 'SDK.json') -Raw|ConvertFrom-Json
-if($manifest.schemaVersion -ne 1 -or $manifest.version -cne $Version -or $manifest.abiVersion -ne 1){throw 'Invalid SDK identity'}
+if($manifest.schemaVersion -ne 1 -or $manifest.version -cne $Version -or $manifest.abiVersion -ne 1 -or
+   $manifest.environment -cne $Environment){throw 'Invalid SDK identity'}
 $seen=[Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
 foreach($record in $manifest.files){
  $path=Resolve-PackagePath $stage $record.path
@@ -19,4 +24,8 @@ foreach($file in Get-ChildItem -LiteralPath $stage -Recurse -File){
 foreach($required in @('include/Briefcase/DeceiveInc/Spy.hpp','src/DeceiveInc/Spy.cpp','src/DeceiveInc/SpyContracts.hpp','include/Briefcase/ModApi.h','include/Briefcase/Unreal.hpp','third_party/include/nlohmann/json.hpp','cmake/BriefcaseNativeSDKConfig.cmake')){
  if(-not $seen.Contains((Resolve-PackagePath $stage $required))){throw 'Incomplete SDK'}
 }
-Write-Output "SDK $Version validated."
+$clientApi=Resolve-PackagePath $stage 'include/Briefcase/ClientModApi.h'
+if(($Environment -eq 'client') -ne $seen.Contains($clientApi)){throw 'SDK environment/API mismatch'}
+$config=Get-Content -LiteralPath (Resolve-PackagePath $stage 'cmake/BriefcaseNativeSDKConfig.cmake') -Raw
+if($config -notmatch ('set\(BriefcaseNativeSDK_ENVIRONMENT "'+[regex]::Escape($Environment)+'"\)')){throw 'SDK CMake environment mismatch'}
+Write-Output "$Environment SDK $Version validated."

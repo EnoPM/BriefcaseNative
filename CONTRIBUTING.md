@@ -103,9 +103,10 @@ Never regenerate it from an unreviewed working tree.
 derive from it. Do not replace assets belonging to an existing release.
 
 A push to `main` that changes `VERSION` automatically builds and tests Windows and
-Linux, creates a draft, verifies every uploaded digest and publishes the complete
-release. A push that does not change `VERSION` does not publish. The same workflow
-can be started manually and kept as a draft.
+Linux. It publishes the verified Windows server, Windows client, server SDK and
+client SDK first, then attaches the independently verified Linux server archive
+when that build finishes. A push that does not change `VERSION` does not publish.
+The same workflow can be started manually and kept as a draft.
 
 The release workflow requires the repository secret `UPSTREAM_READ_TOKEN` with read
 access to the pinned private Unreal submodule. Publication itself uses GitHub's
