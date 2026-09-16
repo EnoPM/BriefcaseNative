@@ -37,11 +37,11 @@
     },
     {
       "path": ".github/workflows/linux-server-release.yml",
-      "sha256": "63d38b7fe6df2fc426cc76287da0a60b4b35fea686c2a7e6785e278051fc9c05"
+      "sha256": "f05c08f3644b7bfb8cf501dd5783916d712bf650ff0da1b64775b36ec7e0dc0f"
     },
     {
       "path": ".github/workflows/release.yml",
-      "sha256": "14493be6ca93574904502c3f5567a5d51ebd00edf5eff37c3697db60bc0ba559"
+      "sha256": "b80bdc435b602afc821ba07234a852335cec68742b284c97b584747a4e3b5ed2"
     },
     {
       "path": ".gitignore",
@@ -761,7 +761,7 @@
     },
     {
       "path": "scripts/linux/prepare-backend.sh",
-      "sha256": "ba32c447dff65db9c0f78f475fc3be4f07b9c8def3e29fab8c736d6fc4fc9e0f"
+      "sha256": "306e42a8c7f3b10ece6528e9c0233e22e1e73aeb58c5310a413e3761e83470ea"
     },
     {
       "path": "scripts/linux/publish-release.py",
@@ -881,7 +881,7 @@
     },
     {
       "path": "sdk/templates/NativeMod/release.yml",
-      "sha256": "1db8586da6c279a6edb4760cd2fe7c8317789f47c282d410b042d0c711ee2c0c"
+      "sha256": "d58994ae5f8398b386d87aea1141ec47ff679b46b4c0b266e67d2819582f3e86"
     },
     {
       "path": "sdk/templates/NativeMod/scripts/Build.ps1",

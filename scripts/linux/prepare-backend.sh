@@ -22,5 +22,6 @@ apply_patch_once "$source" "$root/cmake/patches/ue4ss-linux-time.patch"
 apply_patch_once "$source/deps/first/patternsleuth" "$root/cmake/patches/ue4ss-linux-resolvers.patch"
 cmake -S "$source" -B "$build" -G Ninja -DCMAKE_C_COMPILER=clang-19 \
   -DCMAKE_CXX_COMPILER=clang++-19 -DCMAKE_BUILD_TYPE=Game__Shipping__Linux \
+  -DCMAKE_CXX_FLAGS=-Wno-ignored-attributes \
   -DUE4SS_GUI=OFF -DUE4SS_BUILD_TESTS=ON
 cmake --build "$build" --parallel "${BRIEFCASE_BUILD_JOBS:-4}" --target Unreal PalworldSignatureTests
