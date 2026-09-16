@@ -14,7 +14,7 @@ class ReleaseContracts(Contracts):
         self.hash="b0b275eac71bb8314b8afb5b36368d882faefafc993d5eac05bb5956a7334ef7"
         stage,manifest=self.package("1.0.0")
         project=self.base/"project";(project/"dist/Releases").mkdir(parents=True)
-        (project/"CMakeLists.txt").write_text("project(BriefcaseNative VERSION 1.0.0 LANGUAGES CXX)")
+        (project/"VERSION").write_text("1.0.0\n")
         archive=project/"dist/Releases/BriefcaseNative-Server-linux-x64-1.0.0.zip"
         with zipfile.ZipFile(archive,"w") as z:
             for file in stage.rglob("*"):

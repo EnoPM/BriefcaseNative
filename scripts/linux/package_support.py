@@ -61,6 +61,11 @@ def atomic(path,data,mode=0o644):
     finally:
         if os.path.exists(temporary):os.unlink(temporary)
 def write_json(path,value):atomic(path,(json.dumps(value,indent=2)+"\n").encode(),0o600)
+def source_version(project):
+    text=(project/'VERSION').read_text(encoding='utf-8').strip()
+    require(re.fullmatch(r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)',text), 'Invalid VERSION file')
+    return text
+
 def version(text):
     require(isinstance(text,str) and re.fullmatch(r"v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)",text),"Invalid stable version")
     return tuple(map(int,text.removeprefix("v").split(".")))

@@ -8,10 +8,8 @@ foreach($dir in @('scripts/release','scripts/update','dist/Releases')){
 }
 Copy-Item -Path (Join-Path $project 'scripts/release/*.ps1') -Destination (Join-Path $fixture 'scripts/release')
 Copy-Item -LiteralPath (Join-Path $project 'scripts/update/Updater.ps1') -Destination (Join-Path $fixture 'scripts/update')
-Copy-Item -LiteralPath (Join-Path $project 'CMakeLists.txt') -Destination $fixture
-$cmake=Get-Content -LiteralPath (Join-Path $fixture 'CMakeLists.txt') -Raw
-if($cmake -notmatch 'project\(BriefcaseNative VERSION (\d+\.\d+\.\d+)'){throw 'Missing version'}
-$global:bcReleaseTestVersion=$Matches[1]
+Copy-Item -LiteralPath (Join-Path $project 'VERSION') -Destination $fixture
+$global:bcReleaseTestVersion=& (Join-Path $fixture 'scripts/release/Read-Version.ps1') -ProjectRoot $fixture
 $global:bcReleaseTestArchive=Join-Path $fixture "dist/Releases/BriefcaseNative-Server-windows-x64-$global:bcReleaseTestVersion.zip"
 Copy-Item -LiteralPath (Join-Path $project "dist/Releases/BriefcaseNative-Server-windows-x64-$global:bcReleaseTestVersion.zip") -Destination $global:bcReleaseTestArchive
 Copy-Item -LiteralPath (Join-Path $project "dist/Releases/BriefcaseNative-Server-windows-x64-$global:bcReleaseTestVersion.zip.sha256") -Destination ($global:bcReleaseTestArchive+'.sha256')
@@ -65,6 +63,11 @@ try {
     foreach($version in @('v0.3.0','0.3.0-beta','01.3.0','99.99.99',('0.3.0'+[Environment]::NewLine+'injected'))){
         Reject {& $validate -Version $version -Commit $global:bcReleaseTestCommit}
     }
+    foreach($invalid in @('v1.2.3','01.2.3','1.2.3-beta',"1.2.3`ninjected",'')) {
+        [IO.File]::WriteAllText((Join-Path $fixture 'VERSION'),$invalid)
+        Reject {& $validate -Version $global:bcReleaseTestVersion -Commit $global:bcReleaseTestCommit}
+    }
+    [IO.File]::WriteAllText((Join-Path $fixture 'VERSION'),$global:bcReleaseTestVersion+"`r`n")
     Reject {& $validate -Version $global:bcReleaseTestVersion -Commit ('b'*40)}
     $global:bcReleaseTestTag='b'*40
     Reject {& $validate -Version $global:bcReleaseTestVersion -Commit $global:bcReleaseTestCommit}

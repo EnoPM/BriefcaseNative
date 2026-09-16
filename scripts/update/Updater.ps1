@@ -280,9 +280,13 @@ function Invoke-ServerUpdate([string]$Win64) {
     # Caller holds launch.lock through startup. Recovery is mandatory even if updates have been disabled.
     Restore-UpdateTransaction $Win64
     $configPath = Resolve-UpdatePath $Win64 'Briefcase/updater.json'
-    if (-not (Test-Path -LiteralPath $configPath)) { return 'not-configured' }
     $installStarted = $false
     try {
+        # Fresh ZIP installations need no manual configuration. Existing settings,
+        # including an explicit opt-out or a custom repository, belong to the user.
+        if (-not (Test-Path -LiteralPath $configPath)) {
+            Write-UpdateJson $configPath @{schemaVersion=1;enabled=$true;repository='EnoPM/BriefcaseNative';timeoutSeconds=20}
+        }
         $config = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json
         if ($config.schemaVersion -ne 1 -or $config.enabled -isnot [bool] -or $config.timeoutSeconds -lt 1 -or $config.timeoutSeconds -gt 120) {
             throw 'Invalid updater configuration.'

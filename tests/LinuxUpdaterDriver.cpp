@@ -25,8 +25,13 @@ int main(int argc, char** argv) {
             });
         } else if (command == "recover") Updater(argv[2]).recover();
         else if (command == "update") {
-            Updater updater(argv[2], [&](const std::string& url, const fs::path& path, int, uint64_t maximum) {
-                require(argc == 5, "Offline download fixture");
+            Updater updater(argv[2], [&](const std::string& url, const fs::path& path, int timeout, uint64_t maximum) {
+                require(argc == 5 || argc == 7, "Offline download fixture");
+                if (argc == 7) {
+                    require(timeout == std::stoi(argv[6]), "Unexpected configured timeout");
+                    if (url.ends_with("latest"))
+                        require(url == "https://api.github.com/repos/" + std::string(argv[5]) + "/releases/latest", "Unexpected repository");
+                }
                 atomic(path, read(url.ends_with("latest") ? argv[3] : argv[4], maximum));
             });
             std::puts(updater.update([](const std::string&) {}).c_str());

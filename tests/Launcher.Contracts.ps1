@@ -75,7 +75,9 @@ try {
     New-Item -ItemType Directory -Path $updaterDir -Force|Out-Null
     Copy-Item -LiteralPath (Join-Path $project 'scripts\update\Updater.ps1') -Destination $updaterDir
     $run=& $launcher
-    Assert-True ($run.update -eq 'not-configured') 'Unconfigured updater should allow startup.'
+    Assert-True ($run.update -eq 'failed-kept-installed') 'Missing fixture build metadata should retain the installed server.'
+    $defaults=Get-Content -LiteralPath (Join-Path $win64 'Briefcase/updater.json') -Raw|ConvertFrom-Json
+    Assert-True ($defaults.enabled -and $defaults.repository -ceq 'EnoPM/BriefcaseNative') 'First launch did not configure the official updater.'
     Assert-True ($global:bcLauncherTestcaptured.WorkingDirectory -eq $win64) 'Updater changed working directory.'
     $lock=[IO.File]::Open((Join-Path $win64 'Briefcase\Updates\launch.lock'),[IO.FileMode]::Open,[IO.FileAccess]::ReadWrite,[IO.FileShare]::None)
     try { Assert-Throws {& $launcher} 'Concurrent launch lock ignored.' } finally {$lock.Dispose()}
@@ -85,6 +87,9 @@ try {
     $example=Get-Content -LiteralPath (Join-Path $updaterDir 'updater.example.json') -Raw|ConvertFrom-Json
     $example.enabled=$false
     $example|ConvertTo-Json|Set-Content -LiteralPath (Join-Path $updaterDir 'updater.example.json')
+    $run=& $launcher
+    Assert-True ($run.update -eq 'failed-kept-installed') 'A changed example must not overwrite existing user settings.'
+    Remove-Item -LiteralPath (Join-Path $win64 'Briefcase/updater.json')
     $run=& $launcher
     Assert-True ($run.update -eq 'disabled') 'First launch must initialize update configuration from the package.'
     Assert-True (Test-Path -LiteralPath (Join-Path $win64 'Briefcase/updater.json')) 'Update configuration not persisted.'

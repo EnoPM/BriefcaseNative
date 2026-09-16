@@ -7,6 +7,9 @@ It then starts the native launcher under the same launch lock. Errors go to
 Briefcase/Logs/launcher-error.log; launch records include the actual server PID and update status.
 
 StartBriefcaseNativeServer.ps1 remains available for command-line use, with the same update path.
+From 0.5.1, a missing Briefcase/updater.json is created automatically with updates enabled
+against EnoPM/BriefcaseNative. The first launch checks immediately; existing settings are
+preserved, including an explicit opt-out. See Updates.md for configuration and recovery.
 Administration restarts use this coordinator too. --launch-child is an internal invocation,
 reserved for the coordinator after the update; normal users should omit it.
 
@@ -29,12 +32,9 @@ Never keep the old proxy alongside the injected bootstrap.
 
 ## Linux boundary
 
-This implementation currently targets Windows x64. LaunchWindows.hpp and the bootstrap entry
-gate are platform-specific. A Linux port needs a native process/preload adapter, the Linux game
-binary, validated native contracts, and a compatible Unreal backend. The current Windows game
-offsets must not be reused. The updater coordinator currently uses Windows PowerShell and also
-needs a Linux implementation. The update format, public mod ABI and separation of framework/mods
-can be retained. Hiding a Windows window is not a Linux port.
+Linux has its own native C++ launcher, preload bootstrap and updater, documented in
+LinuxServer.md. It uses Binaries/Linux, Linux game profiles and a linux-x64 release asset.
+Both platforms initialize the official update feed automatically and preserve user settings.
 
 ## Validation
 

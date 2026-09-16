@@ -1,13 +1,12 @@
 name: Publish server release
-run-name: Server ${{ inputs.version }} (${{ inputs.draft && 'draft' || 'publish' }})
+run-name: Server release from VERSION (${{ inputs.draft && 'draft' || 'publish' }})
 
 on:
+  push:
+    branches: [main]
+    paths: [VERSION]
   workflow_dispatch:
     inputs:
-      version:
-        description: 'Version in CMakeLists.txt (e.g. 0.3.0, without v)'
-        required: true
-        type: string
       draft:
         description: 'Keep the release as a draft'
         required: true
@@ -30,7 +29,6 @@ jobs:
     runs-on: windows-2025
     timeout-minutes: 90
     env:
-      RELEASE_VERSION: ${{ inputs.version }}
       RUSTUP_TOOLCHAIN: 1.97.1
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -43,7 +41,10 @@ jobs:
         run: python ./scripts/release/Assert-Source.py
 
       - name: Validate version and source revision
-        run: ./scripts/release/Test-ReleaseVersion.ps1 -Version $env:RELEASE_VERSION -Commit $env:GITHUB_SHA
+        run: |
+          $version = ./scripts/release/Read-Version.ps1
+          ./scripts/release/Test-ReleaseVersion.ps1 -Version $version -Commit $env:GITHUB_SHA
+          "RELEASE_VERSION=$version" >> $env:GITHUB_ENV
 
       - name: Install the tested Rust toolchain
         run: |
@@ -83,10 +84,10 @@ jobs:
         with:
           name: server-release
           path: |
-            dist/Releases/BriefcaseNative-Server-windows-x64-${{ inputs.version }}.zip
-            dist/Releases/BriefcaseNative-Server-windows-x64-${{ inputs.version }}.zip.sha256
-            dist/Releases/BriefcaseNative-SDK-${{ inputs.version }}.zip
-            dist/Releases/BriefcaseNative-SDK-${{ inputs.version }}.zip.sha256
+            dist/Releases/BriefcaseNative-Server-windows-x64-${{ env.RELEASE_VERSION }}.zip
+            dist/Releases/BriefcaseNative-Server-windows-x64-${{ env.RELEASE_VERSION }}.zip.sha256
+            dist/Releases/BriefcaseNative-SDK-${{ env.RELEASE_VERSION }}.zip
+            dist/Releases/BriefcaseNative-SDK-${{ env.RELEASE_VERSION }}.zip.sha256
           if-no-files-found: error
           compression-level: 0
           retention-days: 14
@@ -121,7 +122,15 @@ jobs:
       - name: Create and verify the GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_VERSION: ${{ inputs.version }}
-          RELEASE_DRAFT: ${{ inputs.draft }}
         run: |
-          ./scripts/release/Publish-Release.ps1 -Version $env:RELEASE_VERSION -Commit $env:GITHUB_SHA -Repository $env:GITHUB_REPOSITORY -Draft:($env:RELEASE_DRAFT -eq 'true')
+          $version = ./scripts/release/Read-Version.ps1
+          ./scripts/release/Publish-Release.ps1 -Version $version -Commit $env:GITHUB_SHA -Repository $env:GITHUB_REPOSITORY -Draft
+
+  linux:
+    needs: publish
+    permissions:
+      contents: write
+    uses: ./.github/workflows/linux-server-release.yml
+    with:
+      publish: ${{ !inputs.draft }}
+    secrets: inherit

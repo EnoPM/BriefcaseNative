@@ -16,9 +16,9 @@ with tempfile.TemporaryDirectory() as temp:
         records = []
         for name, data in files.items():
             p=stage/name; p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(data)
-            records.append({"path":name,"sha256":hashlib.sha256(data.replace(b"\r\n",b"\n")).hexdigest()})
+            records.append({"path":name,"sha256":None if name=='VERSION' else hashlib.sha256(data.replace(b"\r\n",b"\n")).hexdigest()})
         p=stage/inventory;p.parent.mkdir(parents=True,exist_ok=True)
-        p.write_text(json.dumps({"roots":["runtime","samples","scripts"],"files":records}))
+        p.write_text(json.dumps({"roots":["VERSION","runtime","samples","scripts"],"files":records}))
         return list(files)+[inventory]
     def reject(tracked):
         global checks
@@ -34,5 +34,14 @@ with tempfile.TemporaryDirectory() as temp:
     tracked=setup({"samples/Extra/briefcase.mod.json":b"{}"})
     reject(tracked)
     tracked=setup({"mods/application/source.cpp":b"// application"})
+    reject(tracked)
+    tracked=setup({'VERSION':b'1.2.3\n','runtime/example.cpp':b'// reviewed'})
+    assert guard.verify(stage,tracked)==2;checks+=1
+    (stage/'VERSION').write_text('1.2.4\n')
+    assert guard.verify(stage,tracked)==2;checks+=1
+    for invalid in ('v1.2.3','1.2.3-beta','01.2.3','1.2.3\ninjected',''):
+        (stage/'VERSION').write_text(invalid);reject(tracked)
+    (stage/'VERSION').write_text('1.2.4\n')
+    (stage/'runtime/example.cpp').write_text('// unreviewed')
     reject(tracked)
 print(f"PASS {checks} source publication checks")

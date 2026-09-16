@@ -7,7 +7,7 @@ def command(*args):return subprocess.check_output(list(args),text=True).strip()
 def publish(project,repository,version,commit,publish_draft=False):
     u.version(version)
     u.require(re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+",repository) and re.fullmatch(r"[a-f0-9]{40}",commit),"Invalid release identity")
-    source_version=re.search(r"project\(BriefcaseNative VERSION (\d+\.\d+\.\d+)",(project/"CMakeLists.txt").read_text())[1]
+    source_version=u.source_version(project)
     u.require(version==source_version and command("git","rev-parse","HEAD")==commit,"Release/source mismatch")
     archive=project/f"dist/Releases/BriefcaseNative-Server-linux-x64-{version}.zip";checksum=archive.with_suffix(".zip.sha256")
     u.require(checksum.read_text().strip()==u.digest_file(archive)+"  "+archive.name,"Release checksum mismatch")

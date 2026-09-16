@@ -3,9 +3,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
 $project=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 . (Join-Path $project 'scripts/update/Updater.ps1')
-$cmake=Get-Content -LiteralPath (Join-Path $project 'CMakeLists.txt') -Raw
-if($cmake -notmatch 'project\(BriefcaseNative VERSION (\d+\.\d+\.\d+)'){throw 'Missing version'}
-$version=$Matches[1]
+$version=& (Join-Path $PSScriptRoot 'Read-Version.ps1') -ProjectRoot $project
 $stage=Join-Path $project ('artifacts/sdk-'+[guid]::NewGuid().ToString('N'))
 foreach($dir in @('include','third_party/include','Licenses','cmake')){
  New-Item -ItemType Directory -Path (Join-Path $stage $dir) -Force|Out-Null

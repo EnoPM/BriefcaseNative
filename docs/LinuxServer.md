@@ -80,6 +80,12 @@ Launch `./Briefcase.ServerLauncher` directly from the installation's Binaries/Li
 directory (launching its absolute path elsewhere also uses Binaries/Linux as the
 game's working directory). Python remains a development/CI requirement only.
 
+From 0.5.1, extracting the package and launching it is enough to enable automatic
+updates from EnoPM/BriefcaseNative. The launcher creates Briefcase/updater.json only
+if absent and checks before the first server start and subsequent restarts. Existing
+settings, including enabled: false, are preserved. No GitHub token is needed for
+the official public release feed. See Updates.md for offline behavior and recovery.
+
 The native launcher dynamically links the distribution's maintained libcurl and
 libarchive libraries. On Ubuntu 24.04, install runtime libraries with:
 
@@ -123,7 +129,7 @@ a running game, and preserves mods and user configuration. Old framework scripts
 listed in the installed manifest are removed transactionally. A 0.4.0 installation
 must use this manual installation once: its older updater cannot accept the new
 package layout. New installations simply extract the native archive into Binaries/Linux.
-Package versions follow CMakeLists.txt; published assets must never be overwritten.
+Package versions come exclusively from the root VERSION file; published assets must never be overwritten.
 
 ## Supervision and updates
 
@@ -133,8 +139,8 @@ shell evaluation. A per-installation lock prevents concurrent launchers.
 Unexpected game exits are reported without an automatic crash/restart loop.
 SIGINT/SIGTERM stops the child, with bounded escalation if necessary.
 
-Briefcase/updater.json configures updates. Deployment copies the example only if
-the file is absent. With enabled=true, the supervisor checks the configured GitHub
+Briefcase/updater.json configures updates. Deployment or the first launch initializes
+the official feed only if the file is absent. With enabled=true, the supervisor checks the configured GitHub
 repository before first launch and before administration restarts. A newer stable
 Linux asset is installed before the game starts. Network failure or a release
 without Linux assets keeps the installed version.

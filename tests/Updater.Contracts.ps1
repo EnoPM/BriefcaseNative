@@ -125,7 +125,8 @@ Put $backup 'previous'
 Put (Join-Path $win64 'Briefcase.ServerLauncher.exe') 'interrupted'
 Write-UpdateJson (Join-Path $win64 'Briefcase/Updates/transaction.json') @{id=$id;state='installing';files=@(
     @{path='Briefcase.ServerLauncher.exe';existed=$true;previousHash=(Get-FileHash -LiteralPath $backup).Hash})}
-Check ((Invoke-ServerUpdate $win64) -eq 'not-configured') 'Missing repository did not skip.'
+function Get-UpdateDownload { throw 'Simulated GitHub outage' }
+Check ((Invoke-ServerUpdate $win64 3>$null) -eq 'failed-kept-installed') 'Offline recovery did not retain the installed version.'
 Check ((Read 'Briefcase.ServerLauncher.exe') -eq 'previous') 'Interrupted transaction not recovered.'
 $journal=Read 'Briefcase/Updates/transaction.json'|ConvertFrom-Json
 $journal.state='installing';Write-UpdateJson (Join-Path $win64 'Briefcase/Updates/transaction.json') $journal
@@ -145,12 +146,59 @@ function Get-UpdateDownload([string]$Url,[string]$Destination,[int]$TimeoutSecon
 }
 Check ((Invoke-ServerUpdate $win64) -eq 'not-configured' -and $script:requests -eq 0) 'Empty repo made a request.'
 Write-UpdateJson (Join-Path $win64 'Briefcase/updater.json') @{schemaVersion=1;enabled=$true;repository='example/repo';timeoutSeconds=20}
+$customConfig = Read 'Briefcase/updater.json'
 $release.assets[0].size=(Get-Item -LiteralPath $archive).Length
 $release.assets[0].digest='sha256:'+(Get-FileHash -LiteralPath $archive).Hash.ToLowerInvariant()
 Check ((Invoke-ServerUpdate $win64) -eq 'installed 0.4.0') 'Full automatic update failed.'
 Check ($script:requests -eq 2) 'Expected one metadata and one archive request.'
+Check ((Read 'Briefcase/updater.json') -ceq $customConfig) 'Custom updater configuration overwritten.'
 Check ((Invoke-ServerUpdate $win64) -eq 'current') 'Installed version not retained.'
+
+# A user extracting the ZIP and launching it must get the official feed immediately.
+$configPath = Join-Path $win64 'Briefcase/updater.json'
+Remove-Item -LiteralPath $configPath
+Put (Join-Path $win64 'Briefcase/Updater/build.json') '{"frameworkVersion":"0.3.0"}'
+$release.assets[0].browser_download_url=$release.assets[0].browser_download_url.Replace('example/repo','EnoPM/BriefcaseNative')
+$script:requests=0
+function Get-UpdateDownload([string]$Url,[string]$Destination,[int]$TimeoutSeconds,[long]$MaxBytes) {
+    $script:requests++
+    Check ($TimeoutSeconds -eq 20) 'Default timeout not used.'
+    if ($Url.EndsWith('/latest')) {
+        Check ($Url -ceq 'https://api.github.com/repos/EnoPM/BriefcaseNative/releases/latest') 'Official repository not selected.'
+        Write-UpdateJson $Destination $release
+    } else { Copy-Item -LiteralPath $script:fixtureArchive -Destination $Destination }
+}
+Check ((Invoke-ServerUpdate $win64) -eq 'installed 0.4.0') 'Fresh installation did not check and install an update.'
+Check ($script:requests -eq 2) 'Fresh installation skipped its update check.'
+$defaults=Read 'Briefcase/updater.json'|ConvertFrom-Json
+$template=Get-Content -LiteralPath (Join-Path $project 'scripts/update/updater.example.json') -Raw|ConvertFrom-Json
+foreach ($key in @('schemaVersion','enabled','repository','timeoutSeconds')) {
+    Check ($defaults.$key -ceq $template.$key) "First-launch default differs from shipped example: $key"
+}
+$original=Read 'Briefcase/updater.json'
+Check ((Invoke-ServerUpdate $win64) -eq 'current') 'Fresh config not reusable.'
+Check ((Read 'Briefcase/updater.json') -ceq $original) 'Existing defaults rewritten.'
+
+Write-UpdateJson $configPath @{schemaVersion=1;enabled=$false;repository='Custom/Repo';timeoutSeconds=47}
+$original=Read 'Briefcase/updater.json';$before=$script:requests
+Check ((Invoke-ServerUpdate $win64) -eq 'disabled') 'Explicit opt-out ignored.'
+Check ($script:requests -eq $before) 'Disabled updater made a request.'
+Check ((Read 'Briefcase/updater.json') -ceq $original) 'Disabled updater settings overwritten.'
+Put $configPath '{invalid user config'
+Check ((Invoke-ServerUpdate $win64 3>$null) -eq 'failed-kept-installed') 'Invalid user config not handled.'
+Check ((Read 'Briefcase/updater.json') -ceq '{invalid user config') 'Invalid existing configuration silently replaced.'
+
+Write-UpdateJson $configPath @{schemaVersion=1;enabled=$true;repository='Custom/Repo';timeoutSeconds=47}
+$original=Read 'Briefcase/updater.json'
+function Get-UpdateDownload([string]$Url,[string]$Destination,[int]$TimeoutSeconds,[long]$MaxBytes) {
+    Check ($Url -ceq 'https://api.github.com/repos/Custom/Repo/releases/latest' -and $TimeoutSeconds -eq 47) 'Existing custom settings not used.'
+    Write-UpdateJson $Destination $release
+}
+Check ((Invoke-ServerUpdate $win64) -eq 'current') 'Custom settings ignored.'
+Check ((Read 'Briefcase/updater.json') -ceq $original) 'Custom settings rewritten.'
+Remove-Item -LiteralPath $configPath
 function Get-UpdateDownload { throw 'Simulated GitHub outage' }
 Check ((Invoke-ServerUpdate $win64 3>$null) -eq 'failed-kept-installed') 'Offline launch must keep installed version.'
+Check ((Read 'Briefcase/updater.json'|ConvertFrom-Json).enabled -eq $true) 'Offline first launch did not save defaults.'
 Check ((Read 'Briefcase.ServerLauncher.exe') -eq 'new') 'Offline attempt changed binary.'
 Write-Output "PASS updater contracts: $checks checks (release selection, ZIP boundaries, integrity, preservation, recovery, offline startup)."

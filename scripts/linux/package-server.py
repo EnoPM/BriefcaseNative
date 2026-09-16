@@ -5,7 +5,7 @@ import package_support as u
 GAME_HASH="b0b275eac71bb8314b8afb5b36368d882faefafc993d5eac05bb5956a7334ef7"
 
 def package(project,build,backend,deps,output,json_source=None):
-    version=re.search(r"project\(BriefcaseNative VERSION (\d+\.\d+\.\d+)",(project/"CMakeLists.txt").read_text())[1]
+    version=u.source_version(project)
     output=u.plain(output);output.mkdir(parents=True,exist_ok=True)
     stage=Path(tempfile.mkdtemp(prefix="server-linux-",dir=output));modes={}
     def put(name,data,mode=0o644):

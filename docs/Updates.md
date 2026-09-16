@@ -1,15 +1,26 @@
 # Mises à jour du serveur
 
 Le lanceur local vérifie la dernière release stable GitHub avant de démarrer le Shipping,
-toujours depuis Win64. Le redémarrage demandé dans l'administration emprunte le même
+depuis `Binaries/Win64` sur Windows ou `Binaries/Linux` sur Linux. Le redémarrage demandé dans l'administration emprunte le même
 lanceur. Aucun téléchargement ni remplacement ne se produit pendant une partie.
-Un lancement direct de l'EXE sans ce lanceur ne vérifie pas les mises à jour.
+Un lancement direct de l'exécutable du jeu sans ce lanceur ne vérifie pas les mises à jour.
 
-## Activer après la création du dépôt
+## Activation automatique
 
-Copier `Briefcase/Updater/updater.example.json` vers `Briefcase/updater.json`, puis renseigner
-`repository` sous la forme `proprietaire/depot`. `enabled` permet de désactiver la vérification.
-Sans fichier ou avec un dépôt vide, aucune requête réseau n'est envoyée.
+À partir de la version 0.5.1, une installation depuis le ZIP officiel ne demande aucune
+configuration manuelle : au premier lancement, `Briefcase.ServerLauncher.exe` (Windows)
+ou `Briefcase.ServerLauncher` (Linux) crée `Briefcase/updater.json` s'il est absent,
+avec `enabled: true`, `repository: "EnoPM/BriefcaseNative"` et `timeoutSeconds: 20`.
+Il vérifie immédiatement les mises à jour, puis à chaque démarrage ou redémarrage via le lanceur.
+Une mise à jour compatible est installée avant de lancer le serveur.
+
+Un fichier existant est conservé tel quel, y compris `enabled: false`, un dépôt personnalisé
+ou une configuration invalide (signalée comme erreur, jamais remplacée silencieusement).
+`enabled` permet de désactiver la vérification ; un dépôt vide la désactive également.
+`Briefcase/Updater/updater.example.json` reste fourni comme référence. La configuration
+active appartient à l'utilisateur et n'est jamais incluse parmi les fichiers remplacés par une mise à jour.
+Les installations 0.5.0 sans configuration doivent installer le nouveau paquet une fois,
+ou copier l'exemple vers `Briefcase/updater.json` pour activer leur updater existant.
 Cette version utilise les releases **publiques**, sans jeton GitHub ni mot de passe supplémentaire.
 Ne pas placer de jeton dans le nom du dépôt. Aucun dépôt n'est créé automatiquement.
 
@@ -19,7 +30,7 @@ une release absente laisse démarrer la version installée avec un avertissement
 
 ## Préparer une release
 
-1. Changer la version `project(BriefcaseNative VERSION ...)` dans CMakeLists.txt.
+1. Changer uniquement le fichier `VERSION` à la racine (par exemple `0.5.1`).
 2. Exécuter `scripts/build/Build.ps1`, puis `scripts/client/Package-Client.ps1`.
    Ce dernier teste et vérifie les deux paquets, puis prépare l'archive serveur dans `dist/Releases`.
 3. Après validation et approbation, créer une release stable portant le tag `vMAJOR.MINOR.PATCH`.
@@ -55,24 +66,31 @@ si le compte GitHub qui publie les releases est compromis. Sécuriser les accès
 
 ## Portabilité et périmètre
 
-La première intégration concerne le **serveur Windows x64**, publié en premier. Le client n'installe
-pas automatiquement ses mises à jour. Le protocole (HTTPS, JSON, ZIP, SHA256) est indépendant de l'OS ;
-les scripts de lancement/processus restent Windows. Un serveur Linux devra disposer de son propre
-installateur/lanceur et d'un asset Linux, ainsi que du portage du runtime. Aucun support Linux n'est annoncé ici.
+Les paquets **serveur Windows x64 et Linux x64** utilisent le même protocole
+(HTTPS, JSON, ZIP, SHA256), avec un asset propre à chaque plateforme. Le lanceur Linux
+et son updater sont natifs C++ ; le coordinateur Windows utilise PowerShell.
+Le client n'installe pas automatiquement ses mises à jour. Voir [LinuxServer.md](LinuxServer.md)
+pour les dépendances et les limites de validation du serveur Linux.
 
 Référence : [API officielle GitHub Releases](https://docs.github.com/en/rest/releases/releases).
 
-## Workflow GitHub Actions manuel
+## Publication automatique et manuelle
 
-Le fichier .github/workflows/release.yml fournit **Publish server release**.
-Il n'est déclenché ni par un push ni par la création d'un tag.
+Le fichier `.github/workflows/release.yml` fournit **Publish server release**.
+Un push sur `main` qui modifie `VERSION` déclenche automatiquement la compilation,
+les tests et la publication de `v<VERSION>`. Un push sans changement de ce fichier
+ne publie rien. Le fichier accepte uniquement `MAJOR.MINOR.PATCH`, sans préfixe `v`.
+La version est lue dans le commit déclencheur, jamais dans une autre révision de `main`.
+CMake, le SDK et les noms d'archives utilisent tous cette même source.
+L'inventaire des sources valide le format de `VERSION` sans lui imposer une empreinte
+fixe ; changer uniquement ce fichier suffit pour une nouvelle release.
 
-Lorsque le dépôt sera créé et ces fichiers présents sur sa branche par défaut :
+Pour déclencher manuellement :
 
-1. Mettre à jour la version dans CMakeLists.txt et enregistrer les sources dans Git.
+1. Mettre à jour `VERSION` et enregistrer les sources dans Git.
 2. Ouvrir **Actions → Publish server release → Run workflow**.
 3. Choisir la branche contenant le code à publier.
-4. Saisir sa version, par exemple 0.3.0 (sans v), exactement comme dans CMake.
+4. La version est lue automatiquement dans `VERSION` ; aucune saisie supplémentaire.
 5. Laisser **Keep the release as a draft** décoché pour publier automatiquement, ou le cocher
    pour préparer un brouillon à relire avant publication.
 6. Cliquer sur **Run workflow**.
@@ -88,13 +106,19 @@ Le client est compilé et testé mais n'est pas publié.
 
 Le job de compilation dispose d'un accès en lecture au dépôt. Le job de publication utilise
 le GITHUB_TOKEN fourni automatiquement par GitHub, avec contents: write. Aucun secret
-personnel, mot de passe serveur, chemin de copie locale ou fichier local.settings.json n'est requis.
+personnel n'est utilisé pour publier. La compilation utilise le secret `UPSTREAM_READ_TOKEN`
+pour lire le sous-module Unreal privé. Aucun mot de passe serveur, chemin de copie locale
+ou fichier local.settings.json n'est requis.
 Les politiques du dépôt/de l'organisation doivent autoriser GitHub Actions et la création des releases/tags.
 Les actions utilisées sont officielles et épinglées par leur SHA complet.
 
 Le tag vMAJOR.MINOR.PATCH cible le commit compilé. Un tag existant associé à un autre commit
-est refusé ; une release existante n'est pas remplacée. Les uploads sont assemblés dans un brouillon,
-puis leurs digests GitHub sont comparés aux fichiers locaux avant publication comme release stable/latest.
+est refusé ; une release existante n'est pas remplacée. Les uploads sont assemblés dans un brouillon.
+La release reste en brouillon pendant que le workflow réutilisable `linux-server-release.yml`
+compile, teste et ajoute les assets Linux du même commit. Les digests GitHub sont comparés
+aux fichiers locaux avant publication comme release stable/latest, avec les six assets
+(Windows, Linux et SDK, chacun avec son SHA-256). Le mode brouillon manuel conserve la
+release en brouillon après validation des deux plateformes.
 Les notes de release sont générées par GitHub. Un brouillon ne déclenche pas les mises à jour serveur.
 
 En cas d'échec après création du brouillon, celui-ci est laissé en place pour inspection.
@@ -108,8 +132,6 @@ Validation locale du workflow :
 - après préparation de l'archive, tests/ReleaseWorkflow.Contracts.ps1 teste les contrôles de version/tag,
   le brouillon, la publication et les erreurs d'intégrité avec des commandes GitHub simulées.
   Ce test ne contacte pas GitHub et ne crée aucune release.
-
-Le premier build sur un runner GitHub reste à valider lorsque le dépôt existera.
 
 Références : [déclenchement manuel](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow),
 [création des releases avec GitHub CLI](https://cli.github.com/manual/gh_release_create).

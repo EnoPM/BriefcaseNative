@@ -1,8 +1,9 @@
 """Produce the OS-neutral public SDK, including exact file hashes."""
 import argparse, hashlib, json, re, shutil, tempfile, zipfile
 from pathlib import Path
+import package_support as u
 def package(project, json_source, output):
-    version=re.search(r"project\(BriefcaseNative VERSION (\d+\.\d+\.\d+)",(project/"CMakeLists.txt").read_text())[1]
+    version=u.source_version(project)
     output.mkdir(parents=True,exist_ok=True)
     stage=Path(tempfile.mkdtemp(prefix="sdk-",dir=output))
     for name in ("Briefcase.ModApi","Briefcase.ClientModApi","Briefcase.DeceiveInc"):

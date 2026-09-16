@@ -2,6 +2,7 @@
 import argparse
 import hashlib
 import json
+import re
 import subprocess
 from pathlib import Path
 
@@ -23,7 +24,12 @@ def verify(root, tracked):
         if path.name == "briefcase.mod.json" and name not in sample_manifests:
             raise ValueError("Only approved educational samples may declare mod packages")
         data = (root / name).read_bytes().replace(b"\r\n", b"\n")
-        if hashlib.sha256(data).hexdigest() != digest:
+        # VERSION is the one deliberately editable release input. Keep its path
+        # in the reviewed inventory, but validate its grammar instead of a hash.
+        if name == 'VERSION':
+            if digest is not None or not re.fullmatch(rb'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)',data.strip()):
+                raise ValueError('Invalid VERSION release input')
+        elif hashlib.sha256(data).hexdigest() != digest:
             raise ValueError("Source changed since review: " + name)
     return len(expected)
 

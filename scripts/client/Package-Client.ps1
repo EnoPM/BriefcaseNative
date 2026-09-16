@@ -24,9 +24,7 @@ foreach($kind in @('Client','Server')) {
         '{"schemaVersion":1,"enabledMods":["briefcase.native-overlay-sample"]}'|
             Set-Content -LiteralPath (Join-Path $destination 'Briefcase\loader.json') -Encoding utf8
     }
-    $cmakeSource=Get-Content -LiteralPath (Join-Path $project 'CMakeLists.txt') -Raw
-    if($cmakeSource -notmatch 'project\(BriefcaseNative VERSION (\d+\.\d+\.\d+)'){throw 'Cannot read framework version.'}
-    $frameworkVersion=$Matches[1]
+    $frameworkVersion=& (Join-Path $project 'scripts/release/Read-Version.ps1') -ProjectRoot $project
     $records=@(Get-ChildItem -LiteralPath $destination -Recurse -File|ForEach-Object {
         [ordered]@{path=$_.FullName.Substring($destination.Length+1);sha256=(Get-FileHash -LiteralPath $_.FullName).Hash.ToLowerInvariant();bytes=$_.Length}
     })

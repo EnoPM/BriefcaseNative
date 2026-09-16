@@ -43,6 +43,33 @@ class Contracts(unittest.TestCase):
         return dict(tag_name='v'+version,draft=False,prerelease=False,assets=[dict(name=name,state='uploaded',size=archive.stat().st_size,digest='sha256:'+digest(archive),browser_download_url='https://github.com/Example/Framework/releases/download/v'+version+'/'+name)])
     def configure(self):
         write_json(self.root/'Briefcase/updater.json',dict(schemaVersion=1,enabled=True,repository='Example/Framework',timeoutSeconds=1))
+    def test_fresh_install_configures_and_checks_official_release(self):
+        first,m=self.package('1.0.0');self.installed(first,m);second,_=self.package('1.1.0')
+        archive=self.archive(second);release=self.release(archive)
+        release['assets'][0]['browser_download_url']=release['assets'][0]['browser_download_url'].replace('Example/Framework','EnoPM/BriefcaseNative')
+        path=self.base/'release.json';write_json(path,release)
+        self.assertEqual(self.run_native('update',self.root,path,archive,'EnoPM/BriefcaseNative','20'),'installed')
+        config=self.root/'Briefcase/updater.json'
+        expected=dict(schemaVersion=1,enabled=True,repository='EnoPM/BriefcaseNative',timeoutSeconds=20)
+        self.assertEqual(json.loads(config.read_text()),expected);self.assert_version('1.1.0')
+        template=Path(__file__).resolve().parents[1]/'scripts/update/updater.example.json'
+        self.assertEqual(json.loads(template.read_text()),expected)
+        original=config.read_bytes()
+        self.assertEqual(self.run_native('update',self.root,path,archive,'EnoPM/BriefcaseNative','20'),'current')
+        self.assertEqual(config.read_bytes(),original)
+    def test_existing_disabled_or_invalid_config_is_preserved(self):
+        first,m=self.package('1.0.0');self.installed(first,m);config=self.root/'Briefcase/updater.json'
+        write_json(config,dict(schemaVersion=1,enabled=False,repository='Custom/Repo',timeoutSeconds=47))
+        original=config.read_bytes()
+        # This driver refuses any network request without a download fixture.
+        self.assertEqual(self.run_native('update',self.root),'disabled');self.assertEqual(config.read_bytes(),original)
+        config.write_text('{invalid user config')
+        self.assertEqual(self.run_native('update',self.root),'failed-kept-installed')
+        self.assertEqual(config.read_text(),'{invalid user config');self.assert_version('1.0.0')
+    def test_fresh_install_offline_keeps_installed_version(self):
+        first,m=self.package('1.0.0');self.installed(first,m)
+        self.assertEqual(self.run_native('update',self.root),'failed-kept-installed');self.assert_version('1.0.0')
+        self.assertTrue(json.loads((self.root/'Briefcase/updater.json').read_text())['enabled'])
     def test_install_obsolete_and_preserve_user_data(self):
         config=self.root/'Briefcase/Mods/Example/config.json';config.parent.mkdir(parents=True);config.write_bytes(b'private settings')
         first,m=self.package('1.0.0',{'Briefcase/Docs/old.md':b'old'});self.installed(first,m)
@@ -97,7 +124,9 @@ class Contracts(unittest.TestCase):
         path=self.base/'release.json';write_json(path,release);self.configure()
         wrong=dict(release);wrong['assets']=[dict(release['assets'][0],digest='sha256:'+'a'*64)];write_json(path,wrong)
         self.assertEqual(self.run_native('update',self.root,path,archive),'failed-kept-installed');self.assert_version('1.0.0')
-        write_json(path,release);self.assertEqual(self.run_native('update',self.root,path,archive),'installed');self.assert_version('1.1.0')
+        original=(self.root/'Briefcase/updater.json').read_bytes()
+        write_json(path,release);self.assertEqual(self.run_native('update',self.root,path,archive,'Example/Framework','1'),'installed');self.assert_version('1.1.0')
+        self.assertEqual((self.root/'Briefcase/updater.json').read_bytes(),original)
     def test_retired_files_removed_during_native_install(self):
         first,m=self.package('1.0.0');self.installed(first,m)
         for name in ('StartBriefcaseNativeServer.sh','Briefcase/Updater/supervisor.py','Briefcase/Updater/updater.py'):

@@ -9,7 +9,8 @@ from pathlib import Path
 assert os.geteuid()==0, 'Run this isolation contract with sudo'
 build=Path(sys.argv[1]).resolve()
 project=Path(__file__).resolve().parents[1]
-version=re.search(r'project\(BriefcaseNative VERSION (\d+\.\d+\.\d+)',(project/'CMakeLists.txt').read_text())[1]
+version=(project/'VERSION').read_text().strip()
+assert re.fullmatch(r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)',version)
 mount,umount,chroot=(shutil.which(name) for name in ('mount','umount','chroot'))
 assert mount and umount and chroot
 base=project/'artifacts/native-distribution';base.mkdir(parents=True,exist_ok=True)

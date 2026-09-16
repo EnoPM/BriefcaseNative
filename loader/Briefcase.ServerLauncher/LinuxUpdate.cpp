@@ -159,9 +159,14 @@ void Updater::install(const fs::path& stage, const Json& supplied, const std::fu
 std::string Updater::update(const std::function<void(const std::string&)>& log) {
     recover(); // Recovery errors must prevent launch, even with updates disabled.
     const auto config_path = package_path(root_, "Briefcase/updater.json");
-    if (!fs::exists(config_path)) return "not-configured";
     fs::path stage; Json manifest;
     try {
+        // The launcher holds the installation lock. Only initialize a missing
+        // user configuration; never reset an opt-out or custom repository.
+        if (!fs::exists(config_path)) {
+            write_json(config_path, {{"schemaVersion", 1}, {"enabled", true},
+                                    {"repository", "EnoPM/BriefcaseNative"}, {"timeoutSeconds", 20}});
+        }
         const auto config = document(config_path);
         const auto timeout = number(config.at("timeoutSeconds"));
         require(config.at("schemaVersion") == 1 && config.at("enabled").is_boolean() && timeout >= 1 && timeout <= 120, "Invalid updater settings");
