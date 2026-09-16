@@ -179,19 +179,23 @@ Server settings use DeceiveInc/Saved/Config/LinuxServer/TripwireServer.ini.
 Administration does not automatically follow a custom game INI override.
 Without Admin/server.json, administration is disabled.
 
-## Manual GitHub release
+## GitHub releases
 
-linux-server-core.yml checks the portable foundation. linux-server-release.yml
-builds/tests the full host and adds Linux assets to an existing release for the
-same commit. Existing assets are never replaced.
+linux-server-core.yml checks the portable foundation. The main release workflow
+automatically calls linux-server-release.yml to build/test the full host and add
+Linux assets to the Windows/SDK draft for the same commit. Existing assets are
+never replaced. The release becomes public only after both platforms succeed.
 
 1. Configure UPSTREAM_READ_TOKEN with read access to the upstream Unreal submodule.
-2. Increment the version and publish the reviewed source changes normally.
-3. Run the Windows release workflow with draft=true to create the release and SDK.
-4. Run Add Linux server release at that same commit/version. Keep publish=false
-   for review, or enable it to publish the verified existing draft.
+2. Set the new stable version in the root VERSION file and push the reviewed changes
+   to main. A push changing VERSION starts the complete publication automatically.
+3. Alternatively, run Publish server release manually. It reads VERSION from the
+   selected commit; draft=true keeps all verified assets in a draft for review.
+4. Add Linux server release remains manually available to finish an existing matching
+   draft after a Linux failure; its publish option controls whether to expose that draft.
 
-Both workflows share a concurrency group. Build jobs have contents:read;
+The parent and reusable workflow use separate concurrency groups to avoid waiting
+on their own lock. Build jobs have contents:read;
 contents:write is confined to publication. Dependencies and mod sources are not
 uploaded. The 0.4.0 Windows/Linux release workflows passed on GitHub. New source
 changes require their own builds and tests before publication; local publication

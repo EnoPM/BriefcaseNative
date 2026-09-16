@@ -21,7 +21,7 @@ The client package includes only the native overlay sample. The server package c
 
 The [Linux dedicated server port](docs/LinuxServer.md) includes the shared host,
 native hooks and startup patches, TLS administration, restart supervision and
-updates before launch. Separate Linux packaging and a manual release workflow
+updates before launch. Separate Linux packaging and automated releases
 are available; connected-player testing remains before a production release.
 
 ## Development installation
@@ -39,6 +39,8 @@ The samples demonstrate logging, runtime inspection and rendering text through t
 
 ## Releases
 
-The manually triggered release workflow builds and tests the framework, verifies packages
-and creates the server and SDK release assets. See [updates](docs/Updates.md).
+The root [VERSION](VERSION) file is the single source of the framework version.
+A push on `main` changing that file builds and tests Windows and Linux, verifies
+the packages, then publishes the server and SDK release assets together. Manual
+publication remains available, including a draft option. See [updates](docs/Updates.md).
 Source publication is checked against an explicit file inventory.

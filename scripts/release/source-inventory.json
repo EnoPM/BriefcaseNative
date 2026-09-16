@@ -52,7 +52,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "25f8952fac367795834170465a5137458413d33d186b3b05521519b49f647c55"
+      "sha256": "f751912bcbb633afc7779cb3bb995f4a637fe0ec8e1ecd7e6a34e561d35c35a9"
     },
     {
       "path": "VERSION",
@@ -124,7 +124,7 @@
     },
     {
       "path": "docs/LinuxServer.md",
-      "sha256": "755ba35b105e7ecdbf3adf1ad13ec33be651d80bebdf8bc0a62675ab105b4c84"
+      "sha256": "02b56633b23f81cd85f07a1cfd727a78b119c37026f2cd814ac09558c57abd7a"
     },
     {
       "path": "docs/Localization.md",
