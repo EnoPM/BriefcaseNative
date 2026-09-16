@@ -102,7 +102,10 @@ int run(const fs::path& input_root, DWORD parent, DWORD wait_for, const std::str
             root.parent_path().parent_path().filename() == L"DeceiveInc", "Invalid Win64 server directory");
     const auto game = plain(root / game_name);
     require(fs::is_regular_file(game), "Dedicated server executable is missing");
-    const auto launch = document(package_path(root, "Briefcase/launch.json"));
+    const auto launch_path = package_path(root, "Briefcase/launch.json");
+    if (!fs::exists(launch_path))
+        write_json(launch_path, {{"serverWin64", utf8(root.wstring())}});
+    const auto launch = document(launch_path);
     require(launch.contains("serverWin64") && launch.at("serverWin64").is_string() &&
             same_path(root, fs::path(wide(launch.at("serverWin64").get<std::string>()))),
             "Launcher is not authorized for this Win64 directory");

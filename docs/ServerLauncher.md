@@ -8,6 +8,11 @@ Shipping under the same launch lock. Initial launcher errors go to
 `Briefcase/Logs/launcher-error.log`; coordinator activity and errors go to
 `Briefcase/Logs/launcher.log`. Launch records include the actual server PID and update status.
 
+On a fresh Windows installation, the coordinator creates `Briefcase/launch.json`
+with the absolute path of the Win64 directory that contains the launcher. An
+existing file is preserved and must identify that same directory; a mismatched
+file stops startup rather than authorizing a different installation.
+
 From 0.5.1, a missing Briefcase/updater.json is created automatically with updates enabled
 against EnoPM/BriefcaseNative. The first launch checks immediately; existing settings are
 preserved, including an explicit opt-out. See Updates.md for configuration and recovery.

@@ -58,6 +58,8 @@ class Contracts(unittest.TestCase):
    with self.subTest(name=name): self.run_native('path',self.root,name,code=78)
   duplicate=self.base/'duplicate.json';duplicate.write_text('{"enabled":false,"enabled":true}')
   self.run_native('document',duplicate,code=78)
+  missing=subprocess.run([DRIVER,'document',str(self.base/'missing.json')],capture_output=True,text=True,timeout=20)
+  self.assertEqual(missing.returncode,78);self.assertIn('Cannot open file',missing.stderr)
   bad=self.base/'bad.zip'
   with zipfile.ZipFile(bad,'w') as archive: archive.writestr('../escape',b'x')
   self.run_native('extract',bad,self.base/'stage',code=78)

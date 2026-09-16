@@ -31,6 +31,7 @@ void regular(HANDLE handle, uint64_t limit) {
 Handle open_read(const fs::path& path, uint64_t limit) {
     Handle handle{CreateFileW(plain(path).c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING,
                               FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_SEQUENTIAL_SCAN, nullptr)};
+    require(handle.value != INVALID_HANDLE_VALUE, "Cannot open file");
     regular(handle.value, limit); return handle;
 }
 void write_all(HANDLE file, const std::string& data) {

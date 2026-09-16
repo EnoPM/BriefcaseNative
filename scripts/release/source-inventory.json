@@ -57,7 +57,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "4f47a9ef7a1153d309f73f424e71f385d4bac3e90b8a5f4a02b10d218916f749"
+      "sha256": "8f12c8a1d32306a78e1a1f29e14585b8e31c24d2e8cc575a9a808c89be20caa4"
     },
     {
       "path": "VERSION",
@@ -165,7 +165,7 @@
     },
     {
       "path": "docs/ServerLauncher.md",
-      "sha256": "f3592ceaaac805b5d40ee27b55d1ff2e52e7dad434f99cf29be62b2281c0dde6"
+      "sha256": "b3e3cf0d7ad91d5eac3943995557bdfd61c60753a274546bf389459ee95ae60f"
     },
     {
       "path": "docs/SourcePublication.md",
@@ -241,11 +241,11 @@
     },
     {
       "path": "loader/Briefcase.ServerLauncher/WindowsFiles.cpp",
-      "sha256": "c8cfad71b3bfe526c8226fd2968be596d03bbd84c59b110cadf50b8fe689bd4f"
+      "sha256": "1a45ffb69a32f63138408d6e1c7e80450ac0a214fc881151b9789ed247796834"
     },
     {
       "path": "loader/Briefcase.ServerLauncher/WindowsWorker.cpp",
-      "sha256": "86740beea9976e01883b1b9a5e1006efc0c61cc355804621d29b2c62d615bc4a"
+      "sha256": "206fcfb482905717900f3e04c54fb7ee3cffbfc13719d81ce15d943f296e165c"
     },
     {
       "path": "loader/Briefcase.VersionProxy/EntryGate.hpp",
@@ -1069,7 +1069,7 @@
     },
     {
       "path": "tests/ServerLauncherIntegration.ps1",
-      "sha256": "7a050793d5d5d970f2236f0328ba6cc3c75eee1357b0058a3300fec8936d1b60"
+      "sha256": "5c433b5004a42df3d0a61a22ff980329bbe5e6c32c570c32fdecf9f6a2bc9fe2"
     },
     {
       "path": "tests/SourcePublicationContracts.py",
@@ -1089,7 +1089,7 @@
     },
     {
       "path": "tests/WindowsUpdaterContracts.py",
-      "sha256": "905038d5ee61cc361aa9bf3aa27a2a113b6b4926788ccac65feb8061636a67a3"
+      "sha256": "a508413966f5041e5a6da82f5aca9f8e9c66e34601886ef950ca17b77f0fbb2b"
     },
     {
       "path": "tests/WindowsUpdaterDriver.cpp",

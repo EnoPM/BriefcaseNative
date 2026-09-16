@@ -11,7 +11,6 @@ Copy-Item -LiteralPath (Join-Path $Build 'Briefcase.ServerBootstrap.dll') -Desti
 Copy-Item -LiteralPath (Join-Path $Build 'Briefcase.LauncherMockHost.dll') -Destination (Join-Path $runtime 'Briefcase.NativeHost.dll')
 Copy-Item -LiteralPath (Join-Path $Build 'Briefcase.ServerLauncherContracts.exe') -Destination (Join-Path $win64 'DeceiveIncServer-Win64-Shipping.exe')
 Copy-Item -LiteralPath (Join-Path $Build 'Briefcase.ServerUpdater.exe') -Destination $tools
-@{serverWin64=$win64}|ConvertTo-Json|Set-Content -LiteralPath (Join-Path $win64 'Briefcase/launch.json')
 @{schemaVersion=1;enabled=$false;repository='EnoPM/BriefcaseNative';timeoutSeconds=20}|ConvertTo-Json|Set-Content -LiteralPath (Join-Path $win64 'Briefcase/updater.json')
 $previous=$env:BC_TEST_SERVER_LIFETIME
 $env:BC_TEST_SERVER_LIFETIME='60000'
@@ -27,6 +26,8 @@ try {
     if(-not $record){throw 'Coordinator did not return while server was running.'}
     $run=Get-Content -LiteralPath $record.FullName -Raw|ConvertFrom-Json
     if($run.update -ne 'disabled' -or $run.workingDirectory -ne $win64){throw 'Update/cwd contract failed.'}
+    $launch=Get-Content -LiteralPath (Join-Path $win64 'Briefcase/launch.json') -Raw|ConvertFrom-Json
+    if($launch.serverWin64 -ine $win64){throw 'Fresh installation did not initialize launch.json.'}
     $child=Get-Process -Id $run.pid
     if($child.Path -ine (Join-Path $win64 'DeceiveIncServer-Win64-Shipping.exe')){throw 'Unexpected child process.'}
     if(-not(Test-Path -LiteralPath (Join-Path $win64 'entry-verified.txt'))){throw 'Game entered without preparation.'}

@@ -50,14 +50,8 @@ directly beside the platform's Shipping executable.
    The SDK and source-code archives are not server installers.
 3. Extract the ZIP directly into:
    `C:\DeceiveIncServer\DeceiveInc\Binaries\Win64`
-4. Create `Briefcase\launch.json` in that Win64 directory. Replace the example
-   path with the absolute path to your own installation and escape each backslash:
-
-```json
-{
-  "serverWin64": "C:\\DeceiveIncServer\\DeceiveInc\\Binaries\\Win64"
-}
-```
+4. Run `Briefcase.ServerLauncher.exe` from that Win64 directory. On first launch,
+   it creates `Briefcase\launch.json` with the absolute path of this installation.
 
 The resulting layout starts like this:
 
@@ -78,6 +72,8 @@ DeceiveInc/Binaries/Win64/
 Start the server with `Briefcase.ServerLauncher.exe`. Do not start
 `DeceiveIncServer-Win64-Shipping.exe` directly: doing so bypasses Briefcase, its
 mods and its update check. The launcher opens no server UI or external console.
+An existing `Briefcase\launch.json` that identifies another installation is
+rejected instead of being overwritten.
 
 If startup fails, read `Briefcase\Logs\launcher-error.log`,
 `Briefcase\Logs\launcher.log` and the game logs.
