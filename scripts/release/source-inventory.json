@@ -37,11 +37,11 @@
     },
     {
       "path": ".github/workflows/linux-server-release.yml",
-      "sha256": "9affcaffd0cd1300cd186058eac0048253d32473e9d35f2cdc8f9ef56f3ef609"
+      "sha256": "63d38b7fe6df2fc426cc76287da0a60b4b35fea686c2a7e6785e278051fc9c05"
     },
     {
       "path": ".github/workflows/release.yml",
-      "sha256": "6569b21a1fa72e759e3abf13ba036d6419610f6d7f5941052ee4c947d5b31600"
+      "sha256": "14493be6ca93574904502c3f5567a5d51ebd00edf5eff37c3697db60bc0ba559"
     },
     {
       "path": ".gitignore",
@@ -881,7 +881,7 @@
     },
     {
       "path": "sdk/templates/NativeMod/release.yml",
-      "sha256": "f3d020da0675e8fb0146c3886c10065fde00e5de613230eef2c14ad021371b25"
+      "sha256": "1db8586da6c279a6edb4760cd2fe7c8317789f47c282d410b042d0c711ee2c0c"
     },
     {
       "path": "sdk/templates/NativeMod/scripts/Build.ps1",
@@ -1053,7 +1053,7 @@
     },
     {
       "path": "tests/ReleaseWorkflow.Contracts.ps1",
-      "sha256": "8878478beda630c1d4e43c8256056c7bd58c583142b1833acd072b71eed996b0"
+      "sha256": "07e76ae4ff11f6b7f9e7e686365d005124b62acf6e2845e930c2e15b49e197e4"
     },
     {
       "path": "tests/RestartUpdater.Contracts.ps1",

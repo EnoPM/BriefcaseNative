@@ -86,6 +86,7 @@ try {
     $global:bcReleaseTestCommands.Clear();$global:bcReleaseTestMode='exists'
     Reject {& $publish -Version $global:bcReleaseTestVersion -Commit $global:bcReleaseTestCommit -Repository fixture/repo}
     Check ($global:bcReleaseTestCommands.Count -eq 1) 'Existing release modified.'
+    $global:LASTEXITCODE=0
     Write-Output "PASS $checks release workflow contracts; no remote calls."
 } finally {
     $env:GH_TOKEN=$oldToken
