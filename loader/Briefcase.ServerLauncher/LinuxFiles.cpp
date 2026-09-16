@@ -1,4 +1,4 @@
-#include "LinuxUpdate.hpp"
+#include "Update.hpp"
 #include <array>
 #include <fcntl.h>
 #include <mbedtls/sha256.h>
@@ -56,12 +56,17 @@ fs::path package_path(const fs::path& root, const std::string& name) {
 }
 bool managed(const std::string& name, bool legacy) {
     static const std::set<std::string> required{
-        "Briefcase.ServerLauncher", "Package.json", "Briefcase/Runtime/libBriefcase.NativeHost.so",
-        "Briefcase/Runtime/libBriefcase.ServerBootstrap.so", "Briefcase/Tools/Briefcase.AdminSetup",
-        "Briefcase/Updater/build.json", "Briefcase/Updater/updater.example.json"};
-    static const std::set<std::string> retired{"StartBriefcaseNativeServer.sh", "Briefcase/Updater/supervisor.py", "Briefcase/Updater/updater.py"};
+        "Briefcase.ServerLauncher", "Package.json", "Briefcase/Core/libBriefcase.NativeHost.so",
+        "Briefcase/Core/libBriefcase.ServerBootstrap.so", "Briefcase/Core/Tools/Briefcase.AdminSetup",
+        "Briefcase/Core/Updater/build.json", "Briefcase/Core/Updater/updater.example.json"};
+    static const std::set<std::string> retired{
+        "StartBriefcaseNativeServer.sh", "Briefcase/Updater/supervisor.py", "Briefcase/Updater/updater.py",
+        "Briefcase/Runtime/libBriefcase.NativeHost.so", "Briefcase/Runtime/libBriefcase.ServerBootstrap.so",
+        "Briefcase/Tools/Briefcase.AdminSetup", "Briefcase/Updater/build.json",
+        "Briefcase/Updater/updater.example.json"};
     return required.contains(name) || (legacy && retired.contains(name)) ||
-        std::regex_match(name, std::regex("Briefcase/(Docs|Licenses|Localization)/[A-Za-z0-9_./-]+\\.(json|txt|md)"));
+        std::regex_match(name, std::regex("Briefcase/Core/(Docs|Licenses|Localization)/[A-Za-z0-9_./-]+\\.(json|txt|md)")) ||
+        (legacy && std::regex_match(name, std::regex("Briefcase/(Docs|Licenses|Localization)/[A-Za-z0-9_./-]+\\.(json|txt|md)")));
 }
 std::string read(const fs::path& path, uint64_t limit) {
     Fd fd{open(plain(path).c_str(), O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK)};
@@ -131,6 +136,11 @@ void atomic(const fs::path& path, const std::string& data, unsigned mode) {
     } catch (...) { std::error_code error; fs::remove(temporary, error); throw; }
 }
 void write_json(const fs::path& path, const Json& value) { atomic(path, value.dump(2) + "\n"); }
+unsigned file_mode(const fs::path& path) {
+    struct stat info{};
+    require(lstat(plain(path).c_str(), &info) == 0, "Cannot inspect file mode");
+    return info.st_mode & 0777;
+}
 // Used only after validating managed paths and regular files.
 void remove_file(const fs::path& path) {
     if (!fs::exists(plain(path))) return;

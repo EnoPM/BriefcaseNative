@@ -72,7 +72,7 @@ server, then run the packaged setup tool from its platform binaries directory.
 Windows:
 
 ```powershell
-& ".\Briefcase\Tools\Briefcase.AdminSetup.exe" `
+& ".\Briefcase\Core\Tools\Briefcase.AdminSetup.exe" `
     --root "$PWD\Briefcase" `
     --listen "127.0.0.1" `
     --port 50002 `

@@ -43,5 +43,6 @@ $selection | ConvertTo-Json | Set-Content -LiteralPath $temporary -Encoding utf8
 Move-Item -LiteralPath $temporary -Destination $settingsPath -Force
 $written = Get-Content -LiteralPath $settingsPath -Raw | ConvertFrom-Json
 if (($written.enabledMods -join ',') -cne ($ModId -join ',')) { throw 'Selection readback mismatch.' }
+Remove-OldDeploymentBackups -ServerWin64 $paths.Win64 -Keep 5
 Write-Host "Selection saved: $settingsPath. Mod Data files preserved."
 [pscustomobject]$selection

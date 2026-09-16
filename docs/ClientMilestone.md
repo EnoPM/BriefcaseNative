@@ -25,7 +25,7 @@ Dear ImGui **1.91.9b** is pinned under `third_party/imgui-1.91.9b`, with its MIT
 license and SHA-256 inventory in `SOURCE.json`. The framework owns one context;
 mods do not ship private copies. Segoe UI loads from Windows with an embedded-font
 fallback and is not redistributed. Statically linked third-party sources remain
-separate and their licenses ship under `Briefcase/Licenses`.
+separate and their licenses ship under `Briefcase/Core/Licenses`.
 
 The earlier `Briefcase.Native.Rendering` reference was inspected read-only. Its
 small WARP swap chain discovers DXGI methods, MinHook installs hooks, the process's

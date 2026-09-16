@@ -39,6 +39,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     root = args.root.resolve()
     tracked = subprocess.check_output(
-        ["git", "-c", "safe.directory=" + root.as_posix(), "ls-files", "-z"], cwd=root
+        ["git", "-c", "safe.directory=" + root.as_posix(), "ls-files", "--cached", "--others",
+         "--exclude-standard", "-z"], cwd=root
     ).decode().split("\0")
-    print("PASS reviewed framework source inventory:", verify(root, [p for p in tracked if p]))
+    print("PASS reviewed framework source inventory:",
+          verify(root, [p for p in tracked if p and (root / p).is_file()]))

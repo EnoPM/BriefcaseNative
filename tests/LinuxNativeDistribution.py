@@ -29,11 +29,11 @@ with tempfile.TemporaryDirectory(prefix='root-',dir=base) as temporary:
     copy(build/'Briefcase.LinuxGameFixture',folder+'/DeceiveIncServer-Linux-Shipping')
     data={
         'Briefcase.ServerLauncher':(build/'Briefcase.ServerLauncher').read_bytes(),
-        'Briefcase/Runtime/libBriefcase.ServerBootstrap.so':(build/'libBriefcase.ServerBootstrap.so').read_bytes(),
-        'Briefcase/Runtime/libBriefcase.NativeHost.so':(build/'libBriefcase.LinuxHostFixture.so').read_bytes(),
-        'Briefcase/Tools/Briefcase.AdminSetup':(build/'Briefcase.LinuxGameFixture').read_bytes(),
-        'Briefcase/Updater/build.json':json.dumps(dict(frameworkVersion=version)).encode(),
-        'Briefcase/Updater/updater.example.json':json.dumps(dict(schemaVersion=1,enabled=False,repository='',timeoutSeconds=1)).encode(),
+        'Briefcase/Core/libBriefcase.ServerBootstrap.so':(build/'libBriefcase.ServerBootstrap.so').read_bytes(),
+        'Briefcase/Core/libBriefcase.NativeHost.so':(build/'libBriefcase.LinuxHostFixture.so').read_bytes(),
+        'Briefcase/Core/Tools/Briefcase.AdminSetup':(build/'Briefcase.LinuxGameFixture').read_bytes(),
+        'Briefcase/Core/Updater/build.json':json.dumps(dict(frameworkVersion=version)).encode(),
+        'Briefcase/Core/Updater/updater.example.json':json.dumps(dict(schemaVersion=1,enabled=False,repository='',timeoutSeconds=1)).encode(),
     }
     digest=lambda content:hashlib.sha256(content).hexdigest()
     manifest=dict(updateSchema=1,environment='server',platform='linux-x64',frameworkVersion=version,

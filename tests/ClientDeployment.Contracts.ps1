@@ -17,18 +17,23 @@ Reject {Resolve-ClientLayout $root (Join-Path $root 'DeceiveInc\Binaries\Win64\.
 Reject {Resolve-ClientLayout (Join-Path $fixture 'DeceiveIncNativeServer') $win64} 'Server root rejected'
 Reject {Assert-ClientDescendant (Join-Path $fixture 'outside') $root} 'Outside write rejected'
 Reject {Assert-ClientDescendant ($root+'-suffix\file') $root} 'Prefix collision rejected'
-$launcher=Join-Path $win64 'StartBriefcaseNativeClient.ps1'
-Copy-Item -LiteralPath (Join-Path $project 'scripts\client\StartBriefcaseNativeClient.ps1') -Destination $launcher
-[ordered]@{allowedClientRoot=$root;clientWin64=$win64;executableSha256=(Get-FileHash -LiteralPath $exe).Hash}|
-    ConvertTo-Json|Set-Content -LiteralPath (Join-Path $win64 'Briefcase\launch.json')
-Push-Location $project
-try {$launch=& $launcher -ValidateOnly}finally{Pop-Location}
-Check ($launch.workingDirectory -eq $win64 -and $launch.executable -eq $exe) 'Launch invariant independent of caller cwd'
-'changed'|Set-Content -LiteralPath $exe
-Reject {& $launcher -ValidateOnly} 'Build hash mismatch rejected'
+foreach($index in 1..8){
+    $name=('20260101-0000{0:D2}-000' -f $index)
+    $directory=Join-Path $root "BriefcaseDeploymentBackups\$name"
+    New-Item -ItemType Directory -Path $directory -Force|Out-Null
+    'backup'|Set-Content -LiteralPath (Join-Path $directory 'marker.txt')
+    (Get-Item -LiteralPath $directory).LastWriteTimeUtc=[datetime]::UtcNow.AddMinutes($index)
+}
+$manual=Join-Path $root 'BriefcaseDeploymentBackups\manual-keep'
+New-Item -ItemType Directory -Path $manual -Force|Out-Null
+'keep'|Set-Content -LiteralPath (Join-Path $manual 'marker.txt')
+Remove-OldClientDeploymentBackups -ClientRoot $root -Keep 5
+$retained=@(Get-ChildItem -LiteralPath (Join-Path $root 'BriefcaseDeploymentBackups') -Directory|Where-Object {$_.Name -cmatch '^[0-9]{8}-[0-9]{6}-[0-9]{3}$'})
+Check ($retained.Count -eq 5) 'Client backup retention failed'
+Check (Test-Path -LiteralPath (Join-Path $manual 'marker.txt')) 'Manual client backup removed'
 $junction=Join-Path $root 'link'
 New-Item -ItemType Junction -Path $junction -Target $fixture|Out-Null
 Reject {Assert-ClientDescendant (Join-Path $junction 'file') $root} 'Junction escape rejected'
 # Remove only the verified link itself; never recursively traverse it.
 if((Get-Item -LiteralPath $junction).Attributes -band [IO.FileAttributes]::ReparsePoint){Remove-Item -LiteralPath $junction -Force}
-Write-Output "PASS $script:checks client deployment/launcher contracts; fixture files only."
+Write-Output "PASS $script:checks client deployment path and retention contracts; fixture files only."

@@ -16,19 +16,20 @@ foreach($kind in @('Client','Server')) {
         & $cmake --install (Join-Path $project 'build') --config Release --component $component --prefix $destination
         if($LASTEXITCODE){throw "Packaging $kind/$component failed."}
     }
-    $licenses=Join-Path $destination 'Briefcase\Licenses'
+    $licenses=Join-Path $destination 'Briefcase\Core\Licenses'
     New-Item -ItemType Directory -Path $licenses -Force|Out-Null
-    Copy-Item -Path (Join-Path $project 'dist\Win64\Briefcase\Licenses\*') -Destination $licenses -Recurse -Force
+    Copy-Item -Path (Join-Path $project 'dist\Win64\Briefcase\Core\Licenses\*') -Destination $licenses -Recurse -Force
     if($kind -eq 'Client'){
-        Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'StartBriefcaseNativeClient.ps1') -Destination $destination
         '{"schemaVersion":1,"enabledMods":["briefcase.native-overlay-sample"]}'|
             Set-Content -LiteralPath (Join-Path $destination 'Briefcase\loader.json') -Encoding utf8
     }
     $frameworkVersion=& (Join-Path $project 'scripts/release/Read-Version.ps1') -ProjectRoot $project
     $records=@(Get-ChildItem -LiteralPath $destination -Recurse -File|ForEach-Object {
-        [ordered]@{path=$_.FullName.Substring($destination.Length+1);sha256=(Get-FileHash -LiteralPath $_.FullName).Hash.ToLowerInvariant();bytes=$_.Length}
+        $relative=$_.FullName.Substring($destination.Length+1).Replace('\','/')
+        [ordered]@{path=$relative;sha256=(Get-FileHash -LiteralPath $_.FullName).Hash.ToLowerInvariant();bytes=$_.Length;mode=$(if($_.Extension -in @('.exe','.dll')){493}else{420})}
     })
-    [ordered]@{updateSchema=1;platform='windows-x64';gameSha256=$(if($kind -eq 'Server'){'78afe1dbeecb09027c274def4f0ac855b447dc52ffe3cd9482c1be4341b0dae6'}else{''});frameworkVersion=$frameworkVersion;environment=$kind.ToLowerInvariant();configuration='Release x64';files=$records}|
+    $gameHash=if($kind -eq 'Server'){'78afe1dbeecb09027c274def4f0ac855b447dc52ffe3cd9482c1be4341b0dae6'}else{(Get-Content -LiteralPath (Join-Path $project 'runtime\Briefcase.NativeHost\ClientBuild.json') -Raw|ConvertFrom-Json).sha256}
+    [ordered]@{updateSchema=1;platform='windows-x64';gameSha256=$gameHash;frameworkVersion=$frameworkVersion;environment=$kind.ToLowerInvariant();configuration='Release x64';files=$records}|
         ConvertTo-Json -Depth 5|Set-Content -LiteralPath (Join-Path $destination 'Package.json') -Encoding utf8
 }
 & (Join-Path $PSScriptRoot 'Assert-Package.ps1')

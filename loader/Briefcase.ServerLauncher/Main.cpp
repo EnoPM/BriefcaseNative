@@ -23,22 +23,40 @@ int wmain(int argc, wchar_t** argv) {
                 args += L" " + briefcase::launcher::quote(a);
             }
             auto pid = briefcase::launcher::start(root / L"DeceiveIncServer-Win64-Shipping.exe",
-                                                  root / L"Briefcase/Runtime/Briefcase.ServerBootstrap.dll", args);
+                                                  root / L"Briefcase/Core/Briefcase.ServerBootstrap.dll", args);
             printf("%lu\n", pid); return 0;
         }
-        // Exit before updates: the coordinator waits for this process, allowing its EXE to be replaced.
-        wchar_t system[32768]{}; GetSystemDirectoryW(system, 32768);
-        auto powershell = std::filesystem::path(system) / L"WindowsPowerShell/v1.0/powershell.exe";
-        auto script = root / L"Briefcase/Updater/Launch-Server.ps1";
-        if (!std::filesystem::is_regular_file(script)) throw std::runtime_error("Missing update coordinator");
-        std::wstring cmd = briefcase::launcher::quote(powershell.wstring()) +
-            L" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File " +
-            briefcase::launcher::quote(script.wstring()) + L" -LauncherProcessId " + std::to_wstring(GetCurrentProcessId());
-        for (int i = 1; i < argc; ++i) cmd += L" " + briefcase::launcher::quote(argv[i]);
+        // The installed updater is copied before launch. The copy can replace every
+        // installed executable, including this launcher and its own source image.
+        const auto source = root / L"Briefcase/Core/Tools/Briefcase.ServerUpdater.exe";
+        const auto updates = root / L"Briefcase/Updates";
+        if (!std::filesystem::is_regular_file(source)) throw std::runtime_error("Missing native update coordinator");
+        std::filesystem::create_directories(updates);
+        for (const auto& entry : std::filesystem::directory_iterator(updates)) {
+            const auto name = entry.path().filename().wstring();
+            if (entry.is_regular_file() && name.starts_with(L"worker-") && name.ends_with(L".exe")) {
+                std::error_code ignored; std::filesystem::remove(entry.path(), ignored);
+            }
+        }
+        const auto worker = updates / (L"worker-" + std::to_wstring(GetCurrentProcessId()) + L"-" +
+                                       std::to_wstring(GetTickCount64()) + L".exe");
+        if (!CopyFileW(source.c_str(), worker.c_str(), TRUE)) throw std::runtime_error("Cannot stage native update coordinator");
+        std::wstring cmd = briefcase::launcher::quote(worker.wstring()) + L" --root " +
+            briefcase::launcher::quote(root.wstring()) + L" --parent " + std::to_wstring(GetCurrentProcessId());
+        int first_argument = 1;
+        if (argc > 1 && std::wstring(argv[1]) == L"--restart") {
+            if (argc < 5 || std::wstring(argv[3]) != L"--wait-parent")
+                throw std::runtime_error("Missing restart coordinator context");
+            cmd += L" --restart " + briefcase::launcher::quote(argv[2]) + L" --wait-parent " +
+                   briefcase::launcher::quote(argv[4]);
+            first_argument = 5;
+        }
+        cmd += L" --";
+        for (int i = first_argument; i < argc; ++i) cmd += L" " + briefcase::launcher::quote(argv[i]);
         STARTUPINFOW si{sizeof(si)}; si.dwFlags = STARTF_USESHOWWINDOW; si.wShowWindow = SW_HIDE;
         PROCESS_INFORMATION pi{};
-        if (!CreateProcessW(powershell.c_str(), cmd.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr,
-                            root.c_str(), &si, &pi)) throw std::runtime_error("Cannot start update coordinator");
+        if (!CreateProcessW(worker.c_str(), cmd.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr,
+                            root.c_str(), &si, &pi)) throw std::runtime_error("Cannot start native update coordinator");
         CloseHandle(pi.hProcess); CloseHandle(pi.hThread); return 0;
     } catch (const std::exception& e) {
         fprintf(stderr, "%s\n", e.what());

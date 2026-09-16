@@ -1,6 +1,6 @@
 $ErrorActionPreference='Stop'
 $project=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
-$destination=Join-Path $project 'dist\Win64\Briefcase\Licenses'
+$destination=Join-Path $project 'dist\Win64\Briefcase\Core\Licenses'
 New-Item -ItemType Directory -Path $destination -Force|Out-Null
 $additional=@{
     'AsmJit.txt'='build\_deps\polyhook2-src\asmjit\LICENSE.md'
@@ -27,7 +27,7 @@ patternsleuth: MIT OR Apache-2.0, https://github.com/trumank/patternsleuth
 Pinned patternsleuth commit: 33e731e99f2a6bb7f65a8e95e89fd1c06ce9d1d2
 The pinned patternsleuth source declares its license in Cargo.toml; no standalone license file is supplied there.
 patternsleuth_bind is part of RE-UE4SS (MIT).
-Zydis, Zycore, PolyHook2, nlohmann/json, AsmJit and AsmTK license texts are included.
+Zydis, Zycore, PolyHook2, nlohmann/json, AsmJit, AsmTK and miniz license texts are included.
 Rust dependencies and their declared licenses are listed in RustDependencies.json.
 License texts supplied by those crates are included under Rust/.
 '@|Set-Content -LiteralPath (Join-Path $destination 'ThirdPartyNotices.txt') -Encoding utf8

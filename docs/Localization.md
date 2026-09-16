@@ -20,7 +20,7 @@ on). The filename defines the language code:
 }
 ```
 
-- Framework: `Briefcase/Localization/<language>.json` contains menu text.
+- Framework: `Briefcase/Core/Localization/<language>.json` contains menu text.
 - Local overrides: `Briefcase/Localization/Overrides/<language>.json` takes
   precedence and is preserved during package updates.
 - Mod: `Briefcase/Mods/<id>/Translations/<language>.json`. Keys automatically

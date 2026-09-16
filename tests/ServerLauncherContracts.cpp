@@ -19,12 +19,12 @@ int wmain() {
     }
     try {
         auto stage = self.parent_path()/L"launcher-fixture"/std::to_wstring(GetTickCount64())/L"DeceiveInc/Binaries/Win64";
-        std::filesystem::create_directories(stage/L"Briefcase/Runtime");
+        std::filesystem::create_directories(stage/L"Briefcase/Core");
         auto exe=stage/L"DeceiveIncServer-Win64-Shipping.exe";
-        auto dll=stage/L"Briefcase/Runtime/Briefcase.ServerBootstrap.dll";
+        auto dll=stage/L"Briefcase/Core/Briefcase.ServerBootstrap.dll";
         std::filesystem::copy_file(self,exe);
         std::filesystem::copy_file(self.parent_path()/L"Briefcase.ServerBootstrap.dll",dll);
-        std::filesystem::copy_file(self.parent_path()/L"Briefcase.LauncherMockHost.dll",stage/L"Briefcase/Runtime/Briefcase.NativeHost.dll");
+        std::filesystem::copy_file(self.parent_path()/L"Briefcase.LauncherMockHost.dll",stage/L"Briefcase/Core/Briefcase.NativeHost.dll");
         auto pid=start(exe,dll,L"-NOCONSOLE -nullrhi",5000);
         Handle child(OpenProcess(SYNCHRONIZE|PROCESS_QUERY_LIMITED_INFORMATION,FALSE,pid));
         if (!child.value || WaitForSingleObject(child.value,5000)!=WAIT_OBJECT_0) return 2;
@@ -35,7 +35,7 @@ int wmain() {
         try { start(exe,dll,L"",5000); } catch(...) { rejected=true; }
         SetEnvironmentVariableW(L"BC_TEST_PREPARE_FAIL",nullptr);
         if(!rejected) return 4;
-        std::filesystem::remove(stage/L"Briefcase/Runtime/Briefcase.NativeHost.dll");
+        std::filesystem::remove(stage/L"Briefcase/Core/Briefcase.NativeHost.dll");
         rejected=false;
         try { start(exe,dll,L"",5000); } catch(...) { rejected=true; }
         if(!rejected) return 5;

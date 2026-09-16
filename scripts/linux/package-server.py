@@ -11,17 +11,17 @@ def package(project,build,backend,deps,output,json_source=None):
     def put(name,data,mode=0o644):
         target=u.relative(stage,name);target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(data);target.chmod(mode);modes[name]=mode
     def copy(name,source):put(name,source.read_bytes())
-    for name,target in (("Briefcase.ServerLauncher",None),("libBriefcase.NativeHost.so","Runtime"),("libBriefcase.ServerBootstrap.so","Runtime"),("Briefcase.AdminSetup","Tools")):
+    for name,target in (("Briefcase.ServerLauncher",None),("libBriefcase.NativeHost.so","Core"),("libBriefcase.ServerBootstrap.so","Core"),("Briefcase.AdminSetup","Core/Tools")):
         data=(build/name).read_bytes()
         u.require(data[:6]==b"\x7fELF\x02\x01" and struct.unpack_from("<H",data,18)[0]==62,"Expected Linux x64 ELF")
         destination="Briefcase/"+target+"/"+name if target else name;put(destination,data,0o755)
         subprocess.run(["strip","--strip-unneeded",str(stage/destination)],check=True)
         dependencies=subprocess.check_output(["readelf","-d",str(stage/destination)],text=True)
         u.require(not re.search(r"imgui|libX11|libGL\.|libvulkan|libSDL|d3d|dxgi",dependencies,re.I),"Graphical dependency in server")
-    put("Briefcase/Updater/build.json",(json.dumps(dict(frameworkVersion=version))+"\n").encode())
-    put("Briefcase/Updater/updater.example.json",(json.dumps(dict(schemaVersion=1,enabled=True,updateMods=True,repository="EnoPM/BriefcaseNative",timeoutSeconds=20),indent=2)+"\n").encode())
-    copy("Briefcase/Docs/LinuxServer.md",project/"docs/LinuxServer.md")
-    for source in sorted((project/"resources/Localization").glob("*.json")):copy("Briefcase/Localization/"+source.name,source)
+    put("Briefcase/Core/Updater/build.json",(json.dumps(dict(frameworkVersion=version))+"\n").encode())
+    put("Briefcase/Core/Updater/updater.example.json",(json.dumps(dict(schemaVersion=1,enabled=True,updateMods=True,repository="EnoPM/BriefcaseNative",timeoutSeconds=20),indent=2)+"\n").encode())
+    copy("Briefcase/Core/Docs/LinuxServer.md",project/"docs/LinuxServer.md")
+    for source in sorted((project/"resources/Localization").glob("*.json")):copy("Briefcase/Core/Localization/"+source.name,source)
     licenses={
         "UE4SS":backend/"LICENSE",
         "MbedTLS":project/"third_party/mbedtls-3.6.7/LICENSE",
@@ -32,16 +32,16 @@ def package(project,build,backend,deps,output,json_source=None):
         "GPL-3":Path("/usr/share/common-licenses/GPL-3"),
         "libcurl":Path("/usr/share/doc/libcurl4t64/copyright"),
         "libarchive":Path("/usr/share/doc/libarchive13t64/copyright")}
-    for name,source in licenses.items():copy("Briefcase/Licenses/"+name+".txt",source)
+    for name,source in licenses.items():copy("Briefcase/Core/Licenses/"+name+".txt",source)
     metadata=json.loads(subprocess.check_output(["cargo","metadata","--locked","--format-version","1","--manifest-path",str(backend/"deps/first/patternsleuth_bind/Cargo.toml")],text=True))
     records=[]
     for item in metadata["packages"]:
         records.append({key:item.get(key) for key in ("name","version","license","source","repository")})
         for source in sorted(Path(item["manifest_path"]).parent.iterdir()):
             if source.is_file() and re.match("^(LICENSE|LICENCE|COPYING|NOTICE)",source.name):
-                copy(f"Briefcase/Licenses/Rust/{item['name']}-{item['version']}/{source.name}.txt",source)
-    put("Briefcase/Licenses/RustDependencies.json",(json.dumps(records,indent=2)+"\n").encode())
-    put("Briefcase/Licenses/ThirdPartyNotices.txt",b"UE4SS Linux revision: 7894d53f6e13011a16445f28e6f7cd46d58c72cc (MIT).\npatternsleuth revision: 23d13d7471c854fb15b586deb2f2678a1b7bc690 (MIT OR Apache-2.0).\npatternsleuth_bind is part of UE4SS. License declarations for Rust crates are in RustDependencies.json.\nGCC runtime libraries are covered by the included GCC license notices and runtime exception.\n")
+                copy(f"Briefcase/Core/Licenses/Rust/{item['name']}-{item['version']}/{source.name}.txt",source)
+    put("Briefcase/Core/Licenses/RustDependencies.json",(json.dumps(records,indent=2)+"\n").encode())
+    put("Briefcase/Core/Licenses/ThirdPartyNotices.txt",b"UE4SS Linux revision: 7894d53f6e13011a16445f28e6f7cd46d58c72cc (MIT).\npatternsleuth revision: 23d13d7471c854fb15b586deb2f2678a1b7bc690 (MIT OR Apache-2.0).\npatternsleuth_bind is part of UE4SS. License declarations for Rust crates are in RustDependencies.json.\nGCC runtime libraries are covered by the included GCC license notices and runtime exception.\n")
     rows=[]
     for name,mode in sorted(modes.items()):
         file=stage/name;rows.append(dict(path=name,bytes=file.stat().st_size,sha256=u.digest_file(file),mode=mode))

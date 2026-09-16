@@ -1,4 +1,4 @@
-#include "LinuxUpdate.hpp"
+#include "Update.hpp"
 #include <archive.h>
 #include <archive_entry.h>
 #include <array>

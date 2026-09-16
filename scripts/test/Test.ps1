@@ -1,8 +1,5 @@
 $ErrorActionPreference='Stop'
 $project=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
-& (Join-Path $project 'tests\Updater.Contracts.ps1')
-& (Join-Path $project 'tests\RestartUpdater.Contracts.ps1')
-& (Join-Path $project 'tests\Launcher.Contracts.ps1')
 & (Join-Path $project 'tests\Deployment.Contracts.ps1')
 $command=Get-Command ctest -ErrorAction SilentlyContinue
 if($command){$ctest=$command.Source}else{

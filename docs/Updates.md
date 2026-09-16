@@ -25,7 +25,7 @@ restart. It installs a compatible update before starting the server.
 
 An existing file is preserved exactly, including `enabled: false`, a custom
 repository or invalid settings that produce an error. An empty repository also
-disables checks. `Briefcase/Updater/updater.example.json` remains a reference. The
+disables checks. `Briefcase/Core/Updater/updater.example.json` remains a reference. The
 active file belongs to the administrator and is never part of update replacement.
 
 Version 0.5.0 installations without configuration must install a newer package
@@ -43,6 +43,7 @@ only `MAJOR.MINOR.PATCH`. A release uses tag `vMAJOR.MINOR.PATCH` and includes:
 
 - `BriefcaseNative-Server-windows-x64-MAJOR.MINOR.PATCH.zip`;
 - `BriefcaseNative-Server-linux-x64-MAJOR.MINOR.PATCH.zip`;
+- `BriefcaseNative-Client-windows-x64-MAJOR.MINOR.PATCH.zip`;
 - the SDK ZIP.
 
 GitHub-generated source archives are not installers.
@@ -104,7 +105,8 @@ An installation lock prevents concurrent mutation. The transaction journal is
 written before any change, and old files are backed up under
 `Briefcase/Updates/<id>/backup`. Failure restores them. After interruption, the next
 launch restores backups before attempting startup. If recovery fails, the server
-does not start with mixed libraries. Backup cleanup is manual in this version.
+does not start with mixed libraries. Completed transaction directories and journals
+are removed before launch, while active recovery data remains available.
 
 Successful installation does not prove gameplay behavior, and automatic rollback
 after an in-game crash is outside scope. Inspect `Briefcase/Updates/last-result.json`
@@ -117,13 +119,16 @@ permissions accordingly.
 ## Platforms
 
 Windows x64 and Linux x64 server packages share HTTPS, JSON, ZIP and SHA-256
-protocols but use separate assets. The Linux launcher and updater are native C++.
-The Windows coordinator currently uses PowerShell. The client does not update
-itself automatically. See [Linux server](LinuxServer.md) for runtime requirements.
+protocols but use separate assets. Both launchers and updaters are native C++ and
+the installed packages require no PowerShell, Python or .NET runtime. On Windows,
+the launcher runs a short-lived copy of `Briefcase.ServerUpdater.exe` so every
+installed executable can be replaced transactionally. The client launcher validates
+and starts the supported game build; client updates are installed by extracting a
+newer client release. See [Linux server](LinuxServer.md) for runtime requirements.
 
 ## Automatic and manual publication
 
-`.github/workflows/release.yml` defines **Publish server release**. A push to
+`.github/workflows/release.yml` defines **Publish Briefcase release**. A push to
 `main` that changes `VERSION` builds, tests and publishes `v<VERSION>`. Other pushes
 publish nothing. The workflow reads the version from the triggering commit, and
 CMake, SDK metadata and archive names derive from the same value.
@@ -131,7 +136,7 @@ CMake, SDK metadata and archive names derive from the same value.
 To run it manually:
 
 1. Update `VERSION` and commit the source to the branch to publish.
-2. Open **Actions → Publish server release → Run workflow**.
+2. Open **Actions → Publish Briefcase release → Run workflow**.
 3. Select the branch.
 4. Enable **Keep the release as a draft** only when a reviewable draft is desired.
 5. Select **Run workflow**.
@@ -141,7 +146,8 @@ never edits `VERSION` for the operator.
 
 The Windows 2025 runner fetches pinned dependencies, installs Rust 1.97.1, builds
 Release x64, runs tests and verifies client/server packages. Graphics fixtures use
-WARP and need no game installation. The client is built and tested but not published.
+WARP and need no game installation. The client and both server variants are
+published from the same source revision.
 
 Publication uses GitHub's scoped `GITHUB_TOKEN` with `contents: write`. The build
 uses repository secret `UPSTREAM_READ_TOKEN` to read the pinned private Unreal

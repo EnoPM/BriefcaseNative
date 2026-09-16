@@ -2,7 +2,7 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
 $project=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
-. (Join-Path $project 'scripts/update/Updater.ps1')
+. (Join-Path $PSScriptRoot 'Package-Tools.ps1')
 $version=& (Join-Path $PSScriptRoot 'Read-Version.ps1') -ProjectRoot $project
 $stage=Join-Path $project ('artifacts/sdk-'+[guid]::NewGuid().ToString('N'))
 foreach($dir in @('include','third_party/include','Licenses','cmake')){
@@ -39,11 +39,11 @@ foreach($file in Get-ChildItem -LiteralPath $stage -Recurse -File){
 $files=@(Get-ChildItem -LiteralPath $stage -File -Recurse|Sort-Object FullName|ForEach-Object{
  [ordered]@{path=$_.FullName.Substring($stage.Length+1).Replace('\','/');sha256=(Get-FileHash -LiteralPath $_.FullName).Hash.ToLowerInvariant();bytes=$_.Length}
 })
-Write-UpdateJson (Join-Path $stage 'SDK.json') ([ordered]@{schemaVersion=1;version=$version;abiVersion=1;files=$files})
+Write-PackageJson (Join-Path $stage 'SDK.json') ([ordered]@{schemaVersion=1;version=$version;abiVersion=1;files=$files})
 $output=Join-Path $project 'dist/Releases'
 New-Item -ItemType Directory -Path $output -Force|Out-Null
 $archive=Join-Path $output "BriefcaseNative-SDK-$version.zip"
-Assert-UpdatePlainPath $archive
+Assert-PackagePlainPath $archive
 if(Test-Path -LiteralPath $archive){Remove-Item -LiteralPath $archive -Force}
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $zip=[IO.Compression.ZipFile]::Open($archive,[IO.Compression.ZipArchiveMode]::Create)

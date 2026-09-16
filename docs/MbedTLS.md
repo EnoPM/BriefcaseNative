@@ -10,7 +10,7 @@ SHA-256 verified against the official checksum file:
 
 Briefcase uses the **Apache-2.0** license option. The upstream
 `third_party/mbedtls-3.6.7/LICENSE` file is preserved and distributed as
-`Briefcase/Licenses/MbedTLS.txt`.
+`Briefcase/Core/Licenses/MbedTLS.txt`.
 
 The upstream code is unchanged. `runtime/Briefcase.Admin/TlsConfig.h` configures
 standard C++ mutexes and disables persistent PSA storage, DTLS, early data and

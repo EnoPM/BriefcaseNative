@@ -131,9 +131,9 @@ int main() {
                     std::filesystem::remove_all(root, e);
             }
         } cleanup{root, parent};
-        std::filesystem::create_directories(root / "Localization");
+        std::filesystem::create_directories(root / "Core" / "Localization");
         std::filesystem::copy(
-            Path(__FILE__).parent_path().parent_path() / "resources" / "Localization", root / "Localization",
+            Path(__FILE__).parent_path().parent_path() / "resources" / "Localization", root / "Core" / "Localization",
             std::filesystem::copy_options::recursive | std::filesystem::copy_options::overwrite_existing);
         write(root / "Localization" / "Overrides" / "fr.json",
               {{"name", "Français"}, {"translations", {{"ui.settings", "Préférences"}}}});

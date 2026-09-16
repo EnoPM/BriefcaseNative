@@ -1,4 +1,4 @@
-#include "LinuxUpdate.hpp"
+#include "Update.hpp"
 #include <array>
 #include <chrono>
 #include <csignal>
@@ -81,8 +81,8 @@ public:
 };
 pid_t launch(const fs::path& game, const std::vector<std::string>& arguments, int channel, int parent_channel) {
     const auto root = game.parent_path();
-    const auto host = package_path(root, "Briefcase/Runtime/libBriefcase.NativeHost.so");
-    const auto bridge = package_path(root, "Briefcase/Runtime/libBriefcase.ServerBootstrap.so");
+    const auto host = package_path(root, "Briefcase/Core/libBriefcase.NativeHost.so");
+    const auto bridge = package_path(root, "Briefcase/Core/libBriefcase.ServerBootstrap.so");
     require(fs::is_regular_file(host) && fs::is_regular_file(bridge), "Runtime libraries missing");
     Fd bridge_fd(open(bridge.c_str(), O_RDONLY | O_NOFOLLOW | O_CLOEXEC));
     require(bridge_fd.value >= 0, "Cannot open bootstrap");
@@ -122,6 +122,7 @@ int supervise(const fs::path& game, const std::vector<std::string>& arguments) {
         const auto result = Updater(root).update([&](const std::string& message) { log(root, message); });
         if (stopping) return 0;
         if (result == "installed") {
+            Updater(root).cleanup([&](const std::string& message) { log(root, message); });
             // CLOEXEC releases the existing lock only if exec succeeds. No unlock gap.
             const auto target = package_path(root, "Briefcase.ServerLauncher");
             std::vector<std::string> values{target.string(), "--server", game.string(), "--"};
@@ -135,6 +136,7 @@ int supervise(const fs::path& game, const std::vector<std::string>& arguments) {
         const auto mods = Updater(root).update_mods([&](const std::string& message) { log(root, message); });
         write_json(package_path(root, "Briefcase/Updates/last-result.json"),
                    {{"framework", result}, {"mods", mods}, {"checkedAt", std::time(nullptr)}});
+        Updater(root).cleanup([&](const std::string& message) { log(root, message); });
         int pair[2]; require(socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, pair) == 0, "Cannot create restart channel");
         Fd parent(pair[0]);
         pid_t pid;
@@ -195,8 +197,9 @@ int deploy(const fs::path& game, const fs::path& archive) {
     extract(plain(archive), stage);
     const auto manifest = package_manifest(stage, document(stage / "Package.json").at("frameworkVersion"), digest(game));
     updater.install(stage, manifest);
+    updater.cleanup([](const std::string&) {});
     const auto config = package_path(root, "Briefcase/updater.json");
-    if (!fs::exists(config)) atomic(config, read(package_path(root, "Briefcase/Updater/updater.example.json")));
+    if (!fs::exists(config)) atomic(config, read(package_path(root, "Briefcase/Core/Updater/updater.example.json")));
     std::printf("Installed Briefcase %s in %s\n", manifest.at("frameworkVersion").get<std::string>().c_str(), root.c_str());
     return 0;
 }

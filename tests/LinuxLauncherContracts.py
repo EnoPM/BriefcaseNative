@@ -9,7 +9,7 @@ import time
 launcher, bootstrap, host, fixture = map(lambda p: Path(p).resolve(), sys.argv[1:])
 with tempfile.TemporaryDirectory(prefix="briefcase launcher ") as directory:
     bin = Path(directory) / "DeceiveInc/Binaries/Linux"
-    runtime = bin / "Briefcase/Runtime"
+    runtime = bin / "Briefcase/Core"
     runtime.mkdir(parents=True)
     game = bin / "DeceiveIncServer-Linux-Shipping"
     shutil.copy2(fixture, game)

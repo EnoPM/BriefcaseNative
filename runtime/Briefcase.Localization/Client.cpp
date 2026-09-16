@@ -95,7 +95,7 @@ void Client::run() {
             requested_language.clear();
         }
         try {
-            auto local = read_languages(root / "Localization");
+            auto local = read_languages(root / "Core" / "Localization");
             auto overrides = read_languages(root / "Localization" / "Overrides");
             for (auto it = overrides.begin(); it != overrides.end(); ++it)
                 local[it.key()].update(it.value());

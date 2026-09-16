@@ -10,10 +10,37 @@ if($hash -ne $identity.sha256){throw 'Unsupported client executable; deployment 
 $stamp=Get-Date -Format 'yyyyMMdd-HHmmss-fff'
 $backup=Assert-ClientDescendant (Join-Path $paths.Root "BriefcaseDeploymentBackups\$stamp") $paths.Root
 $files=@(Get-ChildItem -LiteralPath $package -File -Recurse|Where-Object {$_.Name -ne 'Package.json'})
+$retired=@()
+foreach($name in @('StartBriefcaseNativeClient.ps1','Briefcase\launch.json')){
+    $candidate=Assert-ClientDescendant (Join-Path $paths.Win64 $name) $paths.Root
+    if(Test-Path -LiteralPath $candidate -PathType Leaf){$retired+=@([pscustomobject]@{relative=$name;path=$candidate})}
+}
+$retiredDirectories=@()
+foreach($name in @('Briefcase\Docs','Briefcase\Licenses')){
+    $candidate=Assert-ClientDescendant (Join-Path $paths.Win64 $name) $paths.Root
+    if(Test-Path -LiteralPath $candidate -PathType Container){$retiredDirectories+=@([pscustomobject]@{relative=$name;path=$candidate})}
+}
+$legacyLocalization=Assert-ClientDescendant (Join-Path $paths.Win64 'Briefcase\Localization') $paths.Root
+if(Test-Path -LiteralPath $legacyLocalization -PathType Container){
+    foreach($file in Get-ChildItem -LiteralPath $legacyLocalization -File -Filter '*.json'){
+        Assert-PlainClientPath $file.FullName
+        $retired+=@([pscustomobject]@{relative=('Briefcase\Localization\'+$file.Name);path=$file.FullName})
+    }
+}
 # Resolve and check every destination before replacing any file.
 foreach($file in $files) {
     $relative=$file.FullName.Substring($package.Length+1)
     $null=Assert-ClientDescendant (Join-Path $paths.Win64 $relative) $paths.Root
+}
+foreach($item in $retired){
+    $saved=Assert-ClientDescendant (Join-Path $backup ('Retired\'+$item.relative)) $paths.Root
+    New-Item -ItemType Directory -Path ([IO.Path]::GetDirectoryName($saved)) -Force|Out-Null
+    Copy-Item -LiteralPath $item.path -Destination $saved
+}
+foreach($item in $retiredDirectories){
+    $saved=Assert-ClientDescendant (Join-Path $backup ('Retired\'+$item.relative)) $paths.Root
+    New-Item -ItemType Directory -Path ([IO.Path]::GetDirectoryName($saved)) -Force|Out-Null
+    Copy-Item -LiteralPath $item.path -Destination $saved -Recurse
 }
 foreach($file in $files) {
     $relative=$file.FullName.Substring($package.Length+1)
@@ -29,11 +56,14 @@ foreach($file in $files) {
     Copy-Item -LiteralPath $file.FullName -Destination $target -Force
     if((Get-FileHash -LiteralPath $target).Hash -ne (Get-FileHash -LiteralPath $file.FullName).Hash){throw "Deployment verification failed: $relative"}
 }
-$launch=Assert-ClientDescendant (Join-Path $paths.Win64 'Briefcase\launch.json') $paths.Root
-[ordered]@{allowedClientRoot=$paths.Root;clientWin64=$paths.Win64;executableSha256=$hash}|
-    ConvertTo-Json|Set-Content -LiteralPath $launch -Encoding utf8
+foreach($item in $retired){Remove-Item -LiteralPath $item.path -Force}
+foreach($item in $retiredDirectories){Remove-Item -LiteralPath $item.path -Recurse -Force}
+if((Test-Path -LiteralPath $legacyLocalization -PathType Container) -and
+   -not @(Get-ChildItem -LiteralPath $legacyLocalization -Force).Count){Remove-Item -LiteralPath $legacyLocalization -Force}
 $logs=Assert-ClientDescendant (Join-Path $paths.Win64 'Briefcase\Logs') $paths.Root
 New-Item -ItemType Directory -Path $logs -Force|Out-Null
 $inventory=Assert-ClientDescendant (Join-Path $paths.Win64 'Briefcase\InstalledPackage.json') $paths.Root
 Copy-Item -LiteralPath (Join-Path $package 'Package.json') -Destination $inventory -Force
-& (Join-Path $paths.Win64 'StartBriefcaseNativeClient.ps1') -ValidateOnly
+Remove-OldClientDeploymentBackups -ClientRoot $paths.Root -Keep 5
+& (Join-Path $paths.Win64 'Briefcase.ClientLauncher.exe') --validate-only
+if($LASTEXITCODE){throw "Native client launcher validation failed with exit code $LASTEXITCODE"}

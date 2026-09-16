@@ -4,8 +4,8 @@ from pathlib import Path
 DRIVER = None
 if len(sys.argv)>1 and not sys.argv[1].startswith('-'):
     DRIVER=str(Path(sys.argv.pop(1)).resolve())
-REQUIRED={'Briefcase.ServerLauncher','Briefcase/Runtime/libBriefcase.NativeHost.so',
-          'Briefcase/Runtime/libBriefcase.ServerBootstrap.so','Briefcase/Tools/Briefcase.AdminSetup','Briefcase/Updater/build.json'}
+REQUIRED={'Briefcase.ServerLauncher','Briefcase/Core/libBriefcase.NativeHost.so',
+          'Briefcase/Core/libBriefcase.ServerBootstrap.so','Briefcase/Core/Tools/Briefcase.AdminSetup','Briefcase/Core/Updater/build.json'}
 def digest(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 def write_json(path,value):
     path.parent.mkdir(parents=True,exist_ok=True);path.write_text(json.dumps(value))
@@ -21,7 +21,7 @@ class Contracts(unittest.TestCase):
         stage=self.base/version;stage.mkdir()
         elf=b'\x7fELF\x02\x01'+b'\0'*12+b'\x3e\0'+version.encode()
         contents={name:elf for name in REQUIRED}
-        contents['Briefcase/Updater/build.json']=json.dumps({'frameworkVersion':version}).encode();contents.update(extra or {})
+        contents['Briefcase/Core/Updater/build.json']=json.dumps({'frameworkVersion':version}).encode();contents.update(extra or {})
         rows=[]
         for name,data in contents.items():
             path=stage/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(data)
@@ -31,7 +31,7 @@ class Contracts(unittest.TestCase):
     def installed(self,stage,manifest):
         self.run_native('manifest',stage,manifest['frameworkVersion'],self.hash);self.run_native('install',self.root,stage)
     def assert_version(self,version):
-        self.assertEqual(json.loads((self.root/'Briefcase/Updater/build.json').read_text())['frameworkVersion'],version)
+        self.assertEqual(json.loads((self.root/'Briefcase/Core/Updater/build.json').read_text())['frameworkVersion'],version)
     def archive(self,stage):
         path=stage.with_suffix('.zip')
         with zipfile.ZipFile(path,'w',zipfile.ZIP_DEFLATED) as zipped:
@@ -72,9 +72,9 @@ class Contracts(unittest.TestCase):
         self.assertTrue(json.loads((self.root/'Briefcase/updater.json').read_text())['enabled'])
     def test_install_obsolete_and_preserve_user_data(self):
         config=self.root/'Briefcase/Mods/Example/config.json';config.parent.mkdir(parents=True);config.write_bytes(b'private settings')
-        first,m=self.package('1.0.0',{'Briefcase/Docs/old.md':b'old'});self.installed(first,m)
+        first,m=self.package('1.0.0',{'Briefcase/Core/Docs/old.md':b'old'});self.installed(first,m)
         second,m=self.package('1.1.0');self.installed(second,m)
-        self.assertFalse((self.root/'Briefcase/Docs/old.md').exists());self.assertEqual(config.read_bytes(),b'private settings')
+        self.assertFalse((self.root/'Briefcase/Core/Docs/old.md').exists());self.assertEqual(config.read_bytes(),b'private settings')
         self.assertEqual(stat.S_IMODE((self.root/'Briefcase.ServerLauncher').stat().st_mode),0o755);self.assert_version('1.1.0')
     def test_exception_rolls_back(self):
         first,m=self.package('1.0.0');self.installed(first,m);second,_=self.package('1.1.0')
@@ -92,20 +92,20 @@ class Contracts(unittest.TestCase):
         for name in ('../escape','/absolute','a//b','a/./b','C:/x','a\\b'):
             with self.subTest(name=name):self.run_native('path',self.root,name,code=78)
         config=self.base/'duplicate.json';config.write_text('{"enabled":false,"enabled":true}');self.run_native('document',config,code=78)
-        (self.root/'Briefcase').symlink_to(self.base,target_is_directory=True);self.run_native('path',self.root,'Briefcase/Updater/build.json',code=78)
+        (self.root/'Briefcase').symlink_to(self.base,target_is_directory=True);self.run_native('path',self.root,'Briefcase/Core/Updater/build.json',code=78)
     def test_archives(self):
         cases=[('../escape',0),('Briefcase/Mods/Example/example.so',0),('Briefcase/Updater/updater.py',0),
-               ('Briefcase/Updater/build.json',stat.S_IFLNK|0o777),('Briefcase/Updater/build.json',stat.S_IFREG|0o4755)]
+               ('Briefcase/Core/Updater/build.json',stat.S_IFLNK|0o777),('Briefcase/Core/Updater/build.json',stat.S_IFREG|0o4755)]
         for index,(name,mode) in enumerate(cases):
             archive=self.base/f'bad{index}.zip'
             with zipfile.ZipFile(archive,'w') as zipped:
                 info=zipfile.ZipInfo(name);info.external_attr=mode<<16;zipped.writestr(info,b'x')
             self.run_native('extract',archive,self.base/f'stage{index}',code=78)
-        stage,m=self.package('1.0.0');(stage/'Briefcase/Updater/build.json').write_bytes(b'tampered')
+        stage,m=self.package('1.0.0');(stage/'Briefcase/Core/Updater/build.json').write_bytes(b'tampered')
         self.run_native('manifest',stage,'1.0.0',self.hash,code=78)
     def test_hardlinks_and_manifest_attacks(self):
         first,m=self.package('1.0.0');self.installed(first,m);second,new=self.package('1.1.0')
-        outside=self.base/'outside';outside.write_bytes(b'do not change');target=self.root/'Briefcase/Updater/build.json';target.unlink();os.link(outside,target)
+        outside=self.base/'outside';outside.write_bytes(b'do not change');target=self.root/'Briefcase/Core/Updater/build.json';target.unlink();os.link(outside,target)
         self.run_native('install',self.root,second,code=78);self.assertEqual(outside.read_bytes(),b'do not change')
         new['files'][0]['path']='Briefcase/Mods/Example/settings.json';write_json(second/'Package.json',new)
         self.run_native('install',self.root,second,code=78)
@@ -130,9 +130,21 @@ class Contracts(unittest.TestCase):
     def test_retired_files_removed_during_native_install(self):
         first,m=self.package('1.0.0');self.installed(first,m)
         for name in ('StartBriefcaseNativeServer.sh','Briefcase/Updater/supervisor.py','Briefcase/Updater/updater.py'):
-            path=self.root/name;path.write_text('legacy');m['files'].append(dict(path=name))
+            path=self.root/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_text('legacy');m['files'].append(dict(path=name))
         write_json(self.root/'Package.json',m);second,m=self.package('1.1.0');self.installed(second,m)
         self.assertFalse((self.root/'StartBriefcaseNativeServer.sh').exists());self.assertFalse(list((self.root/'Briefcase/Updater').glob('*.py')))
+    def test_completed_update_work_is_cleaned_without_touching_active_or_unknown_data(self):
+        updates=self.root/'Briefcase/Updates';completed='1'*32;active='2'*32
+        (updates/completed/'stage').mkdir(parents=True);(updates/completed/'stage/file').write_text('temporary')
+        (updates/('install-'+'3'*32)/'stage').mkdir(parents=True)
+        (updates/active/'backup').mkdir(parents=True);(updates/active/'backup/file').write_text('required')
+        (updates/'keep-me').mkdir(parents=True);(updates/'keep-me/user.txt').write_text('keep')
+        write_json(updates/'transaction.json',dict(state='installing',id=active,files=[]))
+        write_json(updates/'mod-transaction.json',dict(state='installed',id='4'*32,files=[]))
+        self.run_native('cleanup',self.root)
+        self.assertFalse((updates/completed).exists());self.assertFalse((updates/('install-'+'3'*32)).exists())
+        self.assertTrue((updates/active/'backup/file').exists());self.assertTrue((updates/'keep-me/user.txt').exists())
+        self.assertTrue((updates/'transaction.json').exists());self.assertFalse((updates/'mod-transaction.json').exists())
     def test_startup_mod_update_preserves_configuration(self):
         mod_id='test.early';repository='Example/Test.Early';prefix=Path('Briefcase/Mods')/mod_id
         installed=dict(schemaVersion=1,id=mod_id,name='Early',author='Test',version='1.0.0',entry='Test.Early.so',minimumApi=1,

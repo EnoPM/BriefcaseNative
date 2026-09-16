@@ -1,13 +1,25 @@
-#include "LinuxUpdate.hpp"
+#include "Update.hpp"
+#include <algorithm>
 #include <array>
+#include <cctype>
+#include <map>
 #include <regex>
 #include <set>
+#include <vector>
+#ifndef _WIN32
 #include <sys/stat.h>
+#endif
 
 namespace bc::launcher {
 void remove_file(const fs::path& path);
 namespace {
 bool matches(const std::string& value, const char* expression) { return std::regex_match(value, std::regex(expression)); }
+std::string legacy_name(std::string value) {
+#ifdef _WIN32
+    std::ranges::replace(value, '\\', '/');
+#endif
+    return value;
+}
 bool mod_id(const std::string& value) { return matches(value, "[a-z0-9]+([.-][a-z0-9]+)*"); }
 std::array<uint64_t, 3> version(const std::string& value) {
     std::smatch match;
@@ -19,9 +31,43 @@ uint64_t number(const Json& value) {
     require(value.is_number_unsigned() || (value.is_number_integer() && value.get<int64_t>() >= 0), "Expected unsigned integer");
     return value.get<uint64_t>();
 }
+#ifdef _WIN32
 const std::set<std::string> required{
-    "Briefcase.ServerLauncher", "Briefcase/Runtime/libBriefcase.NativeHost.so", "Briefcase/Runtime/libBriefcase.ServerBootstrap.so",
-    "Briefcase/Tools/Briefcase.AdminSetup", "Briefcase/Updater/build.json"};
+    "Briefcase.ServerLauncher.exe", "Briefcase/Core/Briefcase.NativeHost.dll",
+    "Briefcase/Core/Briefcase.ServerBootstrap.dll", "Briefcase/Core/Tools/Briefcase.AdminSetup.exe",
+    "Briefcase/Core/Tools/Briefcase.ServerRestart.exe", "Briefcase/Core/Tools/Briefcase.ServerUpdater.exe",
+    "Briefcase/Core/Updater/build.json"};
+#else
+const std::set<std::string> required{
+    "Briefcase.ServerLauncher", "Briefcase/Core/libBriefcase.NativeHost.so", "Briefcase/Core/libBriefcase.ServerBootstrap.so",
+    "Briefcase/Core/Tools/Briefcase.AdminSetup", "Briefcase/Core/Updater/build.json"};
+#endif
+bool native_binary(const std::string& name) {
+#ifdef _WIN32
+    return name == "Briefcase.ServerLauncher.exe" || name.ends_with(".dll") ||
+           name == "Briefcase/Core/Tools/Briefcase.AdminSetup.exe" ||
+           name == "Briefcase/Core/Tools/Briefcase.ServerRestart.exe" ||
+           name == "Briefcase/Core/Tools/Briefcase.ServerUpdater.exe";
+#else
+    return name == "Briefcase.ServerLauncher" || name.ends_with(".so") ||
+           name == "Briefcase/Core/Tools/Briefcase.AdminSetup";
+#endif
+}
+void validate_binary(const std::string& data) {
+#ifdef _WIN32
+    require(data.size() >= 0x40 && data[0] == 'M' && data[1] == 'Z', "Expected Windows x64 PE binary");
+    const auto offset = static_cast<uint32_t>(static_cast<unsigned char>(data[0x3c])) |
+                        (static_cast<uint32_t>(static_cast<unsigned char>(data[0x3d])) << 8) |
+                        (static_cast<uint32_t>(static_cast<unsigned char>(data[0x3e])) << 16) |
+                        (static_cast<uint32_t>(static_cast<unsigned char>(data[0x3f])) << 24);
+    require(offset <= data.size() - 6 && data.substr(offset, 4) == std::string("PE\0\0", 4) &&
+            static_cast<unsigned char>(data[offset + 4]) == 0x64 &&
+            static_cast<unsigned char>(data[offset + 5]) == 0x86, "Expected Windows x64 PE binary");
+#else
+    require(data.size() >= 20 && data.substr(0, 6) == std::string("\177ELF\2\1", 6) &&
+            static_cast<unsigned char>(data[18]) == 62 && data[19] == 0, "Expected Linux x64 ELF binary");
+#endif
+}
 }
 std::optional<Json> select_asset(const Json& release, const std::string& repository, const std::string& current) {
     require(matches(repository, "[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+"), "Invalid repository");
@@ -29,7 +75,7 @@ std::optional<Json> select_asset(const Json& release, const std::string& reposit
     const auto tag = release.at("tag_name").get<std::string>();
     if (version(tag) <= version(current)) return {};
     const auto target = tag.starts_with('v') ? tag.substr(1) : tag;
-    const auto name = "BriefcaseNative-Server-linux-x64-" + target + ".zip";
+    const auto name = "BriefcaseNative-Server-" + std::string(platform_name) + "-" + target + ".zip";
     std::optional<Json> selected;
     for (const auto& asset : release.at("assets")) {
         if (asset.at("name") != name) continue;
@@ -41,7 +87,7 @@ std::optional<Json> select_asset(const Json& release, const std::string& reposit
                 matches(hash, "sha256:[a-f0-9]{64}"), "Invalid GitHub asset metadata");
         selected = Json{{"version", target}, {"url", url}, {"size", asset.at("size")}, {"sha256", hash.substr(7)}};
     }
-    require(selected.has_value(), "Release has no Linux server asset");
+    require(selected.has_value(), "Release has no matching server asset");
     return selected;
 }
 std::optional<Json> select_mod_asset(const Json& release, const std::string& repository,
@@ -73,7 +119,7 @@ Json package_manifest(const fs::path& stage, const std::string& expected, const 
     version(expected);
     const auto manifest = document(package_path(stage, "Package.json"));
     require(manifest.at("updateSchema") == 1 && manifest.at("environment") == "server" &&
-            manifest.at("platform") == "linux-x64" && manifest.at("frameworkVersion") == expected &&
+            manifest.at("platform") == platform_name && manifest.at("frameworkVersion") == expected &&
             manifest.at("gameSha256") == game_hash && matches(game_hash, "[a-f0-9]{64}"), "Incompatible package identity");
     std::set<std::string> seen;
     require(manifest.at("files").is_array() && manifest.at("files").size() <= 4095, "Invalid package inventory");
@@ -85,11 +131,11 @@ Json package_manifest(const fs::path& stage, const std::string& expected, const 
         require(number(item.at("bytes")) <= max_archive && (mode == 0644 || mode == 0755) &&
                 matches(item.at("sha256").get<std::string>(), "[a-f0-9]{64}") && fs::file_size(path) == item.at("bytes") &&
                 digest(path) == item.at("sha256").get<std::string>(), "Package file mismatch");
-        if (name == "Briefcase.ServerLauncher" || name.ends_with(".so") || name == "Briefcase/Tools/Briefcase.AdminSetup") {
+        if (native_binary(name)) {
+#ifndef _WIN32
             require(mode == 0755, "Native binary must be executable");
-            const auto data = read(path, max_archive);
-            require(data.size() >= 20 && data.substr(0, 6) == std::string("\177ELF\2\1", 6) &&
-                    static_cast<unsigned char>(data[18]) == 62 && data[19] == 0, "Expected Linux x64 ELF binary");
+#endif
+            validate_binary(read(path, max_archive));
         }
     }
     std::set<std::string> actual;
@@ -100,7 +146,7 @@ Json package_manifest(const fs::path& stage, const std::string& expected, const 
     }
     auto all = seen; all.insert("Package.json");
     require(actual == all && std::includes(seen.begin(), seen.end(), required.begin(), required.end()), "Incomplete or unlisted package content");
-    require(document(package_path(stage, "Briefcase/Updater/build.json")).at("frameworkVersion") == expected, "Version marker mismatch");
+    require(document(package_path(stage, "Briefcase/Core/Updater/build.json")).at("frameworkVersion") == expected, "Version marker mismatch");
     return manifest;
 }
 Json mod_package_manifest(const fs::path& stage, const std::string& id, const std::string& expected,
@@ -145,10 +191,7 @@ Json mod_package_manifest(const fs::path& stage, const std::string& id, const st
     const auto entry = mod.at("entry").get<std::string>();
     require(matches(entry, platform == "linux-x64" ? "[A-Za-z0-9_.-]+\\.so" : "[A-Za-z0-9_.-]+\\.dll") &&
             seen.contains(prefix + entry), "Mod entry is missing or incompatible");
-    const auto bytes = read(package_path(stage, prefix + entry), max_archive);
-    if (platform == "linux-x64")
-        require(bytes.size() >= 20 && bytes.substr(0, 6) == std::string("\177ELF\2\1", 6) &&
-                static_cast<unsigned char>(bytes[18]) == 62 && bytes[19] == 0, "Expected Linux x64 mod binary");
+    validate_binary(read(package_path(stage, prefix + entry), max_archive));
     return manifest;
 }
 Updater::Updater(fs::path root, Download fetch) : root_(plain(root)), fetch_(std::move(fetch)) {}
@@ -164,19 +207,22 @@ void Updater::recover() {
     require(journal.at("files").is_array() && journal.at("files").size() <= 8192, "Invalid recovery inventory");
     std::set<std::string> seen;
     for (const auto& row : journal.at("files")) {
-        const auto name = row.at("path").get<std::string>();
+        const auto name = legacy_name(row.at("path").get<std::string>());
         require(managed(name, true) && seen.insert(name).second && row.at("existed").is_boolean(), "Invalid recovery target");
         const auto target = package_path(root_, name);
         if (fs::exists(target)) read(target, max_archive);
         if (row.at("existed")) {
             const auto backup = package_path(root_, "Briefcase/Updates/" + id + "/backup/" + name);
-            require(number(row.at("mode")) <= 0777 && mode_ok(number(row.at("mode"))) && digest(backup) == row.at("sha256").get<std::string>(), "Damaged recovery backup");
+            const auto mode = row.value("mode", 0644u);
+            auto hash = row.contains("sha256") ? row.at("sha256").get<std::string>() : row.at("previousHash").get<std::string>();
+            std::ranges::transform(hash, hash.begin(), [](unsigned char value) { return static_cast<char>(std::tolower(value)); });
+            require(mode <= 0777 && mode_ok(mode) && digest(backup) == hash, "Damaged recovery backup");
         }
     }
     for (const auto& row : journal.at("files")) {
-        const auto name = row.at("path").get<std::string>();
+        const auto name = legacy_name(row.at("path").get<std::string>());
         const auto target = package_path(root_, name);
-        if (row.at("existed")) atomic(target, read(package_path(root_, "Briefcase/Updates/" + id + "/backup/" + name), max_archive), number(row.at("mode")));
+        if (row.at("existed")) atomic(target, read(package_path(root_, "Briefcase/Updates/" + id + "/backup/" + name), max_archive), row.value("mode", 0644u));
         else remove_file(target);
     }
     journal["state"] = "rolled-back"; write_json(journal_path, journal);
@@ -193,9 +239,9 @@ void Updater::install(const fs::path& stage, const Json& supplied, const std::fu
     for (const auto& item : manifest.at("files")) { const auto name = item.at("path").get<std::string>(); names.insert(name); wanted[name] = item; }
     if (fs::exists(old_path)) {
         const auto old = document(old_path);
-        require(old.at("environment") == "server" && old.at("platform") == "linux-x64" && old.at("files").size() <= 4095, "Invalid installed manifest");
+        require(old.at("environment") == "server" && old.at("platform") == platform_name && old.at("files").size() <= 4095, "Invalid installed manifest");
         for (const auto& item : old.at("files")) {
-            const auto name = item.at("path").get<std::string>();
+            const auto name = legacy_name(item.at("path").get<std::string>());
             require(managed(name, true), "Unmanaged installed manifest path"); package_path(root_, name); names.insert(name);
         }
     }
@@ -205,10 +251,10 @@ void Updater::install(const fs::path& stage, const Json& supplied, const std::fu
         Json row{{"path", name}, {"existed", fs::exists(target)}};
         if (row["existed"]) {
             const auto data = read(target, max_archive);
-            struct stat info{}; require(lstat(target.c_str(), &info) == 0 && mode_ok(info.st_mode & 07777), "Unsupported installed mode");
+            const auto mode = file_mode(target); require(mode_ok(mode), "Unsupported installed mode");
             const auto backup = package_path(root_, "Briefcase/Updates/" + id + "/backup/" + name);
-            atomic(backup, data, info.st_mode & 0777);
-            row["sha256"] = digest(backup); row["mode"] = info.st_mode & 0777;
+            atomic(backup, data, mode);
+            row["sha256"] = digest(backup); row["mode"] = mode;
         }
         backups.push_back(row);
     }
@@ -221,7 +267,7 @@ void Updater::install(const fs::path& stage, const Json& supplied, const std::fu
             if (name == "Package.json") continue;
             const auto target = package_path(root_, name);
             if (const auto found = wanted.find(name); found != wanted.end()) {
-                atomic(target, read(package_path(stage, name), max_archive), number(found->second.at("mode")));
+                atomic(target, read(package_path(stage, name), max_archive), static_cast<unsigned>(number(found->second.at("mode"))));
                 require(digest(target) == found->second.at("sha256").get<std::string>(), "Installed file readback mismatch");
             } else remove_file(target);
             if (after_write) after_write(index++);
@@ -242,22 +288,25 @@ void Updater::recover_mod() {
     const auto prefix = "Briefcase/Mods/" + mod + "/";
     std::set<std::string> seen;
     for (const auto& row : journal.at("files")) {
-        const auto name = row.at("path").get<std::string>();
+        const auto name = legacy_name(row.at("path").get<std::string>());
         require(name.starts_with(prefix) && seen.insert(name).second && row.at("existed").is_boolean(),
                 "Invalid mod recovery target");
         const auto target = package_path(root_, name);
         if (fs::exists(target)) read(target, max_archive);
         if (row.at("existed")) {
             const auto backup = package_path(root_, "Briefcase/Updates/" + transaction + "/backup/" + name);
-            require(number(row.at("mode")) <= 0777 && mode_ok(number(row.at("mode"))) &&
-                    digest(backup) == row.at("sha256").get<std::string>(), "Damaged mod recovery backup");
+            const auto mode = row.value("mode", 0644u);
+            auto hash = row.contains("sha256") ? row.at("sha256").get<std::string>() : row.at("previousHash").get<std::string>();
+            std::ranges::transform(hash, hash.begin(), [](unsigned char value) { return static_cast<char>(std::tolower(value)); });
+            require(mode <= 0777 && mode_ok(mode) && digest(backup) == hash, "Damaged mod recovery backup");
         }
     }
     for (const auto& row : journal.at("files")) {
-        const auto target = package_path(root_, row.at("path").get<std::string>());
+        const auto name = legacy_name(row.at("path").get<std::string>());
+        const auto target = package_path(root_, name);
         if (row.at("existed"))
             atomic(target, read(package_path(root_, "Briefcase/Updates/" + transaction + "/backup/" +
-                                            row.at("path").get<std::string>()), max_archive), number(row.at("mode")));
+                                            name), max_archive), row.value("mode", 0644u));
         else remove_file(target);
     }
     journal["state"] = "rolled-back";
@@ -303,11 +352,11 @@ void Updater::install_mod(const fs::path& stage, const Json& supplied) {
         Json row{{"path", name}, {"existed", fs::exists(target)}};
         if (row["existed"]) {
             const auto data = read(target, max_archive);
-            struct stat info{};
-            require(lstat(target.c_str(), &info) == 0 && mode_ok(info.st_mode & 07777), "Unsupported mod file mode");
+            const auto mode = file_mode(target);
+            require(mode_ok(mode), "Unsupported mod file mode");
             const auto backup = package_path(root_, "Briefcase/Updates/" + transaction + "/backup/" + name);
-            atomic(backup, data, info.st_mode & 0777);
-            row["sha256"] = digest(backup); row["mode"] = info.st_mode & 0777;
+            atomic(backup, data, mode);
+            row["sha256"] = digest(backup); row["mode"] = mode;
         }
         backups.push_back(row);
     }
@@ -319,7 +368,7 @@ void Updater::install_mod(const fs::path& stage, const Json& supplied) {
             if (name == metadata_name) continue;
             const auto target = package_path(root_, name);
             if (const auto found = wanted.find(name); found != wanted.end()) {
-                atomic(target, read(package_path(stage, name), max_archive), number(found->second.at("mode")));
+                atomic(target, read(package_path(stage, name), max_archive), static_cast<unsigned>(number(found->second.at("mode"))));
                 require(digest(target) == found->second.at("sha256").get<std::string>(), "Installed mod file mismatch");
             } else remove_file(target);
         }
@@ -335,7 +384,9 @@ Json Updater::update_mods(const std::function<void(const std::string&)>& log) {
     int timeout{};
     try {
         config = document(package_path(root_, "Briefcase/updater.json"));
-        timeout = number(config.at("timeoutSeconds"));
+        const auto configured_timeout = number(config.at("timeoutSeconds"));
+        require(configured_timeout <= 120, "Invalid updater timeout");
+        timeout = static_cast<int>(configured_timeout);
         require(config.at("schemaVersion") == 1 && config.at("enabled").is_boolean() &&
                 (!config.contains("updateMods") || config.at("updateMods").is_boolean()) &&
                 timeout >= 1 && timeout <= 120, "Invalid updater settings");
@@ -374,7 +425,7 @@ Json Updater::update_mods(const std::function<void(const std::string&)>& log) {
             fs::create_directories(work);
             fetch_("https://api.github.com/repos/" + repository + "/releases/latest",
                    work / "release.json", timeout, 2 * 1024 * 1024);
-            const auto asset = select_mod_asset(document(work / "release.json"), repository, current, "linux-x64");
+            const auto asset = select_mod_asset(document(work / "release.json"), repository, current, platform_name);
             if (!asset) {
                 result["current"] = result["current"].get<size_t>() + 1;
                 result["mods"].push_back({{"id", id}, {"state", "current"}, {"version", current}}); continue;
@@ -384,7 +435,7 @@ Json Updater::update_mods(const std::function<void(const std::string&)>& log) {
             require(fs::file_size(archive) == asset->at("size") &&
                     digest(archive) == asset->at("sha256").get<std::string>(), "Mod archive digest mismatch");
             const auto stage = work / "stage"; extract(archive, stage, true);
-            const auto package = mod_package_manifest(stage, id, asset->at("version"), repository, "linux-x64");
+            const auto package = mod_package_manifest(stage, id, asset->at("version"), repository, platform_name);
             install_mod(stage, package);
             result["updated"] = result["updated"].get<size_t>() + 1;
             result["mods"].push_back({{"id", id}, {"state", "updated"}, {"version", asset->at("version")}});
@@ -398,6 +449,62 @@ Json Updater::update_mods(const std::function<void(const std::string&)>& log) {
     }
     return result;
 }
+void Updater::cleanup(const std::function<void(const std::string&)>& log) {
+    const auto updates = package_path(root_, "Briefcase/Updates");
+    if (!fs::exists(updates)) return;
+    plain(updates);
+    std::set<std::string> active;
+    for (const auto* name : {"transaction.json", "mod-transaction.json"}) {
+        const auto journal = updates / name;
+        if (!fs::exists(journal)) continue;
+        try {
+            const auto value = document(journal);
+            const auto state = value.at("state").get<std::string>();
+            require(state == "installing" || state == "installed" || state == "rolled-back",
+                    "Invalid update journal state");
+            if (state == "installing") {
+                const auto id = value.at("id").get<std::string>();
+                require(matches(id, "[a-f0-9]{32}"), "Invalid active update identifier");
+                active.insert(id);
+            }
+        } catch (const std::exception& error) {
+            log("Could not inspect update journal " + std::string(name) + ": " + error.what());
+            return;
+        }
+    }
+    std::vector<fs::path> work;
+    for (const auto& entry : fs::directory_iterator(updates)) {
+        const auto name = entry.path().filename().string();
+        const auto id = name.starts_with("install-") ? name.substr(8) : name;
+        if (entry.is_directory() && !active.contains(id) &&
+            (matches(name, "[a-f0-9]{32}") || matches(name, "install-[a-f0-9]{32}")))
+            work.push_back(entry.path());
+    }
+    for (const auto& directory : work) {
+        try {
+            plain(directory);
+            for (const auto& entry : fs::recursive_directory_iterator(directory)) {
+                plain(entry.path());
+                require(entry.is_directory() || entry.is_regular_file(), "Unsafe update work entry");
+            }
+            std::error_code error;
+            fs::remove_all(directory, error);
+            require(!error, "Cannot remove completed update work directory");
+        } catch (const std::exception& error) {
+            log("Could not clean completed update work directory " + directory.filename().string() + ": " + error.what());
+        }
+    }
+    for (const auto* name : {"transaction.json", "mod-transaction.json"}) {
+        const auto journal = updates / name;
+        try {
+            if (!fs::exists(journal)) continue;
+            const auto state = document(journal).at("state").get<std::string>();
+            if (state == "installed" || state == "rolled-back") remove_file(journal);
+        } catch (const std::exception& error) {
+            log("Could not clean completed update journal " + std::string(name) + ": " + error.what());
+        }
+    }
+}
 std::string Updater::update(const std::function<void(const std::string&)>& log) {
     recover(); // Recovery errors must prevent launch, even with updates disabled.
     const auto config_path = package_path(root_, "Briefcase/updater.json");
@@ -410,20 +517,22 @@ std::string Updater::update(const std::function<void(const std::string&)>& log) 
                                     {"repository", "EnoPM/BriefcaseNative"}, {"timeoutSeconds", 20}});
         }
         const auto config = document(config_path);
-        const auto timeout = number(config.at("timeoutSeconds"));
-        require(config.at("schemaVersion") == 1 && config.at("enabled").is_boolean() && timeout >= 1 && timeout <= 120, "Invalid updater settings");
+        const auto configured_timeout = number(config.at("timeoutSeconds"));
+        require(configured_timeout >= 1 && configured_timeout <= 120, "Invalid updater timeout");
+        const auto timeout = static_cast<int>(configured_timeout);
+        require(config.at("schemaVersion") == 1 && config.at("enabled").is_boolean(), "Invalid updater settings");
         if (!config.at("enabled")) return "disabled";
         const auto repository = config.value("repository", std::string{});
         if (repository.empty()) return "not-configured";
         require(matches(repository, "[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+"), "Invalid repository");
-        const auto current = document(package_path(root_, "Briefcase/Updater/build.json")).at("frameworkVersion").get<std::string>();
+        const auto current = document(package_path(root_, "Briefcase/Core/Updater/build.json")).at("frameworkVersion").get<std::string>();
         const auto directory = package_path(root_, "Briefcase/Updates/" + identifier());
         fs::create_directories(directory);
         fetch_("https://api.github.com/repos/" + repository + "/releases/latest", directory / "release.json", timeout, 2 * 1024 * 1024);
         const auto asset = select_asset(document(directory / "release.json"), repository, current);
         if (!asset) return "current";
         const auto archive = directory / "release.zip";
-        fetch_(asset->at("url"), archive, timeout, asset->at("size"));
+        fetch_(asset->at("url"), archive, timeout, asset->at("size").get<uint64_t>());
         require(fs::file_size(archive) == asset->at("size") && digest(archive) == asset->at("sha256").get<std::string>(), "Archive digest mismatch");
         stage = directory / "stage"; extract(archive, stage);
         manifest = package_manifest(stage, asset->at("version"), digest(root_ / game_name));

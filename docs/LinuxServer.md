@@ -163,7 +163,7 @@ Logs are Briefcase/Logs/launcher.log and Briefcase/Logs/BriefcaseNative.log.
 ## Administration
 
 ~~~sh
-./Briefcase/Tools/Briefcase.AdminSetup "$PWD/Briefcase" 127.0.0.1 50002 127.0.0.1:50002
+./Briefcase/Core/Tools/Briefcase.AdminSetup "$PWD/Briefcase" 127.0.0.1 50002 127.0.0.1:50002
 ~~~
 
 Setup generates a strong password without printing it. The password stays in
@@ -189,7 +189,7 @@ never replaced. The release becomes public only after both platforms succeed.
 1. Configure UPSTREAM_READ_TOKEN with read access to the upstream Unreal submodule.
 2. Set the new stable version in the root VERSION file and push the reviewed changes
    to main. A push changing VERSION starts the complete publication automatically.
-3. Alternatively, run Publish server release manually. It reads VERSION from the
+3. Alternatively, run Publish Briefcase release manually. It reads VERSION from the
    selected commit; draft=true keeps all verified assets in a draft for review.
 4. Add Linux server release remains manually available to finish an existing matching
    draft after a Linux failure; its publish option controls whether to expose that draft.

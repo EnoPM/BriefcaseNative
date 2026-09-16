@@ -88,7 +88,13 @@ python scripts/release/Assert-Source.py
 ```
 
 New public source files and reviewed changes must be deliberately added to that
-inventory. Never regenerate it blindly from an unreviewed working tree.
+inventory. After reviewing the complete diff, refresh it explicitly with:
+
+```powershell
+python scripts/release/Update-SourceInventory.py --reviewed
+```
+
+Never regenerate it from an unreviewed working tree.
 
 ## Versions and releases
 

@@ -9,7 +9,13 @@ namespace bc::launcher {
 namespace fs = std::filesystem;
 using Json = nlohmann::json;
 inline constexpr uint64_t max_archive = 512ull * 1024 * 1024;
+#ifdef _WIN32
+inline constexpr const char* game_name = "DeceiveIncServer-Win64-Shipping.exe";
+inline constexpr const char* platform_name = "windows-x64";
+#else
 inline constexpr const char* game_name = "DeceiveIncServer-Linux-Shipping";
+inline constexpr const char* platform_name = "linux-x64";
+#endif
 void require(bool condition, const std::string& message);
 fs::path plain(const fs::path& path);
 fs::path package_path(const fs::path& root, const std::string& name);
@@ -18,6 +24,7 @@ std::string read(const fs::path& path, uint64_t limit = 2 * 1024 * 1024);
 Json document(const fs::path& path);
 std::string digest(const fs::path& path);
 void atomic(const fs::path& path, const std::string& data, unsigned mode = 0600);
+unsigned file_mode(const fs::path& path);
 void write_json(const fs::path& path, const Json& value);
 std::string identifier();
 void allowed_url(const std::string& url);
@@ -41,6 +48,7 @@ public:
                  const std::function<void(size_t)>& after_write = {});
     std::string update(const std::function<void(const std::string&)>& log);
     Json update_mods(const std::function<void(const std::string&)>& log);
+    void cleanup(const std::function<void(const std::string&)>& log);
 private:
     void recover_mod();
     void install_mod(const fs::path& stage, const Json& manifest);

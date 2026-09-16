@@ -5,8 +5,21 @@ It runs the server without opening its graphical interface, loads separately
 installed native mods and checks for framework and compatible mod updates before
 every launch.
 
-The public release currently supports Windows x64 and Ubuntu 24.04 x86_64
-dedicated servers. The client is not distributed yet.
+The public release supports the Windows x64 client and Windows x64 or Ubuntu
+24.04 x86_64 dedicated servers.
+
+## Install the Windows client
+
+1. Close Deceive Inc.
+2. Download `BriefcaseNative-Client-windows-x64-<version>.zip` from the
+   [latest release](https://github.com/EnoPM/BriefcaseNative/releases/latest).
+3. Extract it directly into the game's `DeceiveInc\Binaries\Win64` directory.
+4. Start the game with `Briefcase.ClientLauncher.exe` from that directory.
+
+The launcher verifies the supported game build and always starts
+`DeceiveInc-Win64-Shipping.exe` with Win64 as its working directory. Press F1 to
+open Briefcase. Launcher errors are written to
+`Briefcase\Logs\client-launcher-error.log`.
 
 ## Install the dedicated server
 
@@ -52,19 +65,22 @@ The resulting layout starts like this:
 DeceiveInc/Binaries/Win64/
 ├── DeceiveIncServer-Win64-Shipping.exe
 ├── Briefcase.ServerLauncher.exe
-├── StartBriefcaseNativeServer.ps1
 └── Briefcase/
     ├── launch.json
-    ├── Runtime/
-    ├── Tools/
-    └── Updater/
+    └── Core/
+        ├── Briefcase.NativeHost.dll
+        ├── Briefcase.ServerBootstrap.dll
+        ├── Tools/
+        │   └── Briefcase.ServerUpdater.exe
+        └── Updater/
 ```
 
 Start the server with `Briefcase.ServerLauncher.exe`. Do not start
 `DeceiveIncServer-Win64-Shipping.exe` directly: doing so bypasses Briefcase, its
 mods and its update check. The launcher opens no server UI or external console.
 
-If startup fails, read `Briefcase\Logs\launcher-error.log` and the game logs.
+If startup fails, read `Briefcase\Logs\launcher-error.log`,
+`Briefcase\Logs\launcher.log` and the game logs.
 
 ## Install Briefcase on Linux
 

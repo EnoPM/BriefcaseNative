@@ -32,7 +32,7 @@ find_package(LibArchive REQUIRED)
 add_library(Briefcase.ServerUpdate STATIC
   loader/Briefcase.ServerLauncher/LinuxFiles.cpp
   loader/Briefcase.ServerLauncher/LinuxDownload.cpp
-  loader/Briefcase.ServerLauncher/LinuxUpdate.cpp)
+  loader/Briefcase.ServerLauncher/Update.cpp)
 target_link_libraries(Briefcase.ServerUpdate PUBLIC nlohmann_json::nlohmann_json
   PRIVATE CURL::libcurl LibArchive::LibArchive mbedcrypto)
 target_include_directories(Briefcase.ServerUpdate PUBLIC loader/Briefcase.ServerLauncher)

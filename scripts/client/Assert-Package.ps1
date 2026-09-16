@@ -12,9 +12,11 @@ if(@(Compare-Object $expectedClient $actualClient).Count){throw 'Unexpected clie
 foreach($package in @($ClientPackage,$ServerPackage)){
     if(-not(Test-Path -LiteralPath $package)){throw "Missing package: $package"}
     $bad=@(Get-ChildItem -LiteralPath $package -Recurse -File|Where-Object {$_.Extension -match '^\.(pdb|lib|obj|exe)$'})
-    $allowedSetup=Join-Path $ServerPackage 'Briefcase\Tools\Briefcase.AdminSetup.exe'
-    $allowedRestart=Join-Path $ServerPackage 'Briefcase\Tools\Briefcase.ServerRestart.exe'
-    $bad=@($bad | Where-Object {$_.FullName -ine (Join-Path $ServerPackage 'Briefcase.ServerLauncher.exe') -and $_.FullName -ine $allowedSetup -and $_.FullName -ine $allowedRestart})
+    $allowedSetup=Join-Path $ServerPackage 'Briefcase\Core\Tools\Briefcase.AdminSetup.exe'
+    $allowedRestart=Join-Path $ServerPackage 'Briefcase\Core\Tools\Briefcase.ServerRestart.exe'
+    $allowedUpdater=Join-Path $ServerPackage 'Briefcase\Core\Tools\Briefcase.ServerUpdater.exe'
+    $allowedClientLauncher=Join-Path $ClientPackage 'Briefcase.ClientLauncher.exe'
+    $bad=@($bad | Where-Object {$_.FullName -ine (Join-Path $ServerPackage 'Briefcase.ServerLauncher.exe') -and $_.FullName -ine $allowedClientLauncher -and $_.FullName -ine $allowedSetup -and $_.FullName -ine $allowedRestart -and $_.FullName -ine $allowedUpdater})
     if($bad.Count){throw "Development artifacts in package: $($bad.Name -join ', ')"}
     foreach($file in Get-ChildItem -LiteralPath $package -Filter briefcase.mod.json -Recurse -File) {
         $manifest=Get-Content -LiteralPath $file.FullName -Raw|ConvertFrom-Json
@@ -37,19 +39,19 @@ foreach($file in Get-ChildItem -LiteralPath $ServerPackage -File -Recurse | Wher
     if($LASTEXITCODE -or ($imports -match '(?i)d3d|dxgi|imgui|Client.Rendering')){throw "Graphics dependency or unreadable server binary: $($file.Name)"}
 }
 if(@(Get-ChildItem -LiteralPath $ServerPackage -Recurse|Where-Object {$_.Name -match '(?i)imgui|Client\.|OverlaySample|d3d|dxgi'}).Count){throw 'Client graphics component in server package.'}
-foreach($required in @('Briefcase\Localization\fr.json','Briefcase\Localization\en.json','Briefcase\Licenses\MbedTLS.txt','Briefcase\Licenses\DearImGui.txt','Briefcase\loader.json','StartBriefcaseNativeClient.ps1')){
+foreach($required in @('Briefcase.ClientLauncher.exe','Briefcase\Core\Localization\fr.json','Briefcase\Core\Localization\en.json','Briefcase\Core\Licenses\MbedTLS.txt','Briefcase\Core\Licenses\DearImGui.txt','Briefcase\loader.json')){
     if(-not(Test-Path -LiteralPath (Join-Path $ClientPackage $required))){throw "Missing client package file: $required"}
 }
 $commonClient=(Get-FileHash -LiteralPath (Join-Path $ClientPackage 'Briefcase\Core\Briefcase.NativeHost.dll')).Hash
-$commonServer=(Get-FileHash -LiteralPath (Join-Path $ServerPackage 'Briefcase\Runtime\Briefcase.NativeHost.dll')).Hash
+$commonServer=(Get-FileHash -LiteralPath (Join-Path $ServerPackage 'Briefcase\Core\Briefcase.NativeHost.dll')).Hash
 if($commonClient -ne $commonServer){throw 'Client and server do not share the same runtime build.'}
-if(-not(Test-Path -LiteralPath (Join-Path $ServerPackage 'Briefcase\Tools\Briefcase.AdminSetup.exe'))){throw 'Missing server administration setup tool.'}
+if(-not(Test-Path -LiteralPath (Join-Path $ServerPackage 'Briefcase\Core\Tools\Briefcase.AdminSetup.exe'))){throw 'Missing server administration setup tool.'}
 foreach($package in @($ClientPackage,$ServerPackage)) {
     if(@(Get-ChildItem -LiteralPath $package -Recurse -File | Where-Object {$_.Name -in @('server.json','clients.json','pairing.json','passwords.json','restart-request.json','ui-settings.json')}).Count){throw 'Local administration identity in user package.'}
 }
 Write-Output 'PASS client/server package inventories, common runtime, DLL dependencies, manifests, licenses and absence of PDBs.'
 
-foreach($required in @('Briefcase\Updater\Updater.ps1','Briefcase\Updater\Restart-Server.ps1','Briefcase\Updater\build.json','Briefcase\Updater\updater.example.json')) {
+foreach($required in @('Briefcase\Core\Tools\Briefcase.ServerUpdater.exe','Briefcase\Core\Updater\build.json','Briefcase\Core\Updater\updater.example.json')) {
     if(-not(Test-Path -LiteralPath (Join-Path $ServerPackage $required))){throw "Missing server updater file: $required"}
 }
 if(Test-Path -LiteralPath (Join-Path $ServerPackage 'Briefcase\updater.json')){throw 'Local update repository configuration in user package.'}
@@ -57,6 +59,6 @@ if(Test-Path -LiteralPath (Join-Path $ServerPackage 'Briefcase\updater.json')){t
 if(Test-Path -LiteralPath (Join-Path $ServerPackage 'Briefcase/Mods')){throw 'Framework server package must not contain independent mods.'}
 
 if(Test-Path -LiteralPath (Join-Path $ServerPackage 'version.dll')){throw 'Server package must use the launcher, not the client proxy.'}
-foreach($required in @('Briefcase.ServerLauncher.exe','Briefcase/Runtime/Briefcase.ServerBootstrap.dll','Briefcase/Updater/Launch-Server.ps1','Briefcase/Licenses/Detours.txt')){
+foreach($required in @('Briefcase.ServerLauncher.exe','Briefcase/Core/Briefcase.ServerBootstrap.dll','Briefcase/Core/Licenses/Detours.txt','Briefcase/Core/Licenses/miniz.txt')){
  if(-not(Test-Path -LiteralPath (Join-Path $ServerPackage $required))){throw "Missing launcher file: $required"}
 }

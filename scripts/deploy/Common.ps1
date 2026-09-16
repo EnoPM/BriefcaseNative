@@ -27,3 +27,19 @@ function Get-DeploymentPaths {
     Assert-NoReparsePoint -Path $exe
     [pscustomobject]@{Project=$project;Win64=$target;Executable=$exe}
 }
+function Remove-OldDeploymentBackups {
+    param([Parameter(Mandatory)][string]$ServerWin64,[ValidateRange(1,20)][int]$Keep=5)
+    $win64=[IO.Path]::GetFullPath($ServerWin64).TrimEnd('\')
+    $root=[IO.Path]::GetFullPath((Join-Path $win64 'Briefcase\Backups')).TrimEnd('\')
+    if($root -ine (Join-Path $win64 'Briefcase\Backups') -or -not(Test-Path -LiteralPath $root)){return}
+    Assert-NoReparsePoint -Path $root
+    $candidates=@(Get-ChildItem -LiteralPath $root -Directory -Force|Where-Object {
+        $_.Name -cmatch '^((selection-)?[0-9]{8}-[0-9]{6}-[0-9]{3}(-[a-f0-9]{32})?|updater-[a-f0-9]{32})$'
+    }|Sort-Object LastWriteTimeUtc,Name -Descending)
+    foreach($directory in @($candidates|Select-Object -Skip $Keep)){
+        $resolved=[IO.Path]::GetFullPath($directory.FullName)
+        if([IO.Path]::GetDirectoryName($resolved) -ine $root){throw "Backup escaped retention root: $resolved"}
+        Assert-NoReparsePoint -Path $resolved
+        Remove-Item -LiteralPath $resolved -Recurse -Force
+    }
+}

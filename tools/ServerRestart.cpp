@@ -40,7 +40,11 @@ int wmain(int argc, wchar_t **argv) {
             throw std::runtime_error("Invalid restart ticket");
         wchar_t module[32768]{};
         GetModuleFileNameW(nullptr, module, 32768);
-        root = fs::path(module).parent_path().parent_path();
+        root = fs::path(module).parent_path();
+        while (!root.empty() && root.filename() != L"Briefcase" && root != root.root_path())
+            root = root.parent_path();
+        if (root.filename() != L"Briefcase")
+            throw std::runtime_error("Restart helper is outside Briefcase");
         const auto win64 = root.parent_path(), exe = win64 / "DeceiveIncServer-Win64-Shipping.exe";
         bc::assert_plain_path(exe);
         bc::assert_plain_path(root / "Admin");
@@ -71,41 +75,16 @@ int wmain(int argc, wchar_t **argv) {
             commit{OpenEventW(SYNCHRONIZE, FALSE, (base + L".Commit").c_str())};
         if (!ready.h || !commit.h)
             throw std::runtime_error("Restart requester absent");
-        const auto ini =
-            win64.parent_path().parent_path() / "Saved" / "Config" / "WindowsServer" / "TripwireServer.ini";
-        auto text = read_file(ini, 262144);
-        auto port = [&](const char *key, int fallback) {
-            std::string s;
-            try {
-                s = bc::ini_read(text, "/Script/DeceiveInc.TripwireServerSettings", key);
-            } catch (...) {
-                return fallback;
-            }
-            size_t used{};
-            int v = std::stoi(s, &used);
-            if (used != s.size() || v < 1024 || v > 65535)
-                throw std::runtime_error("Invalid game port");
-            return v;
-        };
-        auto game_port = port("GamePort", 50000), query_port = port("QueryPort", 50001);
-        if (game_port == query_port)
-            throw std::runtime_error("Duplicate game ports");
         for (auto &arg : arguments) {
             const auto a = arg.get<std::string>();
             if (a.size() > 4096 || a.find('\0') != a.npos || a.find_first_of(" \t\r\n\"") != a.npos)
                 throw std::runtime_error("Invalid launcher argument");
         }
         std::wstring command;
-        const auto restart_script = root / "Updater" / "Restart-Server.ps1";
-        const auto launcher = win64 / "StartBriefcaseNativeServer.ps1";
-        bc::assert_plain_path(restart_script);
+        const auto launcher = win64 / "Briefcase.ServerLauncher.exe";
         bc::assert_plain_path(launcher);
-        if (!fs::is_regular_file(restart_script) || !fs::is_regular_file(launcher))
+        if (!fs::is_regular_file(launcher))
             throw std::runtime_error("Updated server launcher is missing");
-        wchar_t system_dir[MAX_PATH]{};
-        if (!GetSystemDirectoryW(system_dir, MAX_PATH))
-            throw std::runtime_error("Windows system directory unavailable");
-        const auto powershell = fs::path(system_dir) / "WindowsPowerShell/v1.0/powershell.exe";
         bc::assert_plain_path(exe);
         SetEvent(ready.h);
         // No process is stopped until the TLS acknowledgement has been sent.
@@ -125,10 +104,10 @@ int wmain(int argc, wchar_t **argv) {
             if (WaitForSingleObject(process.h, 10000) != WAIT_OBJECT_0)
                 throw std::runtime_error("Server has not exited");
         }
-        command = quote(powershell.wstring()) +
-                  L" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File " +
-                  quote(restart_script.wstring()) + L" -RequestId " + fs::path(id).wstring() +
-                  L" -ParentProcessId " + std::to_wstring(GetCurrentProcessId());
+        command = quote(launcher.wstring()) + L" --restart " + fs::path(id).wstring() +
+                  L" --wait-parent " + std::to_wstring(GetCurrentProcessId());
+        for (const auto &argument : arguments)
+            command += L" " + quote(fs::path(argument.get<std::string>()).wstring());
         // Write first: the child waits for our exit and then records the actual new server PID.
         write_file(root / "Admin" / "restart-result.json",
                    Json{{"requestId", id},
@@ -142,7 +121,7 @@ int wmain(int argc, wchar_t **argv) {
         si.dwFlags = STARTF_USESHOWWINDOW;
         si.wShowWindow = SW_HIDE;
         PROCESS_INFORMATION pi{};
-        if (!CreateProcessW(powershell.c_str(), command.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW,
+        if (!CreateProcessW(launcher.c_str(), command.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW,
                             nullptr, win64.c_str(), &si, &pi))
             throw std::runtime_error("Server launcher failed");
         CloseHandle(pi.hThread);

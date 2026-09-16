@@ -3,15 +3,17 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
 $project=Split-Path $PSScriptRoot
 $fixture=Join-Path $project ('artifacts/release-workflow-'+[guid]::NewGuid().ToString('N'))
-foreach($dir in @('scripts/release','scripts/update','dist/Releases')){
+foreach($dir in @('scripts/release','dist/Releases','runtime/Briefcase.NativeHost')){
     New-Item -ItemType Directory -Path (Join-Path $fixture $dir) -Force|Out-Null
 }
 Copy-Item -Path (Join-Path $project 'scripts/release/*.ps1') -Destination (Join-Path $fixture 'scripts/release')
-Copy-Item -LiteralPath (Join-Path $project 'scripts/update/Updater.ps1') -Destination (Join-Path $fixture 'scripts/update')
 Copy-Item -LiteralPath (Join-Path $project 'VERSION') -Destination $fixture
+Copy-Item -LiteralPath (Join-Path $project 'runtime/Briefcase.NativeHost/ClientBuild.json') -Destination (Join-Path $fixture 'runtime/Briefcase.NativeHost/ClientBuild.json')
 $global:bcReleaseTestVersion=& (Join-Path $fixture 'scripts/release/Read-Version.ps1') -ProjectRoot $fixture
 $global:bcReleaseTestArchive=Join-Path $fixture "dist/Releases/BriefcaseNative-Server-windows-x64-$global:bcReleaseTestVersion.zip"
 Copy-Item -LiteralPath (Join-Path $project "dist/Releases/BriefcaseNative-Server-windows-x64-$global:bcReleaseTestVersion.zip") -Destination $global:bcReleaseTestArchive
+$global:bcReleaseTestClient=Join-Path $fixture "dist/Releases/BriefcaseNative-Client-windows-x64-$global:bcReleaseTestVersion.zip"
+Copy-Item -LiteralPath (Join-Path $project "dist/Releases/BriefcaseNative-Client-windows-x64-$global:bcReleaseTestVersion.zip") -Destination $global:bcReleaseTestClient
 $global:bcReleaseTestSdk=Join-Path $fixture "dist/Releases/BriefcaseNative-SDK-$global:bcReleaseTestVersion.zip"
 Copy-Item -LiteralPath (Join-Path $project "dist/Releases/BriefcaseNative-SDK-$global:bcReleaseTestVersion.zip") -Destination $global:bcReleaseTestSdk
 $global:bcReleaseTestCommit='a'*40
@@ -39,7 +41,7 @@ function gh {
     }
     if($command.StartsWith('release view ')){return 'https://api.github.com/repos/fixture/repo/releases/123'}
     if($command -eq 'api https://api.github.com/repos/fixture/repo/releases/123'){
-        $assets=@(foreach($path in @($global:bcReleaseTestArchive,$global:bcReleaseTestSdk)){
+        $assets=@(foreach($path in @($global:bcReleaseTestArchive,$global:bcReleaseTestClient,$global:bcReleaseTestSdk)){
             $hash=(Get-FileHash -LiteralPath $path).Hash.ToLowerInvariant()
             if($global:bcReleaseTestMode -eq 'corrupt'){$hash='0'*64}
             @{name=[IO.Path]::GetFileName($path);state='uploaded';size=(Get-Item -LiteralPath $path).Length;digest="sha256:$hash"}
@@ -77,6 +79,7 @@ try {
     Check (-not ($global:bcReleaseTestCommands -match '^release edit ')) 'Draft published.'
     Check ($global:bcReleaseTestCommands[0] -match '--draft$') 'Release visible before verification.'
     Check ($global:bcReleaseTestCommands[0] -match "--target $global:bcReleaseTestCommit") 'Release targets wrong commit.'
+    Check ($global:bcReleaseTestCommands[0] -match [regex]::Escape([IO.Path]::GetFileName($global:bcReleaseTestClient))) 'Client asset omitted from release creation.'
     $global:bcReleaseTestCommands.Clear()
     & $publish -Version $global:bcReleaseTestVersion -Commit $global:bcReleaseTestCommit -Repository fixture/repo|Out-Null
     Check ($global:bcReleaseTestCommands[-1] -match '--draft=false --latest$') 'Verified release not published.'

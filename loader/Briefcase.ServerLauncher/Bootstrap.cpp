@@ -9,7 +9,7 @@ static void prepare() noexcept {
         wchar_t exe[32768]{};
         if (!GetModuleFileNameW(nullptr, exe, 32768)) ExitProcess(119);
         const auto root = std::filesystem::path(exe).parent_path();
-        auto host = LoadLibraryExW((root / L"Briefcase/Runtime/Briefcase.NativeHost.dll").c_str(), nullptr,
+        auto host = LoadLibraryExW((root / L"Briefcase/Core/Briefcase.NativeHost.dll").c_str(), nullptr,
                                   LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32);
         if (!host) ExitProcess(119);
         auto init = reinterpret_cast<uint32_t(__cdecl*)(uint32_t)>(GetProcAddress(host, "BriefcasePrepare"));

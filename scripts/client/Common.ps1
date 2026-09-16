@@ -38,3 +38,18 @@ function Get-ClientProcesses($Paths) {
     @(Get-CimInstance Win32_Process -Filter "Name = 'DeceiveInc-Win64-Shipping.exe'"|
         Where-Object {$_.ExecutablePath -ieq $Paths.Executable})
 }
+function Remove-OldClientDeploymentBackups {
+    param([Parameter(Mandatory)][string]$ClientRoot,[ValidateRange(1,20)][int]$Keep=5)
+    $root=[IO.Path]::GetFullPath($ClientRoot).TrimEnd('\')
+    $backups=Assert-ClientDescendant (Join-Path $root 'BriefcaseDeploymentBackups') $root
+    if(-not(Test-Path -LiteralPath $backups)){return}
+    $candidates=@(Get-ChildItem -LiteralPath $backups -Directory -Force|Where-Object {
+        $_.Name -cmatch '^[0-9]{8}-[0-9]{6}-[0-9]{3}$'
+    }|Sort-Object LastWriteTimeUtc,Name -Descending)
+    foreach($directory in @($candidates|Select-Object -Skip $Keep)){
+        $resolved=[IO.Path]::GetFullPath($directory.FullName)
+        if([IO.Path]::GetDirectoryName($resolved) -ine $backups){throw "Backup escaped retention root: $resolved"}
+        Assert-PlainClientPath $resolved
+        Remove-Item -LiteralPath $resolved -Recurse -Force
+    }
+}

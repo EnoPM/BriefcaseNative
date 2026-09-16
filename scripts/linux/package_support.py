@@ -2,9 +2,9 @@
 import hashlib, json, os, re, stat, tempfile, zipfile
 from pathlib import Path
 MAX_ARCHIVE=536870912
-REQUIRED={"Briefcase.ServerLauncher","Briefcase/Runtime/libBriefcase.NativeHost.so",
- "Briefcase/Runtime/libBriefcase.ServerBootstrap.so","Briefcase/Tools/Briefcase.AdminSetup",
- "Briefcase/Updater/build.json"}
+REQUIRED={"Briefcase.ServerLauncher","Briefcase/Core/libBriefcase.NativeHost.so",
+ "Briefcase/Core/libBriefcase.ServerBootstrap.so","Briefcase/Core/Tools/Briefcase.AdminSetup",
+ "Briefcase/Core/Updater/build.json"}
 class UpdateError(RuntimeError):pass
 def require(value,message):
     if not value:raise UpdateError(message)
@@ -20,8 +20,8 @@ def relative(root,name):
     require(all(part not in ("",".","..") for part in name.split("/")),"Unsafe package path")
     return plain(Path(root)/name)
 def managed(name):
-    return name=="Package.json" or name in REQUIRED or name=="Briefcase/Updater/updater.example.json" or bool(
-        re.fullmatch(r"Briefcase/(Docs|Licenses|Localization)/[A-Za-z0-9_./-]+\.(json|txt|md)",name))
+    return name=="Package.json" or name in REQUIRED or name=="Briefcase/Core/Updater/updater.example.json" or bool(
+        re.fullmatch(r"Briefcase/Core/(Docs|Licenses|Localization)/[A-Za-z0-9_./-]+\.(json|txt|md)",name))
 def read(path,limit=2097152):
     fd=os.open(plain(path),os.O_RDONLY|os.O_NOFOLLOW|os.O_CLOEXEC|os.O_NONBLOCK)
     with os.fdopen(fd,"rb") as stream:
@@ -102,10 +102,10 @@ def package_manifest(stage,expected_version,game_hash):
         require(type(item.get("bytes")) is int and 0<=item["bytes"]<=MAX_ARCHIVE and
                 item.get("mode") in (0o644,0o755) and re.fullmatch("[a-f0-9]{64}",item.get("sha256","")) and
                 path.stat().st_size==item["bytes"] and digest_file(path)==item["sha256"],"Package file mismatch")
-        if name in {"Briefcase.ServerLauncher","Briefcase/Tools/Briefcase.AdminSetup"} or name.endswith(".so"):
+        if name in {"Briefcase.ServerLauncher","Briefcase/Core/Tools/Briefcase.AdminSetup"} or name.endswith(".so"):
             with path.open('rb') as stream:header=stream.read(20)
             require(item["mode"]==0o755 and len(header)==20 and header[:6]==b'\x7fELF\x02\x01' and header[18:20]==b'\x3e\0',"Expected executable Linux x64 ELF")
     actual={p.relative_to(stage).as_posix() for p in Path(stage).rglob("*") if p.is_file()}
     require(actual==seen|{"Package.json"} and REQUIRED<=seen,"Incomplete or unlisted package content")
-    require(document(relative(stage,"Briefcase/Updater/build.json"))["frameworkVersion"]==expected_version,"Version marker mismatch")
+    require(document(relative(stage,"Briefcase/Core/Updater/build.json"))["frameworkVersion"]==expected_version,"Version marker mismatch")
     return manifest

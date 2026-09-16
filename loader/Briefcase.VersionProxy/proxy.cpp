@@ -29,7 +29,7 @@ static uint32_t bootstrap(void *self) {
         return 1;
     if (GetFileAttributesW(core) != INVALID_FILE_ATTRIBUTES)
         wcscpy_s(path, core);
-    else if (wcscat_s(path, L"Briefcase\\Runtime\\Briefcase.NativeHost.dll"))
+    else
         return 1;
     auto module =
         LoadLibraryExW(path, nullptr, LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32);
