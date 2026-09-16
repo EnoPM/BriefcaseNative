@@ -1,23 +1,39 @@
-# Stockage portable de l’identité d’administration — proposition à approuver
+# Portable administration identity storage
 
-Le mot de passe administrateur et la clé privée TLS sont deux secrets distincts.
+The administration password and the TLS private key are separate secrets.
 
-## Mot de passe administrateur
+## Administration password
 
-L’administrateur a explicitement choisi de stocker le mot de passe en clair dans le champ `password` de `Briefcase/Admin/server.json` (version 2). Le service calcule un vérificateur PBKDF2 en mémoire au démarrage. Les échanges restent sous TLS après vérification du certificat. Ce choix ne change pas la protection de la clé privée TLS décrite ci-dessous.
+The administrator chose to store the password as plain text in the `password`
+field of `Briefcase/Admin/server.json` configuration version 2. At startup, the
+service derives a PBKDF2 verifier in memory. Network exchanges remain protected by
+TLS after certificate verification. This choice does not change how the TLS private
+key is protected.
 
-## Proposition pour la clé TLS
+## TLS private key
 
-La clé privée pourrait être stockée en PEM standard, non chiffrée, dans `Admin/tls-private-key.pem`, avec accès limité au compte du serveur et aux administrateurs du système : ACL restrictive sous Windows, propriétaire du service et mode 0600 sous Linux, répertoire privé en mode 0700.
+Windows protects the existing private key with DPAPI for the account that configured
+the server. Linux stores the standard PEM key in `Admin/tls-private-key.pem`, with
+access limited to the server account and system administrators. The private
+directory uses mode `0700` and the key uses mode `0600`.
 
-Une prochaine version de configuration référencerait ce nom de fichier relatif et conserverait le certificat public, le sel, le vérificateur, l’adresse et le port. La clé serait exclue des paquets utilisateurs et du dépôt Git.
+The configuration references only a relative filename and also stores the public
+certificate, salt, verifier, address and port. The private key is excluded from user
+packages and Git.
 
-Le serveur pourrait démarrer sans saisie d’un secret supplémentaire. La migration Windows convertirait la clé DPAPI existante en conservant le certificat, son empreinte, le mot de passe administrateur et les réglages. Une sauvegarde privée de la version précédente serait créée avant toute conversion. Aucun nouveau certificat ne serait approuvé automatiquement côté client.
+The server starts without requesting another secret. Moving a Linux installation or
+its backup requires preserving the file owner and permissions. A person who obtains
+the private key or a backup containing it can use the key without the original
+machine account, so filesystem permissions and backup controls protect the secret
+at rest. TLS traffic remains encrypted.
 
-**Conséquence concrète :** une personne obtenant ce fichier privé ou une sauvegarde qui l’inclut pourrait utiliser la clé sans disposer du compte Windows d’origine. Les permissions et les sauvegardes deviennent donc la protection du secret au repos. Le trafic réseau reste chiffré en TLS.
+No client automatically trusts a new certificate. Replacing or migrating an
+identity requires the administrator to approve the new certificate fingerprint.
 
-Cette migration n’est pas appliquée. Le contrôle automatique d’approbation a refusé de supprimer le chiffrement DPAPI de la clé TLS sans autorisation explicite portant sur cette clé.
+## Optional encrypted storage
 
-## Alternative avec chiffrement au repos
-
-Utiliser une clé privée PKCS#8 chiffrée par une phrase secrète fournie au démarrage ou par un gestionnaire de secrets indépendant. Ce choix conserve le chiffrement au repos, mais exige de définir comment le serveur obtient cette phrase. Stocker une seconde clé de déchiffrement à côté du fichier chiffré n’ajouterait pas une protection utile contre la copie des deux fichiers.
+An installation may instead use a PKCS#8 private key encrypted by a passphrase
+provided at startup or by an independent secret manager. This preserves encryption
+at rest but requires a defined source for the passphrase. Keeping a second
+decryption key beside the encrypted file does not meaningfully protect against an
+attacker who can copy both files.

@@ -1,152 +1,108 @@
-# Service public briefcase.unreal v1
+# Public `briefcase.unreal` service v1
 
-ABI C uniquement, structures à taille/version fixes. Voir UnrealApi.h et les wrappers Unreal.hpp.
+The API is a C ABI with fixed-size, versioned structures. See `UnrealApi.h` and
+the `Unreal.hpp` wrappers.
 
-Les pointeurs Unreal restent privés au backend. Le mod déclare séparément unreal.reflection,
+Unreal pointers remain private to the backend. Mods declare `unreal.reflection`,
+`unreal.invoke`, `unreal.hooks` and `unreal.lifecycle` separately. Access to a
+service table never bypasses each call's capability check. All operations run on
+the game thread after initialization; use `post_game_thread` from
+`BriefcaseModLoad`.
 
-unreal.invoke, unreal.hooks et unreal.lifecycle. Une table accessible ne contourne pas les
+## Reflection and invocation
 
-contrôles de capacités de chaque appel. Toutes les opérations se font dans le game thread,
+`resolve_function` accepts a complete `/Script` path and exact JSON signature:
+`parameterSize`, `parameters` (`name`, `type`, `offset`, optional `return`) and
+optional flags. Every name, type, offset and size is compared with live metadata.
+`describe_function` exposes that metadata without returning a pointer.
 
-après initialisation ; utiliser post_game_thread depuis BriefcaseModLoad.
+Version 1 accepts compiled `/Script` classes whose lifetime covers the server.
+Dynamic Blueprint function metadata is not cached.
 
+Supported values are `int32`, finite `float`, `bool`, one-byte byte/enum, object
+and `FVector`. Argument names must be unique, types exact and values representable.
+Returns use `BcValue`; unsupported output/reference parameters fail. Invocation
+uses an aligned local buffer limited to 4,096 bytes and exposes no raw buffer.
 
-
-## Réflexion et invocation
-
-resolve_function reçoit un chemin /Script complet et une signature JSON exacte :
-
-parameterSize, parameters (name, type, offset, return optionnel), flags optionnel.
-
-Chaque nom, type, offset et taille est comparé aux métadonnées réelles.
-
-describe_function expose ces métadonnées sans renvoyer de pointeur.
-
-La première version accepte les classes compilées /Script, dont la durée de vie couvre le serveur.
-
-Les métadonnées de fonctions Blueprint dynamiques ne sont pas mises en cache.
-
-
-
-Valeurs supportées : int32, float fini, bool, byte/enum de taille 1, objet et FVector.
-
-Les noms d'arguments sont uniques, les types exacts et les valeurs hors représentation sont refusées.
-
-Les retours utilisent BcValue ; les paramètres out/référence non pris en charge sont refusés.
-
-Une invocation alloue un buffer local aligné et borné à 4096 octets ; aucun buffer brut n'est exposé.
-
-Les propriétés peuvent être lues par nom avec validation des types et bornes du conteneur.
-
-Pas d'écriture de propriété dans cette version.
-
-
+Properties may be read by name with type and container-bound validation. Version 1
+does not provide unrestricted property access.
 
 ## Handles
 
-Les handles sont propres à un mod. retain prolonge leur durée de vie ; release_handle libère
+Handles belong to one mod. `retain` extends a reference and `release_handle`
+releases it. Destroying an object invalidates every handle even if Unreal later
+reuses its address.
 
-une référence. Un objet détruit invalide tous ses handles, même si son adresse est réutilisée.
+Hook `self` and function handles are borrowed; retain `self` before storing it.
+Object values returned by reads and invocation are owned and must be released.
+`on_deleted` reports invalidated handles on the game thread and cannot read the
+destroyed object. `ObjectInfo.flags` exposes only `ClassDefaultObject` (16) and
+`ArchetypeObject` (32).
 
-Les handles self/function fournis aux hooks sont empruntés. Retenir self avant de le conserver.
+## Reflected hooks
 
-Les valeurs objet rendues par les lectures et l'invocation sont possédées : les libérer.
+`hook` observes a prefix or postfix without suppressing the original call.
+`ProcessEvent` and reflected Func thunks are covered with deduplication. Direct
+calls to a function's C++ body do not use this transport.
 
-on_deleted signale dans le game thread les handles devenus invalides ; aucune lecture de l'objet
+The callback receives an ephemeral call context for `read_argument`. Parameters
+are available for `ProcessEvent` and native frames whose `Code` is null. A
+non-materialized bytecode frame remains observable through `self`, but argument
+reading rejects its memory. The runtime never guesses VM stack layout.
 
-détruit n'est permise. ObjectInfo.flags expose seulement ClassDefaultObject (16) et ArchetypeObject (32).
+Each registration suppresses its own reentrancy and may remove itself during a
+callback. An exception disables the failing callback and still allows the original
+call.
 
+Limits are 4,096 handles, 256 metadata records, 128 thunk targets, 512 hooks overall,
+64 hooks per mod and 32 nested callbacks carrying argument context. Dispatch is
+indexed by `UFunction` and performs no periodic global search or `GUObjectArray`
+traversal.
 
+## Shutdown
 
-## Hooks
+`BriefcaseModUnload` runs on the game thread when cleanup is requested. The runtime
+then removes all owner hooks, subscriptions and tasks and invalidates its handles.
+Original thunks are restored after their final registration is removed. Native
+libraries remain mapped and hot unload is unsupported.
 
-hook observe préfixe ou postfixe, sans suppression de l'appel vanilla.
+The stop helper requests cleanup through a PID-specific local event, waits for an
+acknowledgment and terminates only the configured installation's executable. An
+external forced termination cannot guarantee callback execution.
 
-ProcessEvent et les Func thunks réfléchis sont couverts avec déduplication.
+## Validation
 
-Les appels directs au corps C++ d'une fonction ne passent pas par ce transport.
+`ReflectionContracts` covers incompatible signatures, ownership, address reuse,
+retention, removal during dispatch, reentrancy suppression and exceptions.
+`RuntimeProbe` uses only the public SDK to invoke `Abs_Int(-7)` on the
+`KismetMathLibrary` CDO, observe one PRE and POST call, verify removal and reject
+invalid parameters. It does not simulate a gameplay phase transition.
 
-Le callback reçoit un contexte éphémère call pour read_argument.
+Handle release and validation use the owning context and do not require
+`unreal.find`. Typed reads accept bounded structure paths such as
+`HeatState.HeatCount`. Direct C++ calls can be observed through the separate
+[native hooks contract](NativeHooks.md).
 
-Les paramètres sont disponibles pour ProcessEvent et les frames native dont Code est nul.
+## Typed writes
 
-Une frame bytecode non matérialisée reste observable via self ; read_argument refuse sa mémoire.
+The extended `BcUnrealApi` keeps its first 96 bytes and appends `write_property`
+and `write_argument`, for 112 bytes total. Existing packages remain compatible;
+new packages must check service size. `Services::service` performs this check.
 
-Aucune interprétation spéculative de la pile VM.
+`unreal.write` is required together with `unreal.reflection` for a property or
+`unreal.hooks` for an argument. Owner and game-thread checks remain active.
 
-Chaque enregistrement supprime sa propre réentrance et peut se retirer pendant un callback.
+`write_property` accepts the scalar and vector types supported by `read_property`
+on a live instance, including bounded structure paths. It rejects CDOs, archetypes,
+object pointers, collections and unsupported types. Type, size, numeric bounds and
+finite values are checked first. It does not automatically trigger replication or
+`OnRep`; the mod must select the correct game event.
 
-Les exceptions désactivent le callback fautif et laissent l'appel vanilla s'exécuter.
+`write_argument` works only during PRE on a materialized input parameter. POST,
+returns, references/output parameters and VM frames without a buffer fail. The
+write is transient and owner-bound. For a native hook, the trampoline receives the
+changed argument exactly once and the mod cannot suppress the original call.
 
-
-
-Bornes : 4096 handles, 256 métadonnées, 128 cibles de thunk, 512 hooks au total / 64 par mod,
-
-32 callbacks imbriqués avec contexte de paramètres. Dispatch indexé par UFunction,
-
-sans parcours de GUObjectArray ni recherche globale périodique.
-
-
-
-## Arrêt
-
-BriefcaseModUnload est appelé dans le game thread lors de la demande de nettoyage.
-
-Le runtime retire ensuite tous les hooks, abonnements et tâches du propriétaire et invalide ses handles.
-
-Les thunks originaux sont restaurés quand leur dernière inscription est retirée.
-
-Les DLL restent mappées ; pas de déchargement à chaud.
-
-Stop-Server demande le nettoyage via un événement local identifié par PID, attend l'accusé de réception,
-
-puis termine uniquement l'exécutable de l'installation configurée.
-
-Une terminaison forcée externe ne peut pas garantir l'exécution de callbacks.
-
-
-
-## Vérification
-
-ReflectionContracts vérifie signatures incompatibles, propriétaires, réutilisation d'adresse,
-
-rétention, retrait durant dispatch, suppression de réentrance et exceptions.
-
-Le paquet de test RuntimeProbe utilise uniquement le SDK public : Abs_Int(-7) sur le CDO
-
-KismetMathLibrary, observations pré/post uniques, retrait effectif et refus de paramètres invalides.
-
-Il ne simule ni Déployer ni transition de phase de jeu.
-
-
-
-La libération/validation d'un handle appartient à son contexte ; elle ne requiert pas unreal.find.
-
-La lecture typée accepte maintenant les chemins de structures bornés, par exemple HeatState.HeatCount.
-
-Les appels C++ directs peuvent être observés séparément : [contrat des hooks natifs](NativeHooks.md).
-
-
-## Écritures typées — extension v1 du 14 septembre 2026
-
-La table BcUnrealApi conserve ses 96 premiers octets et ajoute write_property puis
-write_argument (taille totale 112 octets). Les anciens paquets restent compatibles.
-Un nouveau paquet doit vérifier la taille du service ; Services::service le fait déjà.
-
-La capacité unreal.write est requise, avec unreal.reflection pour une propriété ou
-unreal.hooks pour un argument. Les contrôles de propriétaire et de game thread restent actifs.
-
-write_property accepte les scalaires et vecteurs pris en charge par read_property, sur
-une instance vivante, y compris les chemins de structures bornés. Elle refuse les CDO,
-archétypes, pointeurs objets, collections et types non pris en charge. Les types, tailles,
-bornes numériques et valeurs finies sont vérifiés avant écriture. Elle ne déclenche ni
-réplication ni OnRep automatiquement : le mod reste responsable de choisir le bon événement.
-
-write_argument agit seulement pendant PRE sur un paramètre d'entrée matérialisé.
-POST, retours, références/out et frames VM sans buffer sont refusés. L'appel est transitoire
-et appartient au mod. Pour un hook natif, le trampoline reçoit le paramètre modifié une
-seule fois ; le mod ne peut pas supprimer l'original.
-
-RuntimeProbe vérifie réellement Abs_Int(-3) → Abs_Int(-21) par écriture PRE, puis 3 après
-retrait ; mauvais type, écriture du retour, POST, CDO, appel périmé et faux propriétaire
-sont refusés. Le test ne modifie aucune phase ou instance de gameplay.
+`RuntimeProbe` verifies `Abs_Int(-3)` becoming `Abs_Int(-21)` through a PRE write,
+then returning 3 after removal. It rejects a wrong type, return write, POST write,
+CDO target, expired call and false owner without modifying gameplay state.

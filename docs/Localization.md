@@ -1,66 +1,83 @@
-# Traductions et présentation
+# Localization and presentation
 
-Dans **F1 → Paramètres / Settings**, choisir la langue du menu. Français et anglais sont inclus. Le changement est immédiat ; le choix est conservé dans `Briefcase/ui-settings.json`. Le bouton **Recharger les traductions** relit les fichiers locaux sans redémarrer le jeu.
+Choose the menu language under **F1 → Settings**. English and French catalogs are
+included. Changes apply immediately and persist in `Briefcase/ui-settings.json`.
+**Reload translations** rereads local files without restarting the game.
 
-## Fichiers de langue
+## Language files
 
-Un fichier JSON UTF-8 par langue (`fr.json`, `en.json`, `pt-BR.json`…). Le nom de fichier détermine le code. Exemple :
+Use one UTF-8 JSON file per language (`en.json`, `fr.json`, `pt-BR.json`, and so
+on). The filename defines the language code:
 
 ```json
 {
-  "language": "fr",
-  "name": "Français",
+  "language": "en",
+  "name": "English",
   "translations": {
-    "ui.settings": "Paramètres",
-    "ui.setting": "Réglage"
+    "ui.settings": "Settings",
+    "ui.setting": "Setting"
   }
 }
 ```
 
-- Framework : `Briefcase/Localization/<langue>.json`. Le paquet fournit les textes du menu.
-- Personnalisation locale : `Briefcase/Localization/Overrides/<langue>.json`, prioritaire sur le fichier fourni. Une mise à jour du paquet conserve ce dossier.
-- Mod : `Briefcase/Mods/<identifiant>/Translations/<langue>.json`. Les clés sont automatiquement préfixées par `mods.<identifiant>.`. Seuls les paquets compatibles avec l’environnement participent.
-- Serveur : `Briefcase/Translations/<langue>.json`. Les clés sont automatiquement préfixées par `server.`. Les catalogues du serveur et de ses mods sont transmis après authentification et actualisés via le bouton d’actualisation de l’administration.
+- Framework: `Briefcase/Localization/<language>.json` contains menu text.
+- Local overrides: `Briefcase/Localization/Overrides/<language>.json` takes
+  precedence and is preserved during package updates.
+- Mod: `Briefcase/Mods/<id>/Translations/<language>.json`. Keys automatically
+  receive the `mods.<id>.` prefix. Only packages compatible with the current
+  environment contribute catalogs.
+- Server: `Briefcase/Translations/<language>.json`. Keys automatically receive the
+  `server.` prefix. Server and server-mod catalogs arrive after authentication and
+  refresh through the administration refresh action.
 
-Exemple de fichier `Translations/fr.json` d’un mod :
+Example mod `Translations/en.json`:
 
 ```json
 {
   "translations": {
-    "name": "Exemple de rendu",
-    "settings.opacity": "Opacité du texte",
-    "categories.display": "Affichage"
+    "name": "Overlay sample",
+    "settings.opacity": "Text opacity",
+    "categories.display": "Display"
   }
 }
 ```
 
-Exemple de fichier `Briefcase/Translations/fr.json` côté serveur :
+Example server `Briefcase/Translations/en.json`:
 
 ```json
 {
   "translations": {
-    "settings.ServerName": "Nom public du serveur",
-    "categories.identity": "Identité",
+    "settings.ServerName": "Public server name",
+    "categories.identity": "Identity",
     "balance.groups.Ace": "Ace",
-    "balance.fields.Damage": "Dégâts",
-    "balance.rows.Ace_Weapon_Base": "Arme principale"
+    "balance.fields.Damage": "Damage",
+    "balance.rows.Ace_Weapon_Base": "Primary weapon"
   }
 }
 ```
 
-Le serveur ne peut fournir que des clés `server.` et `mods.`. Il ne peut pas remplacer les textes `ui.` du framework. Ses textes ne sont utilisés que dans sa vue d’administration ; les pages locales ne les héritent pas.
+The server may supply only `server.` and `mods.` keys. It cannot replace framework
+`ui.` text. Remote text applies only inside that server's administration view.
 
-La recherche de traduction suit : langue exacte, langue de base (par exemple `fr` pour `fr-CA`), anglais, puis libellé de secours. Dans l’administration, le texte distant de la langue demandée est prioritaire sur son équivalent local. Une langue proposée dans Settings doit posséder un fichier de framework, même partiel. Les caractères latins étendus, grecs, cyrilliques et la ponctuation typographique sont inclus dans l’atlas Segoe UI ; les autres écritures demanderont une police adaptée.
+Lookup order is exact locale, base language (`fr` for `fr-CA`), English, then the
+fallback label. In administration, remote text for the requested locale takes
+precedence over a local equivalent. Every language offered in Settings needs at
+least a partial framework catalog. The Segoe UI atlas covers extended Latin,
+Greek, Cyrillic and typographic punctuation; other scripts require another font.
 
-Les directives de format (`%s`, `%u`, etc.) doivent rester identiques et dans le même ordre. Une traduction incompatible utilise le format de secours, sans jamais interpréter une directive fournie arbitrairement. Les identifiants ImGui restent stables lors d’un changement de langue.
+Format directives such as `%s` and `%u` must remain identical and in the same
+order. An incompatible translation falls back safely. Arbitrary translated text
+is never interpreted as a format string. ImGui identifiers remain stable when the
+language changes.
 
-Limites : 32 langues par catalogue, 4096 clés par langue, 256 octets par clé, 2048 octets par texte, 256 Kio par fichier et 512 Kio par catalogue agrégé. Les journaux, noms de serveurs saisis par l’utilisateur et diagnostics techniques gardent leur texte d’origine.
+Limits per catalog are 32 languages, 4,096 keys per language, 256 bytes per key,
+2,048 bytes per value, 256 KiB per file and 512 KiB for an aggregated catalog.
+Logs, user-entered server names and technical diagnostics retain their source text.
 
-## Noms de réglages et catégories
+## Setting and category names
 
-Chaque mod peut ajouter `Data/presentation.json` pour définir les libellés et catégories de ses champs.
-
-Le serveur peut ajouter `Briefcase/Admin/presentation.json` :
+A mod may add `Data/presentation.json` to define field labels and categories. The
+server may add `Briefcase/Admin/presentation.json`:
 
 ```json
 {
@@ -92,19 +109,21 @@ Le serveur peut ajouter `Briefcase/Admin/presentation.json` :
 }
 ```
 
-`displayName` seul impose un libellé littéral. Avec `displayNameKey`, la traduction est utilisée et `displayName` sert de secours. Sans personnalisation, les clés automatiques sont `server.settings.<clé>` ou `mods.<id>.settings.<clé>`, et `<préfixe>.categories.<catégorie>`. Les réglages d’équilibrage acceptent les niveaux groupe, ligne, champ, puis réglage exact (`table/ligne/champ`).
+`displayName` alone forces a literal label. With `displayNameKey`, the translation
+is used and `displayName` is its fallback. Without customization, generated keys
+are `server.settings.<key>` or `mods.<id>.settings.<key>`, plus
+`<prefix>.categories.<category>`. Balance presentation may target a group, row,
+field or exact `table/row/field` setting.
 
-Ces métadonnées changent la présentation, jamais le type, les bornes, la clé du fichier ou les valeurs. Actualiser l’administration relit les métadonnées du serveur. Les fichiers de personnalisation ne sont pas inclus dans les paquets et restent conservés au déploiement.
+Presentation metadata never changes a type, bound, persisted key or value.
+Refreshing administration rereads server metadata. Customization files are absent
+from packages and survive deployment.
 
-## Convention de nommage
+## Naming convention
 
-Les clés et les textes de secours intégrés au code sont en anglais : par exemple
-ui.add_server avec Add a server, ou ui.save_group avec Save this group.
-Le français appartient aux valeurs de fr.json. La langue sélectionnée et la chaîne
-de repli (langue exacte, langue de base, anglais, texte de secours) ne changent pas.
-Les noms de paramètres persistés et les identifiants des groupes d’équilibrage
-restent inchangés ; seuls leurs identifiants de traduction et leurs labels par
-défaut sont normalisés. Les personnalisations peuvent toujours choisir un label.
-Le test TranslationSourceContracts vérifie les références et l’accord des textes
-littéraux de secours avec le catalogue anglais.
-
+Keys and fallback strings embedded in code are English, for example
+`ui.add_server` with `Add a server` and `ui.save_group` with `Save this group`.
+French text belongs in `fr.json`. Persisted setting names and balance group IDs do
+not change; only translation IDs and default labels are normalized. The
+`TranslationSourceContracts` test checks references and ensures literal fallbacks
+match the English catalog.

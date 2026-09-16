@@ -6,6 +6,7 @@
     ".github",
     ".gitignore",
     "CMakeLists.txt",
+    "CONTRIBUTING.md",
     "README.md",
     "VERSION",
     "cmake",
@@ -51,8 +52,12 @@
       "sha256": "7c3f528385c977bece90a764c577049940bb45e7e430240ede82dbe10ca994b0"
     },
     {
+      "path": "CONTRIBUTING.md",
+      "sha256": "17cf414597babbedceff225bcba08bbbe73f9666c33332136bad4c87b028cab8"
+    },
+    {
       "path": "README.md",
-      "sha256": "f751912bcbb633afc7779cb3bb995f4a637fe0ec8e1ecd7e6a34e561d35c35a9"
+      "sha256": "2a7e3a49a96c86868a3350f57a12c17c6af406f9a48686a1253764e66ae7d311"
     },
     {
       "path": "VERSION",
@@ -96,19 +101,19 @@
     },
     {
       "path": "docs/Administration.md",
-      "sha256": "d2930ba799ecd17e63f528d7cb40c287b7431da92a2fcd1882e64801a438d69e"
+      "sha256": "5cd3f317eab676f0bc82d8807062929380a1ce2eb9510cf8df4a27bce0b5161f"
     },
     {
       "path": "docs/Architecture.md",
-      "sha256": "be1c1553a286a816346d6c6ab3a09a481d181dfdedb17daaf4902b945547c839"
+      "sha256": "5a03c70dce5b073d9c438b0b2475eb57629c2fc4f3d8e3177f3ff12c6547d003"
     },
     {
       "path": "docs/ClientApi.md",
-      "sha256": "cc345a5c385a3ccb6e6c1543219b210c93f48d33265015f56dfbc5c64e72929c"
+      "sha256": "74c08f233b8a7d586b97a2d861d7391523454888827dccbd41ba6bebca6418f7"
     },
     {
       "path": "docs/ClientMilestone.md",
-      "sha256": "9b5434b94076324802d1f6f5e672fb58ac77f8a4685d92553de22c96bda04837"
+      "sha256": "dc8214e79aff41c9c88bcf677a34ebd5d1dbe48275dfdd0db99d2b483d79b44c"
     },
     {
       "path": "docs/ClientModConfiguration.md",
@@ -116,11 +121,11 @@
     },
     {
       "path": "docs/ClientServers.md",
-      "sha256": "b372cebd7eb804297ca291f49eeff896d23fad15ef1c7205eb420637ca4b665f"
+      "sha256": "7c0aea3cf9b1ed56fab1f7609de5b6bca46af6fab748113e397d8a664718ccf9"
     },
     {
       "path": "docs/Development.md",
-      "sha256": "f069447ac6af1935eff1c3e074c8c919da7ab6534e1413849ab70e0103ebfb84"
+      "sha256": "8db859f77b73c9ab31a9f8c128d276b8288e8b4385d9a18886ff425b77605a98"
     },
     {
       "path": "docs/LinuxServer.md",
@@ -128,11 +133,11 @@
     },
     {
       "path": "docs/Localization.md",
-      "sha256": "5c0cff492a41536a453b9768dccb69701d1a79b392a8864c71f2998504217467"
+      "sha256": "38673cf508e7df9440c14f118a889ba171a3fd5b2580068f188892991ba3e95b"
     },
     {
       "path": "docs/MbedTLS.md",
-      "sha256": "67d2f378ec692666b1d15735b7ea17e4e0e141ab7edb30345adb087801bb9523"
+      "sha256": "8dc02e73247fbe0609a89ec2db7fa586c54f2743f7cc22cd402c117eb34ba30a"
     },
     {
       "path": "docs/MenuKeybind.md",
@@ -140,15 +145,15 @@
     },
     {
       "path": "docs/Milestone1.md",
-      "sha256": "d13a674f2d23d244abad87b7d5d86cf1a162d8805ee6439235e0a13aefca7964"
+      "sha256": "1854cda1eebb39a142967fd0c883bcf98c19f911e1ba57b48d5f5df3dacb66d7"
     },
     {
       "path": "docs/NativeHooks.md",
-      "sha256": "3d2553f49a2cf80d9bad6e4dc5f0fd6e0a7a795f225f768fbd2a3c1a338c8f30"
+      "sha256": "79e356f8be0a9cc8040081a82c76af7e6e53fd1ac2ee1a25c1cc937e5e6da7cf"
     },
     {
       "path": "docs/PortableIdentityStorage.md",
-      "sha256": "7b4002533c58e34c85e71542a20d4896fca2a283ab3e537de329416168109fc0"
+      "sha256": "7a2698bb8458dd1273734cd1a7a6a8b247f9eea2510100669a1777df78d8656c"
     },
     {
       "path": "docs/Repositories.md",
@@ -164,23 +169,23 @@
     },
     {
       "path": "docs/SpyApi.md",
-      "sha256": "5317811360e7b183357c34ca68a5efd0ad8a33aa13a5412209f6391626b5f125"
+      "sha256": "b5036414b762f78ce5267b0f9c493efa8fc732cf3b4dcdaf082c17e1e1afe7f6"
     },
     {
       "path": "docs/StartupApi.md",
-      "sha256": "614929f17763a2fbd320dca3dca8cab2c7e9013c1004245d8b3b8339da1771e2"
+      "sha256": "bf8db6774c3e2dac132581805f9ab979cfb54b60f58c2d203f086ed09bbe0a0d"
     },
     {
       "path": "docs/UE4SS.md",
-      "sha256": "b7fb1267d1abd9bb4ef86ddd95f0ff19a1f75722bbb69c96746a005166394451"
+      "sha256": "3e64d889958833bfa07748eb9a9eeba6158a47f9b3449838c2750ae03891be9b"
     },
     {
       "path": "docs/UnrealApi.md",
-      "sha256": "f3ed0eb21164a7678e40081db9e4662ce5fa41da26220a80968ac3912b48403d"
+      "sha256": "27c01ee680fb417ec1f6da403e401522ab9b6927f0a66ed55f7d85e004b65605"
     },
     {
       "path": "docs/Updates.md",
-      "sha256": "9b8c15754c26c06ebcc3bac36a9704289dbd79cd24606f304b61a9cd8ea40495"
+      "sha256": "1c2a71b3801b945ac19f3cacfb7c0e5bd4c30e8766866bc637bbd85ed04be2d0"
     },
     {
       "path": "loader/Briefcase.ServerLauncher/Bootstrap.cpp",

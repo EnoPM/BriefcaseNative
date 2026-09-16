@@ -1,44 +1,44 @@
-# Développement et indexation CMake
+# CMake development and indexing
 
-Ouvrir le dossier racine BriefcaseNative dans CLion comme projet CMake.
-Le fichier CMakeLists.txt décrit les cibles, leurs sources, leurs dépendances
-et les dossiers contenant leurs en-têtes. Son rôle est comparable à celui d'un
-fichier .csproj et de ses références de projets en C#.
+Open the BriefcaseNative root directory in CLion as a CMake project.
+`CMakeLists.txt` describes the targets, sources, dependencies and include
+directories. Its role is similar to a `.csproj` file and its project references
+in C#.
 
-Le simple fait qu'un fichier soit présent dans le dossier ne lui donne pas
-automatiquement un contexte de compilation. Les fichiers .cpp doivent appartenir
-à une cible CMake ; les .hpp et .inc sont normalement analysés dans le contexte
-des fichiers qui les incluent. Les DLL ne sont pas des fichiers source à indexer.
+A file does not automatically receive a compilation context merely because it is
+present in the directory. Each `.cpp` file must belong to a CMake target. Header
+and `.inc` files are normally analyzed through the files that include them. DLLs
+are binaries and must not be indexed as source files.
 
 ## CLion
 
-Le profil local Debug utilise cmake-build-debug. Les scripts officiels utilisent
-build en Release. Ce sont deux caches CMake distincts : compiler avec les scripts
-ne recharge pas automatiquement le modèle déjà ouvert dans CLion.
+The local Debug profile uses `cmake-build-debug`. The official scripts use the
+Release `build` directory. These are separate CMake caches, so building with the
+scripts does not reload a model already open in CLion.
 
-Après ajout d'une cible ou modification des dépendances :
+After adding a target or changing dependencies:
 
-1. Dans CLion : Tools → CMake → Reload CMake Project
-   (ou Ctrl+Shift+A, puis rechercher Reload CMake Project).
-2. Attendre la fin de la configuration et de l'indexation.
-3. Pour les modifications suivantes, activer le rechargement automatique dans
-   Settings → Build, Execution, Deployment → CMake.
+1. Select **Tools → CMake → Reload CMake Project** in CLion, or press
+   `Ctrl+Shift+A` and search for that action.
+2. Wait for configuration and indexing to finish.
+3. For later changes, enable automatic reload under
+   **Settings → Build, Execution, Deployment → CMake**.
 
-Il n'est normalement pas nécessaire d'invalider tous les caches de l'IDE.
-Une erreur pendant la configuration doit être corrigée avant de recharger.
+Invalidating every IDE cache is normally unnecessary. Fix configuration errors
+before reloading.
 
-CMAKE_EXPORT_COMPILE_COMMANDS est activé : chaque dossier de build contient
-compile_commands.json, qui expose les commandes exactes, définitions et chemins
-d'inclusion utilisés pour chaque source. Ne pas modifier ce fichier généré.
+`CMAKE_EXPORT_COMPILE_COMMANDS` is enabled. Every build directory contains a
+generated `compile_commands.json` with the exact commands, definitions and include
+paths used for each source file. Do not edit it.
 
-## Mbed TLS et CMake
+## Mbed TLS and CMake
 
-Mbed TLS 3.6.7 déclare encore un niveau de politiques CMake 3.5.1.
-Avec CMake 4, cmake/AdminCrypto.cmake utilise CMAKE_POLICY_VERSION_MINIMUM=3.10
-uniquement dans la portée qui ajoute cette dépendance. Le code tiers et les
-avertissements globaux restent inchangés. Le minimum CMake du projet reste 3.28.
+Mbed TLS 3.6.7 still declares CMake policy compatibility with 3.5.1. With CMake 4,
+`cmake/AdminCrypto.cmake` sets `CMAKE_POLICY_VERSION_MINIMUM=3.10` only in the scope
+that adds this dependency. The third-party source and global warnings remain
+unchanged. BriefcaseNative itself still requires CMake 3.28.
 
-Références :
+References:
+
 - https://www.jetbrains.com/help/clion/reloading-project.html
 - https://cmake.org/cmake/help/latest/variable/CMAKE_POLICY_VERSION_MINIMUM.html
-

@@ -1,54 +1,54 @@
-# API native cliente v1
+# Native client API v1
 
-En-tête : `sdk/Briefcase.ClientModApi/include/Briefcase/ClientModApi.h`.
-Exemple complet : `samples/Briefcase.NativeOverlaySample/Overlay.cpp`.
+Header: `sdk/Briefcase.ClientModApi/include/Briefcase/ClientModApi.h`.
+Complete sample: `samples/Briefcase.NativeOverlaySample/Overlay.cpp`.
 
-L'ABI commune `BcApi` v1 est conservée : 80 octets, préfixe historique de 72 octets inchangé.
-Demander les services avec `get_service(context, nom, 1, &service)` ; vérifier le résultat et `size`.
+The shared `BcApi` v1 ABI remains 80 bytes, with its historical 72-byte prefix
+unchanged. Request services with
+`get_service(context, name, 1, &service)`, then check both the result and `size`.
 
-| Service | Capacité du manifeste | Table |
+| Service | Manifest capability | Table |
 | --- | --- | --- |
 | `briefcase.client.render` | `client.render` | `BcClientRenderApi` |
 | `briefcase.client.input` | `client.input` | `BcClientInputApi` |
 
-Le serveur renvoie `BC_DENIED` pour ces services, sans charger le module graphique.
-Les environnements `client`, `server`, `both` sont filtrés avant de charger les DLL.
-Les mods client de cette version utilisent la phase `ready` ; la phase `startup`
-avant entrée EXE reste réservée au serveur.
+The server returns `BC_DENIED` for these services without loading a graphics
+module. Package environments (`client`, `server`, `both`) are filtered before
+loading native libraries. Client mods use the `ready` phase; the pre-entry-point
+`startup` phase remains server-only.
 
-## Rendu
+## Rendering
 
-- `subscribe` retourne un handle associé au mod : 16 callbacks par mod, 128 au total.
-  Ils s'exécutent sur le thread qui présente l'image.
-- `unsubscribe` refuse un handle d'un autre propriétaire. Un retrait pendant le
-  dispatch supprime les appels futurs ; un callback retiré avant son tour n'est pas appelé.
-- Le host invalide les callbacks avant le déchargement logique du mod. Dispatch et
-  retraits sont sérialisés. Les DLL restent mappées jusqu'à la sortie du processus,
-  conformément au chargeur existant ; pas de hot reload.
-- `viewport` donne la taille physique du backbuffer, le DPI, le numéro et l'intervalle
-  d'image. Résultat `BC_NOT_READY` avant la découverte.
-- `to_pixels` convertit les coordonnées normalisées `[0,1]` en coordonnées de bord
-  `[0,width] / [0,height]`, origine en haut à gauche. NaN, infinis et hors-domaine sont refusés.
-- `text` et `rectangle` ne fonctionnent que dans le callback du propriétaire.
-  Couleurs `0xAABBGGRR` ; texte UTF-8, longueur explicite, 4 096 octets maximum ;
-  1 024 primitives maximum par callback et image.
-- Les primitives sont derrière le menu. Aucun device, objet Unreal ou contexte
-  ImGui n'est exposé.
+- `subscribe` returns a handle owned by the mod. Limits are 16 callbacks per mod
+  and 128 overall. They run on the thread presenting the frame.
+- `unsubscribe` rejects another owner's handle. Removing a callback during dispatch
+  prevents later invocations; a callback removed before its turn is not called.
+- The host invalidates callbacks before logical mod unload. Dispatch and removal
+  are serialized. Libraries remain mapped until process exit; there is no hot reload.
+- `viewport` returns physical backbuffer size, DPI, frame number and interval. It
+  returns `BC_NOT_READY` before graphics discovery.
+- `to_pixels` maps normalized `[0,1]` coordinates to `[0,width] / [0,height]` edge
+  coordinates with a top-left origin. NaN, infinity and out-of-range values fail.
+- `text` and `rectangle` work only inside an owner callback. Colors use
+  `0xAABBGGRR`; text is explicit-length UTF-8 up to 4,096 bytes. Each callback may
+  issue at most 1,024 primitives per frame.
+- Mod primitives render behind the framework menu. The API exposes no graphics
+  device, Unreal object or ImGui context.
 
-Les callbacks commencent après la création paresseuse du contexte : ouvrir F1
-une première fois après les shaders. Le sample continue ensuite à dessiner quand
-le menu est fermé. Ne pas accéder à Unreal depuis un callback de rendu.
+Callbacks begin after lazy context creation. Open the F1 menu once after shader
+compilation; the sample then keeps drawing while the menu is closed. Never access
+Unreal from a render callback.
 
-## Entrées et durée de vie
+## Input and lifetime
 
-`key` accepte un virtual-key Windows entre 1 et 255. `down`, `pressed` et `released`
-sont stables pour l'image `frame_number` : plusieurs lectures ne consomment pas
-l'appui. La perte de focus efface les états publiés. Lire une touche ne la capture pas.
+`key` accepts Windows virtual-key values from 1 to 255. `down`, `pressed` and
+`released` remain stable for one `frame_number`; repeated reads do not consume an
+edge. Focus loss clears published states. Reading a key does not capture it.
 
-`capturing` indique si le menu est ouvert et possède le focus. Aucun service de
-simulation d'entrée n'est exposé aux mods.
+`capturing` reports whether the framework menu is open and focused. The public API
+does not expose input simulation.
 
-Les fonctions exportées et callbacks du mod doivent contenir leurs exceptions.
-Le host et le renderer interceptent aussi les exceptions C++ aux points d'appel
-des mods ; un callback de rendu fautif est désactivé. Le sample n'importe que
-l'ABI Briefcase et ne possède ni ImGui ni hook graphique.
+Exported mod functions and callbacks must contain their exceptions. The host and
+renderer also catch C++ exceptions at mod call sites and disable a failing render
+callback. The sample imports only the Briefcase ABI and owns neither ImGui nor a
+graphics hook.

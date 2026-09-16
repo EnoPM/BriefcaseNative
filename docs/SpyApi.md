@@ -1,18 +1,18 @@
-# API C++ typée : Spy
+# Typed C++ API: Spy
 
-Inclure <Briefcase/DeceiveInc/Spy.hpp> et lier la cible CMake Briefcase::DeceiveInc du SDK distribué.
-Cette bibliothèque fait partie du SDK Briefcase. Elle est compilée dans le mod,
-sans nouvelle DLL à installer et sans dépendance à UE4SS ou ImGui dans l'API publique.
-L'ABI C existante reste le seul contrat entre le mod et le runtime.
+Include `<Briefcase/DeceiveInc/Spy.hpp>` and link the distributed SDK target
+`Briefcase::DeceiveInc`. The library compiles into the mod and adds no DLL or public
+dependency on UE4SS or ImGui. The existing C ABI remains the only contract between
+the mod and runtime.
 
-## Utilisation
+## Usage
 
-Ce code s'exécute dans une tâche du game thread, après initialisation d'Unreal :
+Run this code in a game-thread task after Unreal initialization:
 
 ```cpp
 using briefcase::deceive_inc::SpyApi;
 
-SpyApi spies(host); // À conserver pour toute la durée d'utilisation du mod.
+SpyApi spies(host); // Keep this alive for as long as the mod uses Spy objects.
 
 for (auto& spy : spies.FindAll()) {
     if (spy.IsDead())
@@ -24,42 +24,39 @@ for (auto& spy : spies.FindAll()) {
 }
 ```
 
-Pour un développeur C#, Spy est comparable à un objet qui encapsule un accès natif.
-SpyApi centralise sa création et les fonctions qu'il utilise.
-L'équivalent de la réflexion et des conversions est caché dans Briefcase.
-auto laisse le compilateur déduire le type, comme var en C#.
+For a C# developer, `Spy` is similar to an object that wraps native access.
+`SpyApi` centralizes construction and the functions each object uses. Briefcase
+hides reflection and conversions. C++ `auto` lets the compiler infer a type in a
+way similar to C# `var`.
 
-## Opérations
+## Operations
 
-- IsDead, IsBot, IsLocallyControlled, IsInADS : booléens lus dans le jeu.
-- GetLocation, GetVelocity : Vector3 (x, y, z), en centimètres et centimètres/seconde.
-- GetEyesViewPoint : position et rotation (pitch, yaw, roll en degrés).
-- GetObjectPath : chemin Unreal de l'instance, sans interprétation du nom d'agent.
-- GetController, GetWeaponTool : références ObjectHandle possédées, éventuellement vides.
-- IsValid : indique si la référence est encore valide au moment de l'appel.
-- Handle : référence empruntée pour les opérations génériques de l'ABI.
-- Reset : libération anticipée et idempotente.
+- `IsDead`, `IsBot`, `IsLocallyControlled`, `IsInADS`: Boolean game state.
+- `GetLocation`, `GetVelocity`: `Vector3` in centimeters and centimeters/second.
+- `GetEyesViewPoint`: position and pitch/yaw/roll rotation in degrees.
+- `GetObjectPath`: Unreal instance path without interpreting the agent name.
+- `GetController`, `GetWeaponTool`: owned `ObjectHandle` values, possibly empty.
+- `IsValid`: whether the reference is valid at the time of the call.
+- `Handle`: a borrowed reference for generic ABI operations.
+- `Reset`: early, idempotent release.
 
-FindAll() recherche les Spy vivants au sens UObject, y compris les personnages morts.
-FindAll(localSpy.Handle()) limite la recherche au monde de ce personnage.
-La limite du backend reste de 512 objets : un dépassement produit une erreur,
-pas une liste silencieusement tronquée.
-FromHandle(handle) vérifie le type réel puis retient une référence empruntée
-appartenant au même mod. Les références d'un autre mod sont refusées par le runtime.
+`FindAll()` finds every live Spy `UObject`, including dead characters.
+`FindAll(localSpy.Handle())` limits the search to that character's world. The
+backend limit remains 512 objects; overflow produces an error rather than a
+silently truncated list. `FromHandle(handle)` verifies the runtime type and retains
+a borrowed reference owned by the same mod. The runtime rejects cross-mod handles.
 
-## Durée de vie et erreurs
+## Lifetime and errors
 
-Spy et ObjectHandle libèrent automatiquement leurs références à la sortie de leur
-portée, comme un IDisposable utilisé avec using en C#. Leurs copies sont interdites ;
-std::move transfère la référence et laisse la source vide. Conserver une référence
-n'empêche pas Unreal de détruire le personnage. IsValid ne remplace pas la gestion
-des erreurs d'invocation lorsqu'un objet disparaît.
+`Spy` and `ObjectHandle` automatically release references when they leave scope,
+similar to an `IDisposable` used with C# `using`. They cannot be copied;
+`std::move` transfers the reference and empties the source. Retaining a reference
+does not stop Unreal from destroying the character. `IsValid` does not replace
+handling invocation errors when an object disappears.
 
-Chaque Spy conserve les fonctions de sa session en vie. Il faut donc vider les
-collections et références conservées, puis libérer SpyApi dans BriefcaseModUnload.
-Toutes ces opérations, y compris les destructeurs, s'exécutent sur le game thread.
-Aucun cache global ne mélange les propriétaires de mods.
+Every `Spy` keeps its session functions alive. Clear stored collections and
+references before releasing `SpyApi` in `BriefcaseModUnload`. All such operations,
+including destructors, run on the game thread. No global cache mixes mod owners.
 
-Capacités utilisées : unreal.reflection, unreal.invoke et game-thread pour planifier
-les tâches. La couche typée conserve les contrôles de l'ABI et du backend.
-
+Required capabilities are `unreal.reflection`, `unreal.invoke` and `game-thread`
+for task scheduling. The typed layer preserves all ABI and backend checks.

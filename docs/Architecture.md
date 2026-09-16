@@ -1,59 +1,62 @@
-# Première milestone — décisions
+# Architecture decisions
 
-Le projet conserve l'idée du proxy version.dll et du bootstrap hors du verrou du chargeur,
-les profils PE, les manifestes inventoriés avant chargement, le tri topologique et
-les diagnostics horodatés de Briefcase. Il remplace le host managé par un host C++.
-Les références ont été consultées en lecture seule.
+BriefcaseNative keeps the `version.dll` proxy and bootstrap outside the loader
+lock, PE build profiles, manifest inventory before loading, topological dependency
+ordering and timestamped diagnostics. It replaces the former managed host with a
+native C++ host. Reference projects were inspected read-only.
 
-Le proxy transfère les 17 exports de version.dll vers la DLL de System32, capture
-le thread initial et charge Briefcase.NativeHost.dll sur un thread de travail.
-Le host identifie le build avant d'installer le backend.
+On Windows, the proxy forwards all 17 `version.dll` exports to the System32 DLL,
+captures the initial thread and loads `Briefcase.NativeHost.dll` on a worker. The
+host identifies the game build before installing a backend. Linux uses the same
+host and ABI through its native launcher and preload bootstrap.
 
-L'ABI des mods est un en-tête C : tailles, version, codes d'erreur, table de
-fonctions, capacités et handles opaques. Le wrapper C++ est header-only. Ni STL,
-ni types UE4SS, ni propriété mémoire entre CRT ne traversent cette frontière.
-Les mods natifs restent du code de confiance : les capacités ne constituent pas
-un bac à sable contre une DLL hostile.
+The mod ABI is a C header with sizes, versions, error codes, function tables,
+capabilities and opaque handles. Its C++ wrapper is header-only. STL types, UE4SS
+types and memory ownership across CRT boundaries never cross the ABI. Native mods
+remain trusted code; capabilities do not sandbox a hostile DLL or shared library.
 
-Le backend compile les bibliothèques Unreal de RE-UE4SS v3.0.1, pas son application.
-Les sources amont de GUI, Lua, consoles, dumpers et chargeurs de mods sont conservées
-dans le checkout mais ne font pas partie de la cible distribuée. Le scanner Rust
-patternsleuth reste une dépendance interne d'UE4SS ; les mods et l'API sont en C++.
+The Unreal backend compiles libraries from RE-UE4SS v3.0.1 rather than the UE4SS
+application. Upstream GUI, Lua, console, dumper and mod-loader source remains in the
+checkout but is excluded from the distributed target. The Rust `patternsleuth`
+scanner remains an internal UE4SS dependency; mods and the public API are C++.
 
-## Thread et durée de vie
+## Threads and lifetime
 
-Le prototype amorce l'initialisation depuis Sleep sur le thread initial du jeu,
-après un délai de cinq secondes. Cela permet de laisser le jeu construire ses
-classes avant l'initialisation synchrone d'UE4SS. C'est un pont de bootstrap
-spécifique au prototype, à remplacer par un point de cycle Unreal éprouvé dans
-une milestone ultérieure. L'initialisation ne lit pas les objets depuis un worker.
+The Windows prototype starts Unreal initialization from `Sleep` on the game's
+initial thread after a five-second delay, allowing the game to construct its
+classes before synchronous UE4SS initialization. This is a prototype bootstrap
+bridge rather than a general lifecycle API. It never reads Unreal objects from a
+worker thread.
 
-Après initialisation, ProcessEvent et ce pont pompent une file bornée : maximum
-1024 callbacks en attente, 32 traités par passage. À vide, seulement des contrôles
-de thread et de drapeaux atomiques. Aucun parcours global d'objets par frame.
-Un callback de mod doit rester court et ne pas lever d'exception.
+After initialization, `ProcessEvent` and the bootstrap bridge drain a bounded
+queue: at most 1,024 pending callbacks and 32 processed per pass. An empty pass
+only checks thread identity and atomic flags. There is no global object traversal
+per frame. Mod callbacks must remain short and contain all exceptions.
 
-Les handles appartiennent à un mod, ne sont jamais réutilisés dans le processus,
-sont invalidés par le listener de destruction UObject et sont validés avec UE4SS
-avant utilisation. Le plafond est de 4096 handles. Ils ne retiennent pas l'objet.
-Cette milestone ne fournit ni hot reload ni déchargement des mods ; les DLL et
-les contextes restent chargés jusqu'à la fin du processus.
+Handles belong to one mod, are never reused within a process, are invalidated by
+the UObject deletion listener and are checked through UE4SS before use. The limit
+is 4,096 handles. A handle does not keep its Unreal object alive. Logical unload
+invalidates callbacks and owned resources; native libraries remain mapped until
+process exit, and runtime hot reload is unsupported.
 
-## Paquets et dépendances
+## Packages and dependencies
 
-Un dossier par identifiant, un manifeste et une DLL d'entrée locale. Les versions
-sont des triplets numériques stricts, sans plages ni suffixes pour cette milestone.
-Une dépendance déclare un minimum inclusif. Doublons, cycles, dépendances absentes
-ou trop anciennes invalident l'inventaire avant tout chargement. L'échec de chargement
-d'une DLL empêche ensuite ses dépendants de démarrer.
+Each mod has one directory named by its ID, a manifest and a platform-native entry
+library. Versions are strict numeric triples. A dependency declares an inclusive
+minimum version. Duplicate IDs, cycles and missing or outdated dependencies
+invalidate the inventory before loading. Failure to load a library prevents its
+dependents from starting.
 
-## Ce qui est différé
+Manifests declare `client`, `server` or `both`; the opposite environment never
+loads the package. Client rendering, ImGui and input modules are absent from server
+packages.
 
-Les anciens mods montrent les besoins futurs : BeginPlay, Spy, propriétés réfléchies,
-ProcessEvent et états de match, avec beaucoup de code UE4SS et des pointeurs conservés.
-Ils ne sont pas portés ici. Le futur SDK doit masquer ce code derrière des wrappers
-typés et des handles. La production de snapshots et le SDK complet sont différés,
-comme demandé. Aucun SDK dérivé d'un autre build n'est présenté comme celui du serveur.
+## SDK boundaries
 
-CMake remplace le fichier de solution initialement suggéré : il orchestre C++, MASM,
-les bibliothèques UE4SS et le scanner interne. Visual Studio peut ouvrir CMakeLists.txt.
+Typed wrappers such as `SpyApi` hide reflected Unreal calls behind public handles.
+Build-specific native hooks require exact executable identity and byte validation.
+No SDK generated for another build is presented as compatible with the current
+server.
+
+CMake orchestrates C++, MASM, UE4SS libraries and the internal scanner. Visual
+Studio and CLion can open the root `CMakeLists.txt` directly.

@@ -1,139 +1,130 @@
-# Mises à jour du serveur
+# Server updates
 
-Le lanceur local vérifie la dernière release stable GitHub avant de démarrer le Shipping,
-depuis `Binaries/Win64` sur Windows ou `Binaries/Linux` sur Linux. Le redémarrage demandé dans l'administration emprunte le même
-lanceur. Aucun téléchargement ni remplacement ne se produit pendant une partie.
-Un lancement direct de l'exécutable du jeu sans ce lanceur ne vérifie pas les mises à jour.
+The local launcher checks the latest stable GitHub release before starting Shipping
+from `Binaries/Win64` on Windows or `Binaries/Linux` on Linux. Administration
+restarts use the same launcher. No download or replacement occurs during a match.
+Starting the game executable directly bypasses update checks.
 
-## Activation automatique
+## Automatic activation
 
-À partir de la version 0.5.1, une installation depuis le ZIP officiel ne demande aucune
-configuration manuelle : au premier lancement, `Briefcase.ServerLauncher.exe` (Windows)
-ou `Briefcase.ServerLauncher` (Linux) crée `Briefcase/updater.json` s'il est absent,
-avec `enabled: true`, `repository: "EnoPM/BriefcaseNative"` et `timeoutSeconds: 20`.
-Il vérifie immédiatement les mises à jour, puis à chaque démarrage ou redémarrage via le lanceur.
-Une mise à jour compatible est installée avant de lancer le serveur.
+Starting with 0.5.1, installation from an official ZIP requires no updater setup.
+On first launch, `Briefcase.ServerLauncher.exe` or `Briefcase.ServerLauncher`
+creates `Briefcase/updater.json` when absent, using:
 
-Un fichier existant est conservé tel quel, y compris `enabled: false`, un dépôt personnalisé
-ou une configuration invalide (signalée comme erreur, jamais remplacée silencieusement).
-`enabled` permet de désactiver la vérification ; un dépôt vide la désactive également.
-`Briefcase/Updater/updater.example.json` reste fourni comme référence. La configuration
-active appartient à l'utilisateur et n'est jamais incluse parmi les fichiers remplacés par une mise à jour.
-Les installations 0.5.0 sans configuration doivent installer le nouveau paquet une fois,
-ou copier l'exemple vers `Briefcase/updater.json` pour activer leur updater existant.
-Cette version utilise les releases **publiques**, sans jeton GitHub ni mot de passe supplémentaire.
-Ne pas placer de jeton dans le nom du dépôt. Aucun dépôt n'est créé automatiquement.
+```json
+{
+  "enabled": true,
+  "repository": "EnoPM/BriefcaseNative",
+  "timeoutSeconds": 20
+}
+```
 
-`timeoutSeconds` (20 par défaut, 1 à 120) borne séparément la lecture des métadonnées et
-le téléchargement de l'archive. Une panne réseau, une limite GitHub, un dépôt privé ou
-une release absente laisse démarrer la version installée avec un avertissement.
+The launcher immediately checks, then repeats the check at every launch or managed
+restart. It installs a compatible update before starting the server.
 
-## Préparer une release
+An existing file is preserved exactly, including `enabled: false`, a custom
+repository or invalid settings that produce an error. An empty repository also
+disables checks. `Briefcase/Updater/updater.example.json` remains a reference. The
+active file belongs to the administrator and is never part of update replacement.
 
-1. Changer uniquement le fichier `VERSION` à la racine (par exemple `0.5.1`).
-2. Exécuter `scripts/build/Build.ps1`, puis `scripts/client/Package-Client.ps1`.
-   Ce dernier teste et vérifie les deux paquets, puis prépare l'archive serveur dans `dist/Releases`.
-3. Après validation et approbation, créer une release stable portant le tag `vMAJOR.MINOR.PATCH`.
-4. Y joindre `BriefcaseNative-Server-windows-x64-MAJOR.MINOR.PATCH.zip` et son fichier `.sha256`.
-   Les archives de sources générées automatiquement par GitHub ne sont pas des paquets installables.
+Version 0.5.0 installations without configuration must install a newer package
+once or copy the example to `Briefcase/updater.json`. Official public releases need
+no GitHub token. Never place a token in the repository name.
 
-L'updater lit `GET /repos/{owner}/{repo}/releases/latest`. Il refuse les préversions,
-les retours automatiques à une version antérieure, les assets ambigus, les redirections hors GitHub,
-les archives sans digest SHA256 fourni par GitHub et les builds de jeu incompatibles.
-Le hash de jeu pris en charge est actuellement celui du serveur déjà validé (dans le packaging).
-Un futur changement de build doit être validé avec les contrats natifs avant de changer ce hash.
+`timeoutSeconds` ranges from 1 to 120 and separately limits metadata and archive
+downloads. Network failure, GitHub rate limiting, a private repository or a missing
+release leaves the installed version running with a warning.
 
-## Installation et récupération
+## Release contract
 
-L'archive est téléchargée puis extraite dans `Briefcase/Updates/<id>/stage` avec des limites
-de taille et un contrôle des chemins. `Package.json` décrit exactement les fichiers et leurs hashes.
-Seuls les fichiers du framework sont gérés ; aucun mod ne figure dans le nouveau paquet. Les données `Mods/*/Data`,
-la sélection des mods, la configuration d'administration, les mots de passe, les logs, le fichier
-de configuration de l'updater et les réglages du jeu restent en place. Les mods recensés par les anciens paquets monolithiques restent installés. Les mods personnels absents de l'ancien inventaire restent en place.
-Les anciens fichiers gérés absents du nouveau paquet sont retirés, après sauvegarde.
+`VERSION` at the repository root is the sole framework version source. It accepts
+only `MAJOR.MINOR.PATCH`. A release uses tag `vMAJOR.MINOR.PATCH` and includes:
 
-Un verrou empêche deux lanceurs de modifier simultanément l'installation. Le journal de transaction
-est écrit avant toute mutation. Les anciens fichiers sont sauvegardés sous `Briefcase/Updates/<id>/backup`.
-Une erreur entraîne leur restauration. Après interruption au milieu d'une installation, le prochain
-lancement restaure d'abord les sauvegardes. Si cette restauration échoue, le serveur ne démarre pas
-avec un mélange de DLL. Les sauvegardes sont conservées : leur nettoyage reste manuel pour cette version.
-Une installation techniquement réussie n'est pas un test du comportement en jeu : le retour automatique
-sur crash de gameplay ne fait pas partie de cette version.
+- `BriefcaseNative-Server-windows-x64-MAJOR.MINOR.PATCH.zip` and checksum;
+- `BriefcaseNative-Server-linux-x64-MAJOR.MINOR.PATCH.zip` and checksum;
+- the SDK ZIP and checksum.
 
-`Briefcase/Updates/last-result.json` et les traces `Briefcase/Logs/launch-*.json` donnent le résultat.
-Le digest protège l'intégrité de l'archive téléchargée ; il ne remplace pas une signature indépendante
-si le compte GitHub qui publie les releases est compromis. Sécuriser les accès de publication du futur dépôt.
+GitHub-generated source archives are not installers.
 
-## Portabilité et périmètre
+The updater calls `GET /repos/{owner}/{repo}/releases/latest`. It rejects
+prereleases, automatic downgrades, ambiguous assets, redirects outside GitHub,
+archives without GitHub SHA-256 digests and incompatible game builds. A new game
+build must pass native contracts before its supported hash changes.
 
-Les paquets **serveur Windows x64 et Linux x64** utilisent le même protocole
-(HTTPS, JSON, ZIP, SHA256), avec un asset propre à chaque plateforme. Le lanceur Linux
-et son updater sont natifs C++ ; le coordinateur Windows utilise PowerShell.
-Le client n'installe pas automatiquement ses mises à jour. Voir [LinuxServer.md](LinuxServer.md)
-pour les dépendances et les limites de validation du serveur Linux.
+## Installation and recovery
 
-Référence : [API officielle GitHub Releases](https://docs.github.com/en/rest/releases/releases).
+An archive downloads and extracts into `Briefcase/Updates/<id>/stage` under path and
+size limits. `Package.json` lists every managed file and hash. Framework updates do
+not manage mods. Mod data, selection, administration configuration, passwords,
+logs, updater settings and game configuration remain in place. Old managed files
+absent from the new package are removed after backup.
 
-## Publication automatique et manuelle
+An installation lock prevents concurrent mutation. The transaction journal is
+written before any change, and old files are backed up under
+`Briefcase/Updates/<id>/backup`. Failure restores them. After interruption, the next
+launch restores backups before attempting startup. If recovery fails, the server
+does not start with mixed libraries. Backup cleanup is manual in this version.
 
-Le fichier `.github/workflows/release.yml` fournit **Publish server release**.
-Un push sur `main` qui modifie `VERSION` déclenche automatiquement la compilation,
-les tests et la publication de `v<VERSION>`. Un push sans changement de ce fichier
-ne publie rien. Le fichier accepte uniquement `MAJOR.MINOR.PATCH`, sans préfixe `v`.
-La version est lue dans le commit déclencheur, jamais dans une autre révision de `main`.
-CMake, le SDK et les noms d'archives utilisent tous cette même source.
-L'inventaire des sources valide le format de `VERSION` sans lui imposer une empreinte
-fixe ; changer uniquement ce fichier suffit pour une nouvelle release.
+Successful installation does not prove gameplay behavior, and automatic rollback
+after an in-game crash is outside scope. Inspect `Briefcase/Updates/last-result.json`
+and `Briefcase/Logs/launch-*.json` for results.
 
-Pour déclencher manuellement :
+Archive digests protect download integrity but do not provide an independent trust
+root if the publishing GitHub account is compromised. Protect repository release
+permissions accordingly.
 
-1. Mettre à jour `VERSION` et enregistrer les sources dans Git.
-2. Ouvrir **Actions → Publish server release → Run workflow**.
-3. Choisir la branche contenant le code à publier.
-4. La version est lue automatiquement dans `VERSION` ; aucune saisie supplémentaire.
-5. Laisser **Keep the release as a draft** décoché pour publier automatiquement, ou le cocher
-   pour préparer un brouillon à relire avant publication.
-6. Cliquer sur **Run workflow**.
+## Platforms
 
-GitHub doit connaître le workflow sur la branche par défaut pour proposer ce déclenchement manuel.
-Le commit sélectionné au lancement est fixé pour les deux jobs, même si la branche évolue ensuite.
-Le workflow ne modifie pas la version du code à votre place.
+Windows x64 and Linux x64 server packages share HTTPS, JSON, ZIP and SHA-256
+protocols but use separate assets. The Linux launcher and updater are native C++.
+The Windows coordinator currently uses PowerShell. The client does not update
+itself automatically. See [Linux server](LinuxServer.md) for runtime requirements.
 
-Le runner Windows 2025 récupère UE4SS et les dépendances épinglées, installe Rust 1.97.1,
-compile tous les projets en Release x64, exécute les tests puis vérifie les paquets client/serveur.
-Les tests graphiques utilisent WARP : aucune copie du jeu n'est nécessaire. Le ZIP **serveur**, le ZIP **SDK** et leurs .zip.sha256 sont transférés au job de publication et joints à la release.
-Le client est compilé et testé mais n'est pas publié.
+## Automatic and manual publication
 
-Le job de compilation dispose d'un accès en lecture au dépôt. Le job de publication utilise
-le GITHUB_TOKEN fourni automatiquement par GitHub, avec contents: write. Aucun secret
-personnel n'est utilisé pour publier. La compilation utilise le secret `UPSTREAM_READ_TOKEN`
-pour lire le sous-module Unreal privé. Aucun mot de passe serveur, chemin de copie locale
-ou fichier local.settings.json n'est requis.
-Les politiques du dépôt/de l'organisation doivent autoriser GitHub Actions et la création des releases/tags.
-Les actions utilisées sont officielles et épinglées par leur SHA complet.
+`.github/workflows/release.yml` defines **Publish server release**. A push to
+`main` that changes `VERSION` builds, tests and publishes `v<VERSION>`. Other pushes
+publish nothing. The workflow reads the version from the triggering commit, and
+CMake, SDK metadata and archive names derive from the same value.
 
-Le tag vMAJOR.MINOR.PATCH cible le commit compilé. Un tag existant associé à un autre commit
-est refusé ; une release existante n'est pas remplacée. Les uploads sont assemblés dans un brouillon.
-La release reste en brouillon pendant que le workflow réutilisable `linux-server-release.yml`
-compile, teste et ajoute les assets Linux du même commit. Les digests GitHub sont comparés
-aux fichiers locaux avant publication comme release stable/latest, avec les six assets
-(Windows, Linux et SDK, chacun avec son SHA-256). Le mode brouillon manuel conserve la
-release en brouillon après validation des deux plateformes.
-Les notes de release sont générées par GitHub. Un brouillon ne déclenche pas les mises à jour serveur.
+To run it manually:
 
-En cas d'échec après création du brouillon, celui-ci est laissé en place pour inspection.
-Une nouvelle exécution ne remplace pas son contenu : supprimer manuellement le brouillon incomplet
-avant de recommencer, ou reprendre sa gestion dans GitHub. Ne pas remplacer une release déjà distribuée ;
-publier une nouvelle version. Les fichiers de release restent accessibles dans l'artifact
-server-release du run pendant 14 jours et les rapports CTest d'un échec pendant 7 jours.
+1. Update `VERSION` and commit the source to the branch to publish.
+2. Open **Actions → Publish server release → Run workflow**.
+3. Select the branch.
+4. Enable **Keep the release as a draft** only when a reviewable draft is desired.
+5. Select **Run workflow**.
 
-Validation locale du workflow :
-- actionlint .github/workflows/release.yml vérifie la syntaxe GitHub Actions ;
-- après préparation de l'archive, tests/ReleaseWorkflow.Contracts.ps1 teste les contrôles de version/tag,
-  le brouillon, la publication et les erreurs d'intégrité avec des commandes GitHub simulées.
-  Ce test ne contacte pas GitHub et ne crée aucune release.
+The selected commit is fixed for all jobs even if the branch advances. The workflow
+never edits `VERSION` for the operator.
 
-Références : [déclenchement manuel](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow),
-[création des releases avec GitHub CLI](https://cli.github.com/manual/gh_release_create).
+The Windows 2025 runner fetches pinned dependencies, installs Rust 1.97.1, builds
+Release x64, runs tests and verifies client/server packages. Graphics fixtures use
+WARP and need no game installation. The client is built and tested but not published.
 
-Voir [Repositories.md](Repositories.md) pour la séparation et le SDK.
+Publication uses GitHub's scoped `GITHUB_TOKEN` with `contents: write`. The build
+uses repository secret `UPSTREAM_READ_TOKEN` to read the pinned private Unreal
+submodule. It requires no server password, local deployment path or
+`local.settings.json`. Third-party actions are official and pinned by full SHA.
+
+The tag must point to the built commit. Existing tags on another commit and existing
+releases fail rather than being replaced. Assets first enter a draft. The reusable
+Linux workflow builds and appends Linux assets from the same commit. GitHub digests
+are compared with local files before the complete six-asset release becomes stable
+and latest. Manual draft mode retains the validated draft.
+
+If a job fails after draft creation, the draft remains for inspection. Delete an
+incomplete draft before retrying. Never replace a distributed release; publish a
+new version. Release artifacts remain available for 14 days and failed CTest
+reports for 7 days.
+
+Local workflow validation uses `actionlint` and
+`tests/ReleaseWorkflow.Contracts.ps1`, which simulates GitHub commands without
+contacting GitHub or creating a release.
+
+References:
+
+- [GitHub Releases REST API](https://docs.github.com/en/rest/releases/releases)
+- [Manually run a workflow](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow)
+- [GitHub CLI release creation](https://cli.github.com/manual/gh_release_create)
+- [Repository boundaries](Repositories.md)

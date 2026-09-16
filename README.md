@@ -1,46 +1,129 @@
 # BriefcaseNative
 
-Native client and dedicated-server mod framework for Deceive Inc.
+BriefcaseNative is a native mod framework for the Deceive Inc. dedicated server.
+It runs the server without opening its graphical interface, loads separately
+installed native mods and checks for framework updates before every launch.
 
-This repository contains the shared runtime, Unreal backend, public ABI and SDK,
-client menu, server administration, launcher, updater, tests and educational samples.
-Application mods live in independent repositories and are not bundled here.
+The public release currently supports Windows x64 and Ubuntu 24.04 x86_64
+dedicated servers. The client is not distributed yet.
 
-## Build
+## Install the dedicated server
 
-Windows x64, Visual Studio C++ tools, CMake, PowerShell 7 and Rust are required.
-The Unreal dependency requires authorized GitHub access; see docs/UE4SS.md.
+Install [SteamCMD](https://developer.valvesoftware.com/wiki/SteamCMD), then download
+the Deceive Inc. dedicated server anonymously. Choose an empty directory that will
+remain the permanent server directory.
 
-    ./scripts/build/Fetch-Dependencies.ps1
-    ./scripts/build/Build.ps1
-    ./scripts/test/Test.ps1
-    ./scripts/client/Package-Client.ps1
+On Windows:
 
-Packages are written to dist/Client and dist/Server. Public packages contain no PDB files.
-The client package includes only the native overlay sample. The server package contains no mods.
+```powershell
+steamcmd.exe +force_install_dir "C:\DeceiveIncServer" +login anonymous +app_update 5007710 validate +quit
+```
 
-The [Linux dedicated server port](docs/LinuxServer.md) includes the shared host,
-native hooks and startup patches, TLS administration, restart supervision and
-updates before launch. Separate Linux packaging and automated releases
-are available; connected-player testing remains before a production release.
+On Linux:
 
-## Development installation
+```bash
+./steamcmd.sh +force_install_dir /opt/deceive-inc-server +login anonymous +app_update 5007710 validate +quit
+```
 
-Copy local.settings.example.json to local.settings.json and configure the dedicated test paths.
-Deployment validates the destination and preserves installed mod configuration.
-See [server launcher](docs/ServerLauncher.md), [client setup](docs/ClientMilestone.md)
-and [administration](docs/Administration.md).
+SteamCMD creates the game below the chosen directory. Briefcase must be installed
+directly beside the platform's Shipping executable.
 
-## SDK and samples
+## Install Briefcase on Windows
 
-The SDK provides a stable C ABI and C++ wrappers. See [ModApi](docs/UnrealApi.md),
-[ClientModApi](docs/ClientApi.md) and [typed game API](docs/SpyApi.md).
-The samples demonstrate logging, runtime inspection and rendering text through the public API.
+1. Stop the dedicated server.
+2. Download `BriefcaseNative-Server-windows-x64-<version>.zip` from the
+   [latest release](https://github.com/EnoPM/BriefcaseNative/releases/latest).
+   The SDK and source-code archives are not server installers.
+3. Extract the ZIP directly into:
+   `C:\DeceiveIncServer\DeceiveInc\Binaries\Win64`
+4. Create `Briefcase\launch.json` in that Win64 directory. Replace the example
+   path with the absolute path to your own installation and escape each backslash:
 
-## Releases
+```json
+{
+  "serverWin64": "C:\\DeceiveIncServer\\DeceiveInc\\Binaries\\Win64"
+}
+```
 
-The root [VERSION](VERSION) file is the single source of the framework version.
-A push on `main` changing that file builds and tests Windows and Linux, verifies
-the packages, then publishes the server and SDK release assets together. Manual
-publication remains available, including a draft option. See [updates](docs/Updates.md).
-Source publication is checked against an explicit file inventory.
+The resulting layout starts like this:
+
+```text
+DeceiveInc/Binaries/Win64/
+├── DeceiveIncServer-Win64-Shipping.exe
+├── Briefcase.ServerLauncher.exe
+├── StartBriefcaseNativeServer.ps1
+└── Briefcase/
+    ├── launch.json
+    ├── Runtime/
+    ├── Tools/
+    └── Updater/
+```
+
+Start the server with `Briefcase.ServerLauncher.exe`. Do not start
+`DeceiveIncServer-Win64-Shipping.exe` directly: doing so bypasses Briefcase, its
+mods and its update check. The launcher opens no server UI or external console.
+
+If startup fails, read `Briefcase\Logs\launcher-error.log` and the game logs.
+
+## Install Briefcase on Linux
+
+Install the runtime libraries on Ubuntu 24.04:
+
+```bash
+sudo apt-get update
+sudo apt-get install --no-install-recommends libcurl4t64 libarchive13t64 ca-certificates unzip
+```
+
+Then:
+
+1. Stop the dedicated server.
+2. Download `BriefcaseNative-Server-linux-x64-<version>.zip` from the
+   [latest release](https://github.com/EnoPM/BriefcaseNative/releases/latest).
+3. Extract it directly into the server's `DeceiveInc/Binaries/Linux` directory.
+4. Launch Briefcase from that directory:
+
+```bash
+cd /opt/deceive-inc-server/DeceiveInc/Binaries/Linux
+chmod +x Briefcase.ServerLauncher
+./Briefcase.ServerLauncher
+```
+
+The launcher always runs `DeceiveIncServer-Linux-Shipping` with
+`Binaries/Linux` as its working directory. No Python, .NET runtime or shell script
+is required by the installed Briefcase package.
+
+## Install mods
+
+Briefcase mods are distributed separately from the framework. Download the mod
+archive matching the server operating system and extract it into the same
+`Binaries/Win64` or `Binaries/Linux` directory. A correctly packaged mod is placed
+under `Briefcase/Mods/<mod-id>/`.
+
+Stop the server before installing or replacing a mod. Preserve an existing
+`Data/config.json` when upgrading a mod because it contains your settings. If
+`Briefcase/settings.json` does not exist, Briefcase loads all compatible installed
+server mods. A mod marked for another environment or operating system is ignored.
+
+## Automatic updates
+
+Starting with BriefcaseNative 0.5.1, the launcher creates
+`Briefcase/updater.json` on first use and checks the official GitHub release before
+starting the server. Compatible updates are installed before launch. An unavailable
+network or release does not remove the installed version.
+
+Existing updater preferences are preserved. To disable automatic checks, stop the
+server and set `enabled` to `false` in `Briefcase/updater.json`. Always launch the
+server through `Briefcase.ServerLauncher.exe` on Windows or
+`./Briefcase.ServerLauncher` on Linux for updates to run.
+
+## More help
+
+- [Server administration](docs/Administration.md)
+- [Windows launcher and logs](docs/ServerLauncher.md)
+- [Linux server notes](docs/LinuxServer.md)
+- [Updater behavior and recovery](docs/Updates.md)
+- [Contributing and building from source](CONTRIBUTING.md)
+
+Before reporting a problem, include the operating system, Briefcase version, game
+server build and relevant files from `Briefcase/Logs`. Never publish
+`Briefcase/Admin/server.json`, passwords or private keys.
