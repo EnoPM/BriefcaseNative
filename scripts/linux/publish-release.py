@@ -1,7 +1,7 @@
 """Attach verified Linux assets to an existing release for the same source commit."""
 import argparse, json, re, subprocess, tempfile
 from pathlib import Path
-import updater as u
+import package_support as u
 
 def command(*args):return subprocess.check_output(list(args),text=True).strip()
 def publish(project,repository,version,commit,publish_draft=False):

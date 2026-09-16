@@ -31,11 +31,11 @@
     },
     {
       "path": ".github/workflows/linux-server-core.yml",
-      "sha256": "3801301a9a35f91d3622dea154070e39ff7a035d10ec7e5182fbbfb6d0333d36"
+      "sha256": "cd3a2dd3cbdccc09610ca8250dbf37fcc46afa756d95e3244cf305051aaa4fed"
     },
     {
       "path": ".github/workflows/linux-server-release.yml",
-      "sha256": "a5d570174aec57d8e20510e38f87ef330e0ca22b6b43002ffba6dc7b2c4ff7a8"
+      "sha256": "08d9571290322f57bdc1b0e2f7371c16f70240955f76356b821332b1cf0ba434"
     },
     {
       "path": ".github/workflows/release.yml",
@@ -47,7 +47,7 @@
     },
     {
       "path": "CMakeLists.txt",
-      "sha256": "fb565f52df4267181ca093aa51d7b1b1579a3621f50e93f1f142236342e9f62d"
+      "sha256": "704ee904c2cbb481f0792fb5978b61da465995392f2fe168429d81f6261022ff"
     },
     {
       "path": "README.md",
@@ -59,11 +59,11 @@
     },
     {
       "path": "cmake/LinuxBackend.cmake",
-      "sha256": "dfee08f20c2952b21bc6aba0640fd4bf90f3c800aff16fd50bbe0bfbd0f0bce0"
+      "sha256": "01ae948f934e69d727caacfda35f3fa7e2462d431b5db6889c28b0a7300926f8"
     },
     {
       "path": "cmake/LinuxServer.cmake",
-      "sha256": "1411a7abd665e84b293ea8037151486ca7f7cad42a0e11a8815166a720984f35"
+      "sha256": "786662762bbf8728aeec937c7cec68a32e83e2dce476186aeb0b51e6e8f541c8"
     },
     {
       "path": "cmake/PortableCore.cmake",
@@ -119,7 +119,7 @@
     },
     {
       "path": "docs/LinuxServer.md",
-      "sha256": "6a5ec812cfe86149c2082e2be500a95d6bbc68f4f1e598779f5c10030009533d"
+      "sha256": "172b33c3d11330b30b0a94a3de2741d5772bd736c2c34737f1539692f9d37b42"
     },
     {
       "path": "docs/Localization.md",
@@ -192,6 +192,26 @@
     {
       "path": "loader/Briefcase.ServerLauncher/LinuxBootstrap.cpp",
       "sha256": "08ab8366522beef9fdba0700cfe626ec375fc7d954ee06b0e610409487a948cd"
+    },
+    {
+      "path": "loader/Briefcase.ServerLauncher/LinuxDownload.cpp",
+      "sha256": "439bffa8c0b512cd70f5741344cf5f1229f9efe4a4fd0793b004233019ca1a8f"
+    },
+    {
+      "path": "loader/Briefcase.ServerLauncher/LinuxFiles.cpp",
+      "sha256": "4fc939bf0d99bf48da353a0809885359a511227437c5ea840d17e5902e04f3b2"
+    },
+    {
+      "path": "loader/Briefcase.ServerLauncher/LinuxMain.cpp",
+      "sha256": "f235c1fc5e5f3e83488656770fc0bacfc385277c241e7d6f7dbd9d27c6613920"
+    },
+    {
+      "path": "loader/Briefcase.ServerLauncher/LinuxUpdate.cpp",
+      "sha256": "b3bb2806b7340f7b199f60db602585f0b0553234d42e71800e3f46d766d7d119"
+    },
+    {
+      "path": "loader/Briefcase.ServerLauncher/LinuxUpdate.hpp",
+      "sha256": "e984cb999254d3eea719012502e35ca7d377c9a34a51ef655c6caf583fd7d360"
     },
     {
       "path": "loader/Briefcase.ServerLauncher/Main.cpp",
@@ -707,7 +727,7 @@
     },
     {
       "path": "scripts/linux/deploy-server.py",
-      "sha256": "4bbdffe0d27ad0420cc2614f09077a50434a1c3843aa19a6930cb08eef649f8d"
+      "sha256": "687c5bb665d4016459d7c1c27c57faf94275ceb45e57e4f04b1203f8d25cae4a"
     },
     {
       "path": "scripts/linux/download-server.sh",
@@ -715,7 +735,7 @@
     },
     {
       "path": "scripts/linux/launch-server.sh",
-      "sha256": "a2a6b287ea53fc40476a149ba6146035558bfff652d3c2aa397e75fb0b0e52ee"
+      "sha256": "08fa3428205d1ca455efd3d8557ec8ea9a6ddd7495dd861611bf53c924689c1f"
     },
     {
       "path": "scripts/linux/package-sdk.py",
@@ -723,7 +743,11 @@
     },
     {
       "path": "scripts/linux/package-server.py",
-      "sha256": "e085d256bae971f31a905e91a9875a14d20c2672c76ae232fdc05ffd952cd1e5"
+      "sha256": "c24e207b9ca037fd99947c60a36c6a4c546777550d3fbbab9ea65d888df06b11"
+    },
+    {
+      "path": "scripts/linux/package_support.py",
+      "sha256": "80b74a4ef780f91f495ac42955149d5ff8c65f1553dba705ff347e77ab3d0a57"
     },
     {
       "path": "scripts/linux/prepare-backend.sh",
@@ -731,15 +755,7 @@
     },
     {
       "path": "scripts/linux/publish-release.py",
-      "sha256": "3a68c23f7de2f58d94b2d902d2de34d91d3245bdbeaff0d63c91c4e00637458f"
-    },
-    {
-      "path": "scripts/linux/supervisor.py",
-      "sha256": "eba0afd011ce8010a794c1346c28da4b7b3b82b53ee8376eb816ad9dd5def33d"
-    },
-    {
-      "path": "scripts/linux/updater.py",
-      "sha256": "4be5d7a181c2ffd7a6c509c76a44a45ffc85186a231b00554f445a06f7ddb808"
+      "sha256": "0fce24a12160b959a7ddd45c8ef7a98bae44ed8ed007888a0d7c5c8c4e9e8690"
     },
     {
       "path": "scripts/release/Assert-SDK.ps1",
@@ -975,15 +991,19 @@
     },
     {
       "path": "tests/LinuxLauncherContracts.py",
-      "sha256": "711f9adc1cbb8ab4ee102a09223661943ea0ff3bbde5e9de79890a11de5871a3"
+      "sha256": "0947df51c272cbb7a25911228c9d90559fa45e9002dadc628844873f66f28db4"
     },
     {
       "path": "tests/LinuxNativeContracts.cpp",
       "sha256": "89732b744f8239df4bcd712dffae8aeca646a0ef0b7fa7ce2822ce335c600048"
     },
     {
+      "path": "tests/LinuxNativeDistribution.py",
+      "sha256": "ee1eecdbf53d88aaae63642e67a57296ec1d55d17c93bbee58414ea55d520312"
+    },
+    {
       "path": "tests/LinuxReleaseContracts.py",
-      "sha256": "cbf89ecab29b3ae0a0a2b885e8e434177351375e40c54791daece62c64ba502f"
+      "sha256": "1c9d99583e1335653567f52ca0d5fded2ec05121f8171f10fba4dd8486cc1271"
     },
     {
       "path": "tests/LinuxUnrealScanContracts.py",
@@ -991,7 +1011,11 @@
     },
     {
       "path": "tests/LinuxUpdaterContracts.py",
-      "sha256": "8cf8a4808197897c7f79957c8486704c3d765cf351cbf10747f35d018d996d08"
+      "sha256": "593ba30136f2a6a462c9dd5bb5b080966846ae9a16f55e730732d6eb3ad1f2ec"
+    },
+    {
+      "path": "tests/LinuxUpdaterDriver.cpp",
+      "sha256": "da1a09abc329f1b0a8e45199d0729bbbd466d95c89c05d5fee1e58ed1235624d"
     },
     {
       "path": "tests/LocalizationContracts.cpp",

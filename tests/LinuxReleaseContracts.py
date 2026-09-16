@@ -4,7 +4,7 @@ from pathlib import Path
 from unittest.mock import patch
 from LinuxUpdaterContracts import Contracts
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"scripts/linux"))
-import updater as u
+import package_support as u
 spec=importlib.util.spec_from_file_location("publisher",Path(__file__).resolve().parents[1]/"scripts/linux/publish-release.py")
 publisher=importlib.util.module_from_spec(spec);spec.loader.exec_module(publisher)
 import zipfile

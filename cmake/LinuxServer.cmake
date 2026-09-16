@@ -4,7 +4,7 @@ endif()
 if(BRIEFCASE_LINUX_SERVER_HOST)
   message(STATUS "Building experimental Linux server host; client components excluded")
 else()
-  message(STATUS "Building Linux SERVER CORE ONLY: no Unreal backend, game launcher or client modules")
+  message(STATUS "Building Linux SERVER CORE and native launcher: no Unreal backend or client modules")
 endif()
 set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -27,6 +27,18 @@ target_link_libraries(Briefcase.Core PUBLIC nlohmann_json::nlohmann_json Briefca
 add_library(Briefcase.Localization STATIC runtime/Briefcase.Localization/Catalog.cpp)
 target_link_libraries(Briefcase.Localization PUBLIC Briefcase.Core)
 include(cmake/AdminCrypto.cmake)
+find_package(CURL 7.85 REQUIRED)
+find_package(LibArchive REQUIRED)
+add_library(Briefcase.ServerUpdate STATIC
+  loader/Briefcase.ServerLauncher/LinuxFiles.cpp
+  loader/Briefcase.ServerLauncher/LinuxDownload.cpp
+  loader/Briefcase.ServerLauncher/LinuxUpdate.cpp)
+target_link_libraries(Briefcase.ServerUpdate PUBLIC nlohmann_json::nlohmann_json
+  PRIVATE CURL::libcurl LibArchive::LibArchive mbedcrypto)
+target_include_directories(Briefcase.ServerUpdate PUBLIC loader/Briefcase.ServerLauncher)
+add_executable(Briefcase.ServerLauncher loader/Briefcase.ServerLauncher/LinuxMain.cpp)
+target_link_libraries(Briefcase.ServerLauncher PRIVATE Briefcase.ServerUpdate)
+target_compile_definitions(Briefcase.ServerLauncher PRIVATE BRIEFCASE_FRAMEWORK_VERSION="${PROJECT_VERSION}")
 add_library(Briefcase.Admin.Transport STATIC runtime/Briefcase.Admin/Transport.cpp
   runtime/Briefcase.Admin/PosixIdentity.cpp)
 target_link_libraries(Briefcase.Admin.Transport PUBLIC Briefcase.Admin.Crypto)
@@ -87,8 +99,10 @@ add_test(NAME AdminTlsInterop COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DI
   "$<TARGET_FILE:Briefcase.AdminPeerFixture>")
 set_tests_properties(AdminTlsInterop PROPERTIES TIMEOUT 45)
 add_test(NAME SourcePublicationContracts COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tests/SourcePublicationContracts.py")
+add_executable(Briefcase.LinuxUpdaterDriver tests/LinuxUpdaterDriver.cpp)
+target_link_libraries(Briefcase.LinuxUpdaterDriver PRIVATE Briefcase.ServerUpdate)
 add_test(NAME LinuxDownloadContracts COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tests/LinuxDownloadContracts.py")
-add_test(NAME LinuxUpdaterContracts COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tests/LinuxUpdaterContracts.py")
+add_test(NAME LinuxUpdaterContracts COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tests/LinuxUpdaterContracts.py" "$<TARGET_FILE:Briefcase.LinuxUpdaterDriver>")
 add_test(NAME LinuxReleaseContracts COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tests/LinuxReleaseContracts.py")
 # Production install/release packaging remains separate from this experimental build.
 

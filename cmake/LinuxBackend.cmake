@@ -82,7 +82,7 @@ add_library(Briefcase.LinuxHostFixture SHARED tests/LinuxHostFixture.cpp)
 add_executable(Briefcase.LinuxGameFixture tests/LinuxGameFixture.cpp)
 target_link_libraries(Briefcase.LinuxGameFixture PRIVATE Briefcase.Admin.Service)
 add_test(NAME LinuxLauncherContracts COMMAND "${Python3_EXECUTABLE}"
-  "${CMAKE_SOURCE_DIR}/tests/LinuxLauncherContracts.py" "${CMAKE_SOURCE_DIR}/scripts/linux/launch-server.sh"
+  "${CMAKE_SOURCE_DIR}/tests/LinuxLauncherContracts.py" "$<TARGET_FILE:Briefcase.ServerLauncher>"
   "$<TARGET_FILE:Briefcase.ServerBootstrap>" "$<TARGET_FILE:Briefcase.LinuxHostFixture>"
   "$<TARGET_FILE:Briefcase.LinuxGameFixture>")
 set_tests_properties(LinuxLauncherContracts PROPERTIES TIMEOUT 45)

@@ -12,7 +12,10 @@ jobs:
       - name: Verify framework source inventory
         run: python3 scripts/release/Assert-Source.py
       - name: Build and test the portable server foundation
-        run: bash scripts/linux/build-server-core.sh
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends libcurl4-openssl-dev libarchive-dev
+          bash scripts/linux/build-server-core.sh
       - name: Verify that no graphical or Windows dependencies were linked
         run: |
           readelf -h build/linux-server-core/Briefcase.NativeHello.so

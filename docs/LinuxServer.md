@@ -6,14 +6,14 @@ hook dispatch and TLS administration services. Startup patches, native detours,
 supervised restart and updates before launch are implemented.
 
 Automated tests and actual headless startup/restart passed under WSL2. Connected
-player sessions and extended production use still need validation. These changes
-have not published a Linux release.
+player sessions and extended production use still need validation. Version 0.5.0
+replaces the Python launcher/update runtime shipped in 0.4.0 with native C++.
 
 ## Architecture
 
 | Component | Linux implementation |
 | --- | --- |
-| Launcher | Python supervisor; direct Shipping execution in Binaries/Linux |
+| Launcher | Native C++ executable; direct Shipping execution in Binaries/Linux |
 | Bootstrap | libBriefcase.ServerBootstrap.so intercepts main through ELF preload |
 | Host | libBriefcase.NativeHost.so, common mod loader and services |
 | Unreal | Pinned headless UE4SS libraries and engine-thread scheduling |
@@ -50,7 +50,7 @@ Tested: Ubuntu 24.04 x86_64, Clang/LLD 19, CMake 3.28+, Ninja, Python 3,
 Rust 1.97.1 and GCC 13 runtime files. Older distributions have not been validated.
 
 ~~~sh
-sudo apt-get install --no-install-recommends build-essential clang-19 lld-19 cmake ninja-build git python3 libssl-dev pkg-config
+sudo apt-get install --no-install-recommends build-essential clang-19 lld-19 cmake ninja-build git python3 libssl-dev pkg-config libcurl4-openssl-dev libarchive-dev
 rustup toolchain install 1.97.1 --profile minimal
 export RUSTUP_TOOLCHAIN=1.97.1
 bash scripts/linux/prepare-backend.sh artifacts/linux/ue4ss-reference artifacts/linux/ue4ss-build
@@ -75,6 +75,21 @@ bash scripts/linux/build-server-core.sh
 
 ## Download, package and deploy
 
+The server distribution contains no Python, shell scripts, or managed runtime.
+Launch `./Briefcase.ServerLauncher` directly from the installation's Binaries/Linux
+directory (launching its absolute path elsewhere also uses Binaries/Linux as the
+game's working directory). Python remains a development/CI requirement only.
+
+The native launcher dynamically links the distribution's maintained libcurl and
+libarchive libraries. On Ubuntu 24.04, install runtime libraries with:
+
+~~~sh
+sudo apt-get install --no-install-recommends libcurl4t64 libarchive13t64 ca-certificates
+~~~
+
+These are native shared libraries, not external curl/unzip commands. HTTPS uses
+certificate and hostname verification, and validates each GitHub redirect.
+
 ~~~sh
 bash scripts/linux/download-server.sh /path/to/steamcmd.sh /path/to/isolated-server
 python3 scripts/linux/package-server.py --build build/linux-server-host --backend-source artifacts/linux/ue4ss-reference --backend-deps artifacts/linux/ue4ss-build/_deps --output dist/Releases
@@ -92,14 +107,23 @@ download helper. It rejects linked paths and a running server, verifies the game
 hash, and installs only managed framework files:
 
 ~~~sh
-python3 scripts/linux/deploy-server.py --server /path/to/isolated-server --archive dist/Releases/BriefcaseNative-Server-linux-x64-0.4.0.zip
+python3 scripts/linux/deploy-server.py --server /path/to/isolated-server --launcher build/linux-server-host/Briefcase.ServerLauncher --archive dist/Releases/BriefcaseNative-Server-linux-x64-0.5.0.zip
 cd /path/to/isolated-server/DeceiveInc/Binaries/Linux
-bash StartBriefcaseNativeServer.sh
+./Briefcase.ServerLauncher
 ~~~
 
-Package versions follow CMakeLists.txt. Increment the version before publishing
-changed binaries or SDK content: local 0.3.0 development archives must not replace
-an already published 0.3.0 release.
+The native executable also installs an archive directly, without Python:
+
+~~~sh
+/path/to/extracted/Briefcase.ServerLauncher --server /path/to/DeceiveIncServer-Linux-Shipping --install-archive /path/to/package.zip
+~~~
+
+This validates the game identity and package, holds the installation lock, refuses
+a running game, and preserves mods and user configuration. Old framework scripts
+listed in the installed manifest are removed transactionally. A 0.4.0 installation
+must use this manual installation once: its older updater cannot accept the new
+package layout. New installations simply extract the native archive into Binaries/Linux.
+Package versions follow CMakeLists.txt; published assets must never be overwritten.
 
 ## Supervision and updates
 
@@ -120,7 +144,7 @@ per-file hashes. Mods and user configuration are outside its managed scope.
 Durable backups and a journal allow recovery after interrupted installation.
 Recovery runs even with updates disabled. A damaged backup blocks launch rather
 than starting mixed versions. After installation the supervisor reloads its
-updated code before starting the game.
+updated executable before starting the game. No interpreter or shell is invoked.
 
 Remote restart uses an inherited Unix sequenced-packet socket. The game verifies
 the parent's PID/UID, then receives acknowledgement before replying to the admin
@@ -163,8 +187,9 @@ same commit. Existing assets are never replaced.
 
 Both workflows share a concurrency group. Build jobs have contents:read;
 contents:write is confined to publication. Dependencies and mod sources are not
-uploaded. This workflow has not yet run on GitHub for the port; local publication
-contracts substitute the CLI.
+uploaded. The 0.4.0 Windows/Linux release workflows passed on GitHub. New source
+changes require their own builds and tests before publication; local publication
+contracts substitute the CLI and do not write to GitHub.
 
 ## Validation and remaining playtest
 
@@ -175,7 +200,10 @@ Examined Steam public build 25107754, Linux depot 5007712:
 
 Tests cover executable patch validation/execution, rejected patches, reflection,
 ABI, TLS interoperability, update rollback/recovery, hostile archives, release
-checks, exclusive launch and acknowledged restart. RuntimeProbe passed its 20
+checks, exclusive launch and acknowledged restart. Native updater contracts also
+terminate a real installer process mid-transaction to exercise recovery. Release
+CI installs and runs the launcher in an isolated root with no Python or shell,
+including a complete acknowledged restart. RuntimeProbe passed its 20
 engine checks in the actual game. A Windows CPython/OpenSSL peer authenticated
 over TLS 1.3, inspected the server, requested restart, reconnected and verified
 all five local test modules reloaded.

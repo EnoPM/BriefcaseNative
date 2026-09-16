@@ -41,7 +41,7 @@ jobs:
       - name: Install native tools
         run: |
           sudo apt-get update
-          sudo apt-get install --no-install-recommends clang-19 lld-19 cmake ninja-build libssl-dev pkg-config
+          sudo apt-get install --no-install-recommends clang-19 lld-19 cmake ninja-build libssl-dev pkg-config libcurl4-openssl-dev libarchive-dev
           rustup toolchain install 1.97.1 --profile minimal --no-self-update
       - name: Build pinned headless Unreal libraries
         env:
@@ -59,6 +59,8 @@ jobs:
           bash scripts/linux/prepare-backend.sh artifacts/linux/ue4ss-reference artifacts/linux/ue4ss-build
       - name: Build and test server
         run: bash scripts/linux/build-server-host.sh artifacts/linux/ue4ss-reference artifacts/linux/ue4ss-build artifacts/linux/ue4ss-build/_deps
+      - name: Verify native distribution without interpreters
+        run: sudo python3 tests/LinuxNativeDistribution.py build/linux-server-host
       - name: Prepare verified Linux asset and public SDK
         run: |
           python3 scripts/linux/package-server.py --build build/linux-server-host --backend-source artifacts/linux/ue4ss-reference --backend-deps artifacts/linux/ue4ss-build/_deps --output dist/Releases

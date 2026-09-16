@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.28)
-project(BriefcaseNative VERSION 0.4.0 LANGUAGES C CXX)
+project(BriefcaseNative VERSION 0.5.0 LANGUAGES C CXX)
 if(NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
   message(FATAL_ERROR "BriefcaseNative requires a 64-bit target.")
 endif()

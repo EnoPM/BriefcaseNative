@@ -1,7 +1,7 @@
 """Create a framework-only, reproducible Linux server release archive."""
 import argparse, hashlib, json, os, re, shutil, stat, struct, subprocess, tempfile, zipfile
 from pathlib import Path
-import updater as u
+import package_support as u
 GAME_HASH="b0b275eac71bb8314b8afb5b36368d882faefafc993d5eac05bb5956a7334ef7"
 
 def package(project,build,backend,deps,output,json_source=None):
@@ -11,15 +11,13 @@ def package(project,build,backend,deps,output,json_source=None):
     def put(name,data,mode=0o644):
         target=u.relative(stage,name);target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(data);target.chmod(mode);modes[name]=mode
     def copy(name,source):put(name,source.read_bytes())
-    for name,target in (("libBriefcase.NativeHost.so","Runtime"),("libBriefcase.ServerBootstrap.so","Runtime"),("Briefcase.AdminSetup","Tools")):
+    for name,target in (("Briefcase.ServerLauncher",None),("libBriefcase.NativeHost.so","Runtime"),("libBriefcase.ServerBootstrap.so","Runtime"),("Briefcase.AdminSetup","Tools")):
         data=(build/name).read_bytes()
         u.require(data[:6]==b"\x7fELF\x02\x01" and struct.unpack_from("<H",data,18)[0]==62,"Expected Linux x64 ELF")
-        destination="Briefcase/"+target+"/"+name;put(destination,data,0o755)
+        destination="Briefcase/"+target+"/"+name if target else name;put(destination,data,0o755)
         subprocess.run(["strip","--strip-unneeded",str(stage/destination)],check=True)
         dependencies=subprocess.check_output(["readelf","-d",str(stage/destination)],text=True)
         u.require(not re.search(r"imgui|libX11|libGL\.|libvulkan|libSDL|d3d|dxgi",dependencies,re.I),"Graphical dependency in server")
-    put("StartBriefcaseNativeServer.sh",b'#!/usr/bin/env bash\nset -euo pipefail\nroot=$(cd -- "$(dirname -- "$0")" && pwd -P)\nexec python3 "$root/Briefcase/Updater/supervisor.py" "$root/DeceiveIncServer-Linux-Shipping" "$@"\n',0o755)
-    for name in ("supervisor.py","updater.py"):copy("Briefcase/Updater/"+name,project/"scripts/linux"/name)
     put("Briefcase/Updater/build.json",(json.dumps(dict(frameworkVersion=version))+"\n").encode())
     put("Briefcase/Updater/updater.example.json",(json.dumps(dict(schemaVersion=1,enabled=True,repository="EnoPM/BriefcaseNative",timeoutSeconds=20),indent=2)+"\n").encode())
     copy("Briefcase/Docs/LinuxServer.md",project/"docs/LinuxServer.md")
@@ -31,7 +29,9 @@ def package(project,build,backend,deps,output,json_source=None):
         "Zydis":deps/"zydis-src/LICENSE", "Zycore":deps/"zydis-src/dependencies/zycore/LICENSE",
         "AsmJit":deps/"polyhook2-src/asmjit/LICENSE.md", "AsmTK":deps/"polyhook2-src/asmtk/LICENSE.md",
         "Fmt":deps/"fmt-src/LICENSE", "GCC-runtime":Path("/usr/share/doc/gcc-13-base/copyright"),
-        "GPL-3":Path("/usr/share/common-licenses/GPL-3")}
+        "GPL-3":Path("/usr/share/common-licenses/GPL-3"),
+        "libcurl":Path("/usr/share/doc/libcurl4t64/copyright"),
+        "libarchive":Path("/usr/share/doc/libarchive13t64/copyright")}
     for name,source in licenses.items():copy("Briefcase/Licenses/"+name+".txt",source)
     metadata=json.loads(subprocess.check_output(["cargo","metadata","--locked","--format-version","1","--manifest-path",str(backend/"deps/first/patternsleuth_bind/Cargo.toml")],text=True))
     records=[]

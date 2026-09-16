@@ -19,7 +19,7 @@ with tempfile.TemporaryDirectory(prefix="briefcase launcher ") as directory:
     for name in ("LD_PRELOAD", "BC_TEST_HOST_STARTED", "BC_TEST_REJECT"):
         env.pop(name, None)
     def launch(extra=None):
-        return subprocess.run(["bash", str(launcher), str(game), "sentinel"],
+        return subprocess.run([str(launcher), "--server", str(game), "--", "sentinel"],
                               env=env | (extra or {}), capture_output=True, text=True, timeout=10)
     result = launch()
     assert result.returncode == 0 and "PASS host-before-main" in result.stdout, result
@@ -31,7 +31,7 @@ with tempfile.TemporaryDirectory(prefix="briefcase launcher ") as directory:
     pids=marker.read_text().splitlines()
     assert len(pids)==2 and pids[0]!=pids[1],pids
     marker.unlink()
-    process=subprocess.Popen(["bash",str(launcher),str(game),"sentinel"],
+    process=subprocess.Popen([str(launcher),"--server",str(game),"--","sentinel"],
         env=env|{"BC_TEST_RESTART":str(marker),"BC_TEST_WAIT":"1"},stdout=subprocess.PIPE,stderr=subprocess.PIPE)
     try:
         deadline=time.monotonic()+8
