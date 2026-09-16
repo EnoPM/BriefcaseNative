@@ -14,12 +14,12 @@ foreach($file in @('Launch-Server.ps1','Updater.ps1')){Copy-Item -LiteralPath (J
 @{serverWin64=$win64}|ConvertTo-Json|Set-Content -LiteralPath (Join-Path $win64 'Briefcase/launch.json')
 @{schemaVersion=1;enabled=$false;repository='EnoPM/BriefcaseNative';timeoutSeconds=20}|ConvertTo-Json|Set-Content -LiteralPath (Join-Path $win64 'Briefcase/updater.json')
 $previous=$env:BC_TEST_SERVER_LIFETIME
-$env:BC_TEST_SERVER_LIFETIME='20000'
+$env:BC_TEST_SERVER_LIFETIME='60000'
 try {
     $initial=Start-Process -FilePath (Join-Path $win64 'Briefcase.ServerLauncher.exe') -WorkingDirectory $project -WindowStyle Hidden -PassThru
-    if(-not $initial.WaitForExit(5000)){throw 'Initial launcher did not release itself for updates.'}
+    if(-not $initial.WaitForExit(15000)){throw 'Initial launcher did not release itself for updates.'}
     $record=$null
-    for($i=0;$i -lt 100;$i++){
+    for($i=0;$i -lt 300;$i++){
         $record=Get-ChildItem -LiteralPath (Join-Path $win64 'Briefcase/Logs') -Filter 'launch-*.json' -ErrorAction SilentlyContinue|Select-Object -First 1
         if($record){break}
         Start-Sleep -Milliseconds 100

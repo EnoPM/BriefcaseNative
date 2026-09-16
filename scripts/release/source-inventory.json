@@ -1069,7 +1069,7 @@
     },
     {
       "path": "tests/ServerLauncherIntegration.ps1",
-      "sha256": "bc111a43dd1f964f299654491adde9b75520380b8e17ffa6b11cb15648951feb"
+      "sha256": "c7e4683159df029457a44b8f48aad043298a88df27f0facd530477353c3aad11"
     },
     {
       "path": "tests/SourcePublicationContracts.py",
