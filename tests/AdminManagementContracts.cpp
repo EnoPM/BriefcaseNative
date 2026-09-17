@@ -98,7 +98,12 @@ int main() {
                                      {"row", "HealthPool_Normal"},
                                      {"field", "Health"},
                                      {"value", 100},
-                                     {"allowedRange", "0 to 200"}}});
+                                     {"allowedRange", "0 to 200"}},
+                                    {{"table", "DT_Balancing_HitscanWeapons"},
+                                     {"row", "DEye_Weapon"},
+                                     {"field", "Damage"},
+                                     {"value", 18},
+                                     {"allowedRange", "0 to 100"}}});
         auto defaults =
             Json{{"format", "DeceiveCommunityBalanceProfile"}, {"schemaVersion", 1}, {"overrides", entries}};
         write_file(game / "Community Balance Template" / "CommunityBalanceProfile.default.json",
@@ -197,8 +202,12 @@ int main() {
               "loader metadata preserved");
         auto balance = m.dispatch("balance.read", {{"group", "Yumi"}});
         check(balance["entries"].size() == 2 && balance["groups"]["Ace"] == 1 &&
-                  balance["groups"]["Commun"] == 1,
+                  balance["groups"]["Commun"] == 1 && balance["groups"]["Gadgets"] == 1 &&
+                  !balance["groups"].contains("PNJ"),
               "group characters across projectile tables");
+        auto gadgets = m.dispatch("balance.read", {{"group", "Gadgets"}});
+        check(gadgets["entries"].size() == 1 && gadgets["entries"][0]["row"] == "DEye_Weapon",
+              "DEye weapon is grouped as a gadget");
         check(balance["groupLabels"]["Commun"]["displayNameKey"] == "server.balance.groups.Shared" &&
                   balance["groupLabels"]["Commun"]["displayName"] == "Shared",
               "legacy group ID leaked into translation key/fallback");

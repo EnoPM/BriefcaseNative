@@ -281,7 +281,7 @@
     },
     {
       "path": "runtime/Briefcase.Admin/Management.cpp",
-      "sha256": "a36a7a68d4ace94badec0e49850098aa8ff516abf05d2318488b59224d1f07b0"
+      "sha256": "26cfd51f5a395d05de30e06a86c6fa4dc56deecdbbcd929d04b8a1430137115f"
     },
     {
       "path": "runtime/Briefcase.Admin/Management.hpp",
@@ -937,7 +937,7 @@
     },
     {
       "path": "tests/AdminManagementContracts.cpp",
-      "sha256": "5d6545b72e3ace981e430cb17d507a1dfc78d169ad14ce13ee3c5f67bc4f4929"
+      "sha256": "fb43f4825c52cd9183620fc5de6cf57357313262f79d249e47517ad35e53f17b"
     },
     {
       "path": "tests/AdminPeerFixture.cpp",

@@ -376,10 +376,10 @@ std::string Management::group(const std::string &table, const std::string &row) 
         if (row.starts_with(std::string(character) + "_") ||
             table.starts_with("DT_" + std::string(character) + "_"))
             return character;
-    if (table == "DT_Gadgets_Balancing" || row.starts_with("Drone") || row.starts_with("AutoTurret"))
-        return "Gadgets";
-    if (row.starts_with("Guard") || row.starts_with("SuperGuard") || row.starts_with("UltraGuard") ||
+    if (table == "DT_Gadgets_Balancing" || row.starts_with("Drone") || row.starts_with("AutoTurret") ||
         row.starts_with("DEye"))
+        return "Gadgets";
+    if (row.starts_with("Guard") || row.starts_with("SuperGuard") || row.starts_with("UltraGuard"))
         return "PNJ";
     return "Commun";
 }
