@@ -4,12 +4,11 @@ static void start_admin_server() noexcept {
     try {
         if (environment != Environment::server)
             return;
-        const auto file = administration_root / "Admin" / "server.json";
-        if (!fs::exists(file)) {
-            log("Administration: disabled; no local Admin/server.json.");
-            return;
-        }
-        auto settings = admin::Settings::load(file);
+        auto provisioned = admin::load_or_provision_local(administration_root);
+        if (provisioned.created)
+            log("Administration: generated local identity and password in Briefcase/Admin/server.json; "
+                "listening on 127.0.0.1:32189.");
+        auto settings = std::move(provisioned.settings);
         auto configs = std::make_shared<admin::ConfigStore>();
         for (const auto &s : scopes) {
             if (s->loaded && admin::ConfigStore::allowed(s->manifest.id) && !s->config_schema.empty())

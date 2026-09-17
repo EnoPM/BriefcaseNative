@@ -10,6 +10,9 @@
 namespace bc::admin {
 using Json = nlohmann::json;
 namespace fs = std::filesystem;
+inline constexpr uint16_t default_port = 32189;
+inline constexpr std::string_view default_address = "127.0.0.1";
+inline constexpr std::string_view default_endpoint = "127.0.0.1:32189";
 struct Error : std::runtime_error {
     std::string code;
     Error(std::string code, std::string message)
@@ -19,7 +22,7 @@ std::string read_file(const fs::path &, size_t limit = 65536);
 void write_file(const fs::path &, std::string_view, bool replace = true, bool private_file = false);
 struct Settings {
     std::string server_id, listen_address{"127.0.0.1"}, endpoint;
-    uint16_t port{50002};
+    uint16_t port{default_port};
     IdentityData identity;
     Bytes salt, verifier;
     uint64_t iterations{600000};
@@ -29,6 +32,11 @@ struct Settings {
 };
 Settings provision(const fs::path &briefcase_root, const std::string &address, uint16_t port,
                    const std::string &endpoint, std::string_view password);
+struct ProvisionedSettings {
+    Settings settings;
+    bool created{};
+};
+ProvisionedSettings load_or_provision_local(const fs::path &briefcase_root);
 class ConfigStore {
     struct Entry {
         std::string id;

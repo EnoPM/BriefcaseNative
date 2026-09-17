@@ -16,7 +16,7 @@ New-Item -ItemType File -Path (Join-Path $fixture 'Win64\DeceiveIncServer-Win64-
 $protected=Join-Path $fixture 'password.json'
 $plain=$null
 try {
-    $arguments=@('--root',$root,'--listen','127.0.0.1','--port','50002','--endpoint','127.0.0.1:50002','--generate-password-file',$protected)
+    $arguments=@('--root',$root,'--listen','127.0.0.1','--port','32189','--endpoint','127.0.0.1:32189','--generate-password-file',$protected)
     $output=& $Setup @arguments 2>&1 | Out-String
     Check ($LASTEXITCODE -eq 0) 'Generated setup failed.'
     $data=Get-Content -LiteralPath $protected -Raw | ConvertFrom-Json
@@ -46,11 +46,11 @@ try {
     $other=Join-Path $fixture 'Other\Win64\Briefcase'
     New-Item -ItemType Directory -Path $other -Force | Out-Null
     New-Item -ItemType File -Path (Join-Path $fixture 'Other\Win64\DeceiveIncServer-Win64-Shipping.exe') | Out-Null
-    $failed=& $Setup --root $other --listen 127.0.0.1 --port 50002 --endpoint 127.0.0.1:50002 --generate-password-file $protected 2>&1 | Out-String
+    $failed=& $Setup --root $other --listen 127.0.0.1 --port 32189 --endpoint 127.0.0.1:32189 --generate-password-file $protected 2>&1 | Out-String
     Check ($LASTEXITCODE -ne 0) 'Existing password destination accepted.'
     Check (-not (Test-Path -LiteralPath (Join-Path $other 'Admin\server.json'))) 'Identity created without recoverable password.'
     Check ((Get-FileHash -LiteralPath $protected).Hash -ceq $before) 'Password file changed on rejected setup.'
-    $generated=& $Setup --root $other --listen 127.0.0.1 --port 50002 --endpoint 127.0.0.1:50002 --generate-password 2>&1 | Out-String
+    $generated=& $Setup --root $other --listen 127.0.0.1 --port 32189 --endpoint 127.0.0.1:32189 --generate-password 2>&1 | Out-String
     Check ($LASTEXITCODE -eq 0) 'Generation directly in server config failed.'
     $otherConfig=Get-Content -LiteralPath (Join-Path $other 'Admin\server.json') -Raw | ConvertFrom-Json
     Check ($otherConfig.password -cmatch '^[0-9a-f]{64}$') 'Expected generated password in server config.'

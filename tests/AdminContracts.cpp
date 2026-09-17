@@ -43,9 +43,29 @@ int main() {
             }
         } cleanup{root, fixture_base};
         const auto briefcase = root / "Briefcase";
+        const auto automatic = root / "AutomaticBriefcase";
+        fs::create_directories(automatic);
+        auto first_start = load_or_provision_local(automatic);
+        check(first_start.created, "first server start did not provision administration");
+        auto automatic_private = bc::strict_json(read_file(automatic / "Admin/server.json"));
+        auto automatic_public = bc::strict_json(read_file(automatic / "Admin/pairing.json"));
+        const auto automatic_password = automatic_private.at("password").get<std::string>();
+        check(automatic_private["version"] == 2 && automatic_password.size() == 64 &&
+                  std::all_of(automatic_password.begin(), automatic_password.end(), [](char value) {
+                      return (value >= '0' && value <= '9') || (value >= 'a' && value <= 'f');
+                  }),
+              "automatic administration password is not 256-bit hexadecimal");
+        check(automatic_private["listen"] == "127.0.0.1" && automatic_private["port"] == 32189 &&
+                  automatic_public["endpoint"] == "127.0.0.1:32189",
+              "automatic administration is not local-only");
+        const auto automatic_before = read_file(automatic / "Admin/server.json");
+        auto repeated_start = load_or_provision_local(automatic);
+        check(!repeated_start.created && repeated_start.settings.server_id == first_start.settings.server_id &&
+                  read_file(automatic / "Admin/server.json") == automatic_before,
+              "subsequent server start replaced administration identity");
         const std::string password = "Fixture-only-password-2026!";
         const auto started = Clock::now();
-        auto settings = provision(briefcase, "127.0.0.1", 50002, "127.0.0.1:50002", password);
+        auto settings = provision(briefcase, "127.0.0.1", 32189, "127.0.0.1:32189", password);
         check(settings.serialize().dump().find(password) == std::string::npos, "password leaked in settings");
         auto public_data = read_file(briefcase / "Admin/pairing.json");
         check(public_data.find("protectedKey") == std::string::npos &&
@@ -93,7 +113,7 @@ int main() {
         check(loaded.server_id == settings.server_id &&
               loaded.identity.protected_key == settings.identity.protected_key, "identity roundtrip");
         settings = loaded;
-        rejected([&] { provision(briefcase, "127.0.0.1", 50002, "127.0.0.1:50002", password); },
+        rejected([&] { provision(briefcase, "127.0.0.1", 32189, "127.0.0.1:32189", password); },
                  "already_configured");
         auto configs = std::make_shared<ConfigStore>();
         check(ConfigStore::allowed("sample.registered"), "registered mod identifier accepted");

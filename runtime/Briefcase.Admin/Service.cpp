@@ -216,6 +216,18 @@ Settings provision(const fs::path &root, const std::string &address, uint16_t po
     write_file(directory / "pairing.json", pairing.dump(2) + "\n", false);
     return settings;
 }
+ProvisionedSettings load_or_provision_local(const fs::path &root) {
+    const auto file = root / "Admin" / "server.json";
+    if (fs::exists(file))
+        return {Settings::load(file), false};
+    auto password = hex(random_bytes(32));
+    struct Wipe {
+        std::string &value;
+        ~Wipe() { erase(value); }
+    } wipe{password};
+    return {provision(root, std::string(default_address), default_port, std::string(default_endpoint), password),
+            true};
+}
 bool ConfigStore::allowed(std::string_view id) {
     if (id.empty() || id.size() > 128) return false;
     bool separator = true;

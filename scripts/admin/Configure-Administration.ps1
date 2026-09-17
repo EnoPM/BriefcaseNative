@@ -1,8 +1,8 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param(
     [Parameter(Mandatory)][string]$ServerRoot,
     [string]$ListenAddress='127.0.0.1',
-    [ValidateRange(1,65535)][int]$Port=50002,
+    [ValidateRange(1,65535)][int]$Port=32189,
     [Parameter(Mandatory)][string]$PublicEndpoint,
     [string]$GeneratePasswordFile,
     [switch]$GeneratePassword

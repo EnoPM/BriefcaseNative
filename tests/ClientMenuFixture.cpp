@@ -104,7 +104,7 @@ static BcResult BC_CALL select_admin(uint64_t id) {
     admin_state = {{"favoriteId", id},
                    {"pending", false},
                    {"state", "idle"},
-                   {"endpoint", "127.0.0.1:50002"},
+                   {"endpoint", "127.0.0.1:32189"},
                    {"fingerprint", std::string(64, 'a')},
                    {"message", ""}};
     return BC_OK;
@@ -175,7 +175,7 @@ static unsigned log_reads{}, restart_requests{}, balance_reads{}, balance_saves{
 static bool reject_balance_read{};
 static BcResult BC_CALL connect_admin(uint64_t id, const char *endpoint, const char *pin,
                                       const char *password, uint32_t) {
-    check(id == selected_admin && std::string(endpoint) == "127.0.0.1:50002" && std::string(pin).size() == 64,
+    check(id == selected_admin && std::string(endpoint) == "127.0.0.1:32189" && std::string(pin).size() == 64,
           "admin connection target");
     check(std::string(password) == "fixture-test-password", "password dispatched");
     ++admin_connections;

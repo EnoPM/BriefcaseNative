@@ -18,7 +18,7 @@ int main() {
                     fs::remove_all(root, e);
             }
         } cleanup{root, parent};
-        auto settings = provision(root, "127.0.0.1", 50002, "127.0.0.1:50002", "Fixture-password-only-2026");
+        auto settings = provision(root, "127.0.0.1", 32189, "127.0.0.1:32189", "Fixture-password-only-2026");
         settings.port = 0;
         auto configs = std::make_shared<ConfigStore>();
         Server server(

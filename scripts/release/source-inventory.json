@@ -105,7 +105,7 @@
     },
     {
       "path": "docs/Administration.md",
-      "sha256": "8c56e91ab764574cf16f98261b3fc677a7b8c14a21fdec22460d74d455d0fb20"
+      "sha256": "b697dae9ac2d1507c6408dcba3b505167817a3896e3ac371333ab80102c14a83"
     },
     {
       "path": "docs/Architecture.md",
@@ -133,7 +133,7 @@
     },
     {
       "path": "docs/LinuxServer.md",
-      "sha256": "3b1e2f4b2f20204d09f1abe337a11eb14bf1c26bfc7d5c4be146d820f7860ee1"
+      "sha256": "4b3b377fad7ef1528ede076a0bdd1c557962ee220b61ea03608d9c27d1231f5f"
     },
     {
       "path": "docs/Localization.md",
@@ -309,11 +309,11 @@
     },
     {
       "path": "runtime/Briefcase.Admin/Service.cpp",
-      "sha256": "46e806476e2c459be909760f4185f9efb97a40dfbf001965dc2c590caa5cd7dc"
+      "sha256": "a6ee422b9677ba9e84341ade5c7bc635c101aa943e97a1a65072ff97dc6adc3c"
     },
     {
       "path": "runtime/Briefcase.Admin/Service.hpp",
-      "sha256": "c84172e607a5fba5a58bd4ea96d279142445c686d219ee13523cb1dc754d8eb8"
+      "sha256": "a2fd6bcaf8af73181d7a8663643835cb2db266f9845c9b86b715fadc265310fd"
     },
     {
       "path": "runtime/Briefcase.Admin/TlsConfig.h",
@@ -337,7 +337,7 @@
     },
     {
       "path": "runtime/Briefcase.Client.Admin/Client.cpp",
-      "sha256": "af93e0ed4954ff2c648047815e8063ad253144e50e429fd4e65e7b6598763e65"
+      "sha256": "3d2f9ed9f92051e2a7026f5823d1df6b118bd19ef930ddb418ab773301d384d5"
     },
     {
       "path": "runtime/Briefcase.Client.Admin/Client.hpp",
@@ -569,7 +569,7 @@
     },
     {
       "path": "runtime/Briefcase.NativeHost/ServerAdmin.inc",
-      "sha256": "4e4fdd759159752056b7be8b236bf1227fd30a7b5c026d10e9de9f07c4c94a82"
+      "sha256": "69c77a318b0d648bb6353e9e6abf9b32238906223a049b268529af263fb1f061"
     },
     {
       "path": "runtime/Briefcase.NativeHost/Services.inc",
@@ -657,7 +657,7 @@
     },
     {
       "path": "scripts/admin/Configure-Administration.ps1",
-      "sha256": "8dbae4c95703f962c985d9ddd96e8ac751311106ce3cf093b73fa08eccafdfc0"
+      "sha256": "de481ed25bcd2da95a36861558c439c4bb497935c44e3b12113d9a7525dc27bd"
     },
     {
       "path": "scripts/admin/Copy-AdministrationPassword.ps1",
@@ -917,11 +917,11 @@
     },
     {
       "path": "tests/AdminClientContracts.cpp",
-      "sha256": "055dc285fb08cffee9c298eb3c587f226d6587efc2be456dbbb5c40ec74bb813"
+      "sha256": "1f19d16558b2181ba95d0cda64ee9c4d936b4a6363af09b6a971f0f61e8c84c0"
     },
     {
       "path": "tests/AdminContracts.cpp",
-      "sha256": "209fe380b550586329baf2f2d8ff3ea5632388ddf30b6d59e6e00da50793924b"
+      "sha256": "02486c79fab38f821e2dd75e1e354ac255facc45f5f50d6506afcac1232d9df8"
     },
     {
       "path": "tests/AdminCryptoContracts.cpp",
@@ -941,11 +941,11 @@
     },
     {
       "path": "tests/AdminPeerFixture.cpp",
-      "sha256": "e7e46b0a7605b4b27787a1fc82b42a53aaeb3da7515ebc75e24b345a53e901c2"
+      "sha256": "c11e9e878d55e6552a2bee9e58247e80394b3e4bba1072b411c2cda32beccd3f"
     },
     {
       "path": "tests/AdminSetupContracts.ps1",
-      "sha256": "75d31c33040ee1ec72f0d415a5394e07b24deb24a512bf1c6998dd378e9b7816"
+      "sha256": "5f97d77bc1086809e0af400e0dd704d15bd9281277a5d951686ef2bd75ba165e"
     },
     {
       "path": "tests/AdminTransportContracts.cpp",
@@ -965,7 +965,7 @@
     },
     {
       "path": "tests/ClientMenuFixture.cpp",
-      "sha256": "466ebe1c35f9fb77aeec45487ffa5a538531b7063d4e41b4a7522d52f9439e6f"
+      "sha256": "95ce7ff19a19679db9b9c19444e53202dd79af6f0fb0425f0b7de1a15606b66d"
     },
     {
       "path": "tests/ClientRenderingFixture.cpp",

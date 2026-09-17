@@ -169,7 +169,7 @@ void Client::load_pairing(const Command &c) {
     if (endpoint.empty()) {
         auto normalized = servers::normalize_endpoint(c.game_endpoint);
         auto colon = normalized.rfind(':');
-        endpoint = normalized.substr(0, colon + 1) + "50002";
+        endpoint = normalized.substr(0, colon + 1) + std::to_string(default_port);
     }
     std::lock_guard lock(mutex);
     state = {{"state", "idle"},

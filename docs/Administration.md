@@ -66,8 +66,14 @@ Automatic secret rotation is outside the current scope.
 
 ## Configure administration
 
-Administration is disabled when `Briefcase/Admin/server.json` is absent. Stop the
-server, then run the packaged setup tool from its platform binaries directory.
+On its first successful startup, the dedicated server automatically creates a
+strong 256-bit password, a TLS identity, `Briefcase/Admin/server.json` and
+`Briefcase/Admin/pairing.json`. The safe defaults listen only on
+`127.0.0.1:32189`. The generated password remains in the private `server.json`
+file and is never printed to the log or console.
+
+To choose a different listen address or public endpoint before the first server
+start, run the packaged setup tool from the platform binaries directory.
 
 Windows:
 
@@ -75,8 +81,8 @@ Windows:
 & ".\Briefcase\Core\Tools\Briefcase.AdminSetup.exe" `
     --root "$PWD\Briefcase" `
     --listen "127.0.0.1" `
-    --port 50002 `
-    --endpoint "127.0.0.1:50002"
+    --port 32189 `
+    --endpoint "127.0.0.1:32189"
 ```
 
 The tool asks for the password twice without echoing it, then stores it in
@@ -89,8 +95,8 @@ Source deployments may use:
 .\scripts\admin\Configure-Administration.ps1 `
     -ServerRoot "D:\DeceiveIncBackups\DeceiveIncNativeServer" `
     -ListenAddress "127.0.0.1" `
-    -Port 50002 `
-    -PublicEndpoint "127.0.0.1:50002" `
+    -Port 32189 `
+    -PublicEndpoint "127.0.0.1:32189" `
     -GeneratePassword
 ```
 

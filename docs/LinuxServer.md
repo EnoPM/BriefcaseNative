@@ -162,8 +162,14 @@ Logs are Briefcase/Logs/launcher.log and Briefcase/Logs/BriefcaseNative.log.
 
 ## Administration
 
+The first successful server start automatically creates a strong password and
+TLS identity with the local-only `127.0.0.1:32189` default. The password stays in
+the mode-600 `Briefcase/Admin/server.json` file and is never printed. Run the
+following setup command before the first start only when a different listen
+address or public endpoint is required.
+
 ~~~sh
-./Briefcase/Core/Tools/Briefcase.AdminSetup "$PWD/Briefcase" 127.0.0.1 50002 127.0.0.1:50002
+./Briefcase/Core/Tools/Briefcase.AdminSetup "$PWD/Briefcase" 127.0.0.1 32189 127.0.0.1:32189
 ~~~
 
 Setup generates a strong password without printing it. The password stays in
@@ -177,7 +183,6 @@ be enforced. Setup refuses to write secrets otherwise. The same Windows client
 manages Linux status, mods, configuration, balance, logs and restart over TLS.
 Server settings use DeceiveInc/Saved/Config/LinuxServer/TripwireServer.ini.
 Administration does not automatically follow a custom game INI override.
-Without Admin/server.json, administration is disabled.
 
 ## GitHub releases
 

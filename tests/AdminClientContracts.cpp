@@ -40,7 +40,7 @@ int main() {
             }
         } cleanup{root, parent};
         const std::string password = "Client-fixture-password-2026!";
-        auto settings = provision(root / "server", "127.0.0.1", 50002, "127.0.0.1:50002", password);
+        auto settings = provision(root / "server", "127.0.0.1", 32189, "127.0.0.1:32189", password);
         settings.port = 0;
         auto store = std::make_shared<ConfigStore>();
         auto schema = bc::strict_json(sample_alpha::schema),
@@ -89,7 +89,7 @@ int main() {
         check(!fs::exists(root / "client" / "Admin"), "idle client wrote to disk");
         check(client.select(7, "Fixture", "127.0.0.1:50000"), "select rejected");
         auto state = await(client, "idle");
-        check(state["favoriteId"] == 7 && state["endpoint"] == "127.0.0.1:50002", "selection snapshot");
+        check(state["favoriteId"] == 7 && state["endpoint"] == "127.0.0.1:32189", "selection snapshot");
         auto start = Clock::now();
         check(client.connect(7, "Fixture", "127.0.0.1:50000", endpoint, settings.identity.fingerprint,
                              password, true),
