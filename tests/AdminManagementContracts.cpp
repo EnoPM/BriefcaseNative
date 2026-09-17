@@ -45,6 +45,11 @@ int main() {
 #endif
         auto game = root / "DeceiveInc", briefcase = game / "Binaries" / binaries / "Briefcase",
              ini = game / "Saved" / "Config" / config / "TripwireServer.ini";
+#ifdef _WIN32
+        check(restart_helper_path(briefcase) ==
+                  briefcase / "Core" / "Tools" / "Briefcase.ServerRestart.exe",
+              "restart helper follows the packaged Core/Tools layout");
+#endif
         fs::create_directories(ini.parent_path());
         fs::create_directories(briefcase / "Admin");
         fs::create_directories(game / "Community Balance Template");
@@ -250,9 +255,28 @@ int main() {
         check(logs["truncated"] && logs["text"].get<std::string>().find("secret") == std::string::npos &&
                   logs["text"].get<std::string>().find("healthy line") != std::string::npos,
               "bounded redacted log tail");
+        fs::create_directories(game / "Saved" / "Logs");
+        write_file(game / "Saved" / "Logs" / "DeceiveInc.log",
+                   "LogOnlineSession: EOS_SessionModification_AddAttribute() named (ServerName) with value (Fixture Server)\n"
+                   "LogOnlineSession: EOS_SessionModification_AddAttribute() named (MapName) with value (FragrantShore_Night)\n"
+                   "LogOnlineSession: EOS_SessionModification_AddAttribute() named (GameMode) with value (Solo)\n"
+                   "LogOnlineSession: EOS_SessionModification_AddAttribute() named (ServerStatus) with value (Lobby)\n"
+                   "LogOnlineSession: EOS_SessionModification_AddAttribute() named (CurrentPlayers) with value (3)\n"
+                   "LogOnlineSession: EOS_SessionModification_AddAttribute() named (NumPublicConnections) with value (12)\n"
+                   "LogOnlineSession: EOS_SessionModification_AddAttribute() named (QueryPort) with value (50001)\n"
+                   "LogOnlineSession: EOS_SessionModification_AddAttribute() named (PasswordHash) with value (never expose me)\n");
+        auto session = m.session_status();
+        check(session["available"] && session["name"] == "Fixture Server" &&
+                  session["map"] == "FragrantShore_Night" && session["players"] == 3 &&
+                  session["maxPlayers"] == 12 && session["queryPort"] == 50001 &&
+                  session.dump().find("never expose me") == std::string::npos,
+              "safe advertised session status");
         rejects([&] { m.dispatch("server.restart", {{"command", "calc"}}); });
         rejects([&] { m.dispatch("server.restart", {}); },
                 "unavailable"); // A fixture cannot restart any Shipping process.
+        rejects([&] { m.dispatch("server.shutdown", {{"force", true}}); });
+        rejects([&] { m.dispatch("server.shutdown", {}); },
+                "unavailable"); // A fixture cannot stop any Shipping process.
 #ifdef _WIN32
         PasswordStore vault(briefcase);
         const std::string password = "Synthetic-client-password-2026";

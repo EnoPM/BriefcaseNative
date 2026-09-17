@@ -481,7 +481,8 @@ void Server::serve(Stream &stream) {
             request["payload"].contains("password") && request["payload"]["password"].is_string())
             erase(request["payload"]["password"].get_ref<std::string &>());
         stream.send(reply.dump());
-        if (operation == "server.restart" && reply.value("ok", false) && restarted)
+        if ((operation == "server.restart" || operation == "server.shutdown") &&
+            reply.value("ok", false) && restarted)
             restarted();
         if (close)
             return;

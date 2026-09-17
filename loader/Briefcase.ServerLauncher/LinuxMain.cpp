@@ -143,8 +143,8 @@ int supervise(const fs::path& game, const std::vector<std::string>& arguments) {
         { Fd channel(pair[1]); pid = launch(game, arguments, channel.value, parent.value); }
         Child child(pid);
         log(root, "Server started pid=" + std::to_string(pid));
-        bool restart = false, channel_open = true, interrupt_sent = false, terminate_sent = false;
-        std::string prepared;
+        bool restart = false, shutdown = false, channel_open = true, interrupt_sent = false, terminate_sent = false;
+        std::string prepared, prepared_action;
         auto prepared_at = std::chrono::steady_clock::now(), stop_at = prepared_at;
         while (true) {
             int status{}; const auto wait = waitpid(pid, &status, WNOHANG);
@@ -153,11 +153,12 @@ int supervise(const fs::path& game, const std::vector<std::string>& arguments) {
                 const auto code = WIFEXITED(status) ? WEXITSTATUS(status) : 128 + WTERMSIG(status);
                 log(root, "Server exited code=" + std::to_string(code));
                 if (restart && !stopping) break;
+                if (shutdown) return 0;
                 return code;
             }
             require(wait >= 0 || errno == EINTR, "Cannot wait for server");
             const auto now = std::chrono::steady_clock::now();
-            if (stopping || restart) {
+            if (stopping || restart || shutdown) {
                 if (!interrupt_sent) { stop_at = now; kill(pid, SIGINT); interrupt_sent = true; }
                 else if (!terminate_sent && now - stop_at > std::chrono::seconds(30)) { kill(pid, SIGTERM); terminate_sent = true; log(root, "Graceful stop timed out; requesting termination"); }
                 else if (now - stop_at > std::chrono::seconds(40)) kill(pid, SIGKILL);
@@ -173,14 +174,22 @@ int supervise(const fs::path& game, const std::vector<std::string>& arguments) {
                 if (count < 0 || count >= ssize_t(buffer.size())) continue;
                 const std::string message(buffer.data(), count);
                 std::smatch match;
-                if (!std::regex_match(message, match, std::regex("(prepare|commit) ([a-f0-9]{32})"))) continue;
+                if (!std::regex_match(message, match,
+                                      std::regex("(prepare-stop|commit-stop|prepare|commit) ([a-f0-9]{32})"))) continue;
                 const std::string request = match[2];
-                if (match[1] == "prepare" && !stopping && !restart) {
-                    prepared = request; prepared_at = now;
-                    const auto response = "ready " + prepared;
+                const std::string action = match[1];
+                if ((action == "prepare" || action == "prepare-stop") && !stopping && !restart && !shutdown) {
+                    prepared = request; prepared_action = action; prepared_at = now;
+                    const auto response = (action == "prepare-stop" ? "ready-stop " : "ready ") + prepared;
                     if (send(parent.value, response.data(), response.size(), MSG_NOSIGNAL | MSG_DONTWAIT) != ssize_t(response.size())) prepared.clear();
-                } else if (match[1] == "commit" && request == prepared && now - prepared_at < std::chrono::seconds(5) && !stopping) {
-                    restart = true; prepared.clear(); log(root, "Acknowledged administration restart");
+                } else if ((action == "commit" || action == "commit-stop") && request == prepared &&
+                           now - prepared_at < std::chrono::seconds(5) && !stopping &&
+                           ((action == "commit" && prepared_action == "prepare") ||
+                            (action == "commit-stop" && prepared_action == "prepare-stop"))) {
+                    restart = action == "commit"; shutdown = action == "commit-stop";
+                    prepared.clear(); prepared_action.clear();
+                    log(root, restart ? "Acknowledged administration restart" :
+                                        "Acknowledged administration shutdown");
                 }
             }
         }

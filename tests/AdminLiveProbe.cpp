@@ -1,5 +1,5 @@
 // Opt-in integration probe. Never installed, never run by CTest.
-// Arguments: server Briefcase, client Briefcase, protected password JSON, game endpoint.
+// Arguments: server Briefcase, client Briefcase, local password JSON, game endpoint.
 // Reads status and validates same-value saves through the production asynchronous client.
 #include "../runtime/Briefcase.Client.Admin/Client.hpp"
 #include <Windows.h>
@@ -26,8 +26,10 @@ static Json wait(Client &client, uint64_t &sequence) {
 int main(int argc, char **argv) {
     try {
         require(argc == 5 ||
-                    (argc == 6 && (std::string(argv[5]) == "--restart" || std::string(argv[5]) == "--idle")),
-                "Expected server Briefcase, client Briefcase, protected password JSON, game endpoint.");
+                    (argc == 6 && (std::string(argv[5]) == "--restart" ||
+                                   std::string(argv[5]) == "--shutdown" ||
+                                   std::string(argv[5]) == "--idle")),
+                "Expected server Briefcase, client Briefcase, local password JSON, game endpoint.");
         fs::path server = fs::absolute(argv[1]).lexically_normal();
         fs::path root = fs::absolute(argv[2]).lexically_normal();
         require(server.filename() == "Briefcase" && root.filename() == "Briefcase" &&
@@ -35,19 +37,39 @@ int main(int argc, char **argv) {
                     fs::exists(root.parent_path() / "DeceiveInc-Win64-Shipping.exe"),
                 "Invalid test copies.");
         auto pairing = Json::parse(read_file(server / "Admin/pairing.json"));
-        auto encrypted = unhex(Json::parse(read_file(argv[3])).at("protectedPassword").get<std::string>());
-        DATA_BLOB input{DWORD(encrypted.size()), encrypted.data()}, plain{};
-        require(
-            CryptUnprotectData(&input, nullptr, nullptr, nullptr, nullptr, CRYPTPROTECT_UI_FORBIDDEN, &plain),
-            "Cannot decrypt local password.");
+        auto passwords = Json::parse(read_file(argv[3]));
+        const Json *saved = &passwords;
+        if (!passwords.contains("protectedPassword") && !passwords.contains("password")) {
+            require(passwords.contains(argv[4]) && passwords.at(argv[4]).is_object(),
+                    "No saved password for the requested game endpoint.");
+            saved = &passwords.at(argv[4]);
+            require(saved->value("endpoint", "") == pairing.at("endpoint").get<std::string>() &&
+                        saved->value("fingerprint", "") == pairing.at("fingerprint").get<std::string>(),
+                    "Saved administration identity does not match the server.");
+        }
+        DATA_BLOB plain{};
         struct WipeBlob {
             DATA_BLOB &blob;
             ~WipeBlob() {
-                SecureZeroMemory(blob.pbData, blob.cbData);
-                LocalFree(blob.pbData);
+                if (blob.pbData) {
+                    SecureZeroMemory(blob.pbData, blob.cbData);
+                    LocalFree(blob.pbData);
+                }
             }
         } wipeBlob{plain};
-        std::string password(reinterpret_cast<char *>(plain.pbData), plain.cbData);
+        std::string password;
+        if (saved->contains("password")) {
+            require(fs::equivalent(fs::absolute(argv[3]), server / "Admin/server.json"),
+                    "Plain password is accepted only from this server's local configuration.");
+            password = saved->at("password").get<std::string>();
+        } else {
+            auto encrypted = unhex(saved->at("protectedPassword").get<std::string>());
+            DATA_BLOB input{DWORD(encrypted.size()), encrypted.data()};
+            require(CryptUnprotectData(&input, nullptr, nullptr, nullptr, nullptr,
+                                       CRYPTPROTECT_UI_FORBIDDEN, &plain),
+                    "Cannot decrypt local password.");
+            password.assign(reinterpret_cast<char *>(plain.pbData), plain.cbData);
+        }
         struct Wipe {
             std::string &s;
             ~Wipe() { erase(s); }
@@ -198,6 +220,19 @@ int main(int argc, char **argv) {
                                  {"pid", after["server"]["processId"]},
                                  {"workingDirectory", restartResult["workingDirectory"]},
                                  {"reconnected", true}};
+        }
+        if (argc == 6 && std::string(argv[5]) == "--shutdown") {
+            const auto previous = remembered["server"].at("processId").get<DWORD>();
+            HANDLE process = OpenProcess(SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION, FALSE, previous);
+            require(process != nullptr, "Server process unavailable before shutdown");
+            auto shutting_down = command("server.shutdown", Json::object());
+            require(shutting_down["state"] == "idle" &&
+                        shutting_down["shutdown"]["scheduled"] == true,
+                    "Shutdown not acknowledged");
+            const auto stopped = WaitForSingleObject(process, 15000) == WAIT_OBJECT_0;
+            CloseHandle(process);
+            require(stopped, "Server did not exit after authenticated shutdown");
+            report["shutdown"] = {{"previousPid", previous}, {"stopped", true}};
         }
         client.disconnect();
         require(wait(client, sequence).at("state") == "idle", "Final disconnect failed.");

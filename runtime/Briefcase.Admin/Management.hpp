@@ -15,10 +15,15 @@ class Management {
   public:
     Management(fs::path briefcase_root, std::vector<Manifest>);
     Json dispatch(const std::string &, const Json &);
+    Json session_status();
     static Json config_schema();
     static std::string group(const std::string &table, const std::string &row);
 };
 Json log_tail(const fs::path &, size_t maximum = 32768);
+#ifdef _WIN32
+fs::path restart_helper_path(const fs::path &briefcase_root);
+#endif
 Json schedule_restart(const fs::path &root);
+Json schedule_shutdown(const fs::path &root);
 void commit_restart() noexcept;
 } // namespace bc::admin

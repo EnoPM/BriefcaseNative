@@ -45,7 +45,7 @@
     },
     {
       "path": ".gitignore",
-      "sha256": "b5ea02b0158fd0ea04358cdfb5e7e54e5e43a5ea2bb22588d7f530b931e892ac"
+      "sha256": "d7a81f61f056a2b9a6ec3c788ad9b6c44d719705bc4898b57d89e95b4227d504"
     },
     {
       "path": "CMakeLists.txt",
@@ -221,7 +221,7 @@
     },
     {
       "path": "loader/Briefcase.ServerLauncher/LinuxMain.cpp",
-      "sha256": "818a58684d4b2cabd77e7a4ae0814e5eb641355cdd47b48fe03b977afc6e2fc2"
+      "sha256": "56dd2647b54a49b109d667aee959367dca220025fb9d24622cf4c58211d3c8c2"
     },
     {
       "path": "loader/Briefcase.ServerLauncher/Main.cpp",
@@ -245,7 +245,7 @@
     },
     {
       "path": "loader/Briefcase.ServerLauncher/WindowsWorker.cpp",
-      "sha256": "206fcfb482905717900f3e04c54fb7ee3cffbfc13719d81ce15d943f296e165c"
+      "sha256": "7783c1e951cd2c6ffefb592aa6b41a0f799ad08706e7d8c054542a966ad389a7"
     },
     {
       "path": "loader/Briefcase.VersionProxy/EntryGate.hpp",
@@ -269,11 +269,11 @@
     },
     {
       "path": "resources/Localization/en.json",
-      "sha256": "71c4d41edd3be077653074812c9e977232fd20f3d24e1a44241388986a2a2fee"
+      "sha256": "fa4e4964cc001af7ca79101c1b6b862a0ce6677b49f69802deed4303c6b27fe6"
     },
     {
       "path": "resources/Localization/fr.json",
-      "sha256": "85e06188cf6b1e2bc9725f9a2fbf0a6f5636f1e0b8ca69383edd7f649f8c355a"
+      "sha256": "441a0f397eb8ec0e3fc8fa1adc43499a28245f997e3d387261e8eb38f70ffdad"
     },
     {
       "path": "runtime/Briefcase.Admin/Crypto.hpp",
@@ -281,11 +281,11 @@
     },
     {
       "path": "runtime/Briefcase.Admin/Management.cpp",
-      "sha256": "3116dcb842bc63ce5cf6991ae59ab201fd19a84bd54805cc5ba87f398f352797"
+      "sha256": "a36a7a68d4ace94badec0e49850098aa8ff516abf05d2318488b59224d1f07b0"
     },
     {
       "path": "runtime/Briefcase.Admin/Management.hpp",
-      "sha256": "3356f3a87f016390bf45392d7d3b60a14acbd68cb706ca3665eab5161cdeceb5"
+      "sha256": "312ca0d3a7aeea6cfea3625805a44981fb198cced7d84a55459bacb754907a62"
     },
     {
       "path": "runtime/Briefcase.Admin/PosixFiles.cpp",
@@ -297,11 +297,11 @@
     },
     {
       "path": "runtime/Briefcase.Admin/PosixRestart.cpp",
-      "sha256": "dcf911699b172736d063e14759a10e15165d9a17deb8bc71d4fdb36953952ed1"
+      "sha256": "d355c0657c3bebeff82d38bd36f5d4dc322e21dd33c160e74f669dbcc6389c5c"
     },
     {
       "path": "runtime/Briefcase.Admin/Restart.cpp",
-      "sha256": "afd3c2688606268d2d3959b55ca8b80d19052f0749c0b18e19e65268f38d14d8"
+      "sha256": "1b42be50440106b0725360e9d2e3cf263d2961bd12a64de4a4a988ff4fb04a00"
     },
     {
       "path": "runtime/Briefcase.Admin/Security.cpp",
@@ -309,7 +309,7 @@
     },
     {
       "path": "runtime/Briefcase.Admin/Service.cpp",
-      "sha256": "a6ee422b9677ba9e84341ade5c7bc635c101aa943e97a1a65072ff97dc6adc3c"
+      "sha256": "55915ee4deccf35abe14b97a44604551660bf294f66f72ee68a63d1eb0ad3369"
     },
     {
       "path": "runtime/Briefcase.Admin/Service.hpp",
@@ -337,7 +337,7 @@
     },
     {
       "path": "runtime/Briefcase.Client.Admin/Client.cpp",
-      "sha256": "3d2f9ed9f92051e2a7026f5823d1df6b118bd19ef930ddb418ab773301d384d5"
+      "sha256": "55342403634ae3e9bc00b7b9fb9c667656e0d84b43021742e4a866f18403cf19"
     },
     {
       "path": "runtime/Briefcase.Client.Admin/Client.hpp",
@@ -569,7 +569,7 @@
     },
     {
       "path": "runtime/Briefcase.NativeHost/ServerAdmin.inc",
-      "sha256": "69c77a318b0d648bb6353e9e6abf9b32238906223a049b268529af263fb1f061"
+      "sha256": "86ddda485ad0de23addd449bcdc7eb687a70fd0e54b728c34c7f2a79b1454a8c"
     },
     {
       "path": "runtime/Briefcase.NativeHost/Services.inc",
@@ -921,7 +921,7 @@
     },
     {
       "path": "tests/AdminContracts.cpp",
-      "sha256": "02486c79fab38f821e2dd75e1e354ac255facc45f5f50d6506afcac1232d9df8"
+      "sha256": "1109bdaeb9e5b8ecf1ae4dce5e3e7b5e40d0c4f5a6ee52e4262a101ce454d686"
     },
     {
       "path": "tests/AdminCryptoContracts.cpp",
@@ -933,11 +933,11 @@
     },
     {
       "path": "tests/AdminLiveProbe.cpp",
-      "sha256": "b1be9a1a62084b9ffb920faa36089cb2b3638b8ef61eca166627796f9b961715"
+      "sha256": "9aedf21a2041f66bda1678366d13c4a1c426dfb6e73d9d1dff87dfcec136a161"
     },
     {
       "path": "tests/AdminManagementContracts.cpp",
-      "sha256": "af99609d25a3c3220e6be6642a9e5aefd7a96fc3a2a70278666d3240018e64b4"
+      "sha256": "5d6545b72e3ace981e430cb17d507a1dfc78d169ad14ce13ee3c5f67bc4f4929"
     },
     {
       "path": "tests/AdminPeerFixture.cpp",
@@ -1069,7 +1069,7 @@
     },
     {
       "path": "tests/ServerLauncherIntegration.ps1",
-      "sha256": "5c433b5004a42df3d0a61a22ff980329bbe5e6c32c570c32fdecf9f6a2bc9fe2"
+      "sha256": "7359341c9fe8f8d1386504fad20339b3d2ae0d4af718cbf2559676050cca339e"
     },
     {
       "path": "tests/SourcePublicationContracts.py",

@@ -109,6 +109,16 @@ int run(const fs::path& input_root, DWORD parent, DWORD wait_for, const std::str
     require(launch.contains("serverWin64") && launch.at("serverWin64").is_string() &&
             same_path(root, fs::path(wide(launch.at("serverWin64").get<std::string>()))),
             "Launcher is not authorized for this Win64 directory");
+    DWORD previous_pid{};
+    if (!restart_id.empty()) {
+        const auto pending = document(package_path(root, "Briefcase/Admin/restart-result.json"));
+        require(pending.value("requestId", "") == restart_id &&
+                    pending.value("state", "") == "starting" &&
+                    pending.contains("previousPid") && pending.at("previousPid").is_number_unsigned() &&
+                    pending.at("previousPid").get<uint64_t>() <= MAXDWORD,
+                "Invalid pending restart result");
+        previous_pid = pending.at("previousPid").get<DWORD>();
+    }
     fs::create_directories(package_path(root, "Briefcase/Updates"));
     Handle lock{CreateFileW(package_path(root, "Briefcase/Updates/launch.lock").c_str(), GENERIC_READ | GENERIC_WRITE,
                             0, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OPEN_REPARSE_POINT, nullptr)};
@@ -132,7 +142,7 @@ int run(const fs::path& input_root, DWORD parent, DWORD wait_for, const std::str
     write_json(package_path(root, "Briefcase/Logs/launch-" + stamp() + ".json"), record);
     if (!restart_id.empty()) {
         write_json(package_path(root, "Briefcase/Admin/restart-result.json"),
-                   {{"requestId", restart_id}, {"pid", pid}, {"state", "started"},
+                   {{"requestId", restart_id}, {"previousPid", previous_pid}, {"pid", pid}, {"state", "started"},
                     {"workingDirectory", utf8(root.wstring())}});
     }
     std::this_thread::sleep_for(std::chrono::seconds(3));

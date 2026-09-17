@@ -155,6 +155,7 @@
     "ui.message.disconnected": "Disconnected.",
     "ui.message.forgotten": "Password forgotten on this client.",
     "ui.message.restarting": "Restart requested. Wait, then reconnect.",
+    "ui.message.shutting_down": "Server shutdown requested.",
     "ui.message.store_warning": "Connected, but local storage failed.",
     "ui.message.failure": "The command failed.",
     "ui.message.connection_failed": "Unable to connect. Check the address, certificate and password.",

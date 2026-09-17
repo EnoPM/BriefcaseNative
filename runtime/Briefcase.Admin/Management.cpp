@@ -12,6 +12,7 @@
 #endif
 #include <algorithm>
 #include <cmath>
+#include <map>
 #include <regex>
 #include <set>
 #include <sstream>
@@ -544,7 +545,59 @@ Json Management::dispatch(const std::string &op, const Json &p) {
         require(p.empty(), "Invalid restart request.");
         return schedule_restart(root);
     }
+    if (op == "server.shutdown") {
+        require(p.empty(), "Invalid shutdown request.");
+        return schedule_shutdown(root);
+    }
     throw Error("unknown_operation", "Command unavailable.");
+}
+
+Json Management::session_status() {
+    std::lock_guard lock(mutex);
+    const auto path = root.parent_path().parent_path().parent_path() / "Saved" / "Logs" /
+                      "DeceiveInc.log";
+    const auto tail = log_tail(path, 65536).value("text", std::string{});
+    Json result = {{"available", false}};
+    const std::map<std::string, std::string> names = {
+        {"ServerName", "name"},       {"MapName", "map"},
+        {"GameMode", "gameMode"},     {"Region", "region"},
+        {"ServerStatus", "state"},    {"ServerVersion", "version"},
+        {"CurrentPlayers", "players"}, {"NumPublicConnections", "maxPlayers"},
+        {"QueryPort", "queryPort"}};
+    constexpr std::string_view marker = "EOS_SessionModification_AddAttribute() named (";
+    std::istringstream lines(tail);
+    std::string line;
+    while (std::getline(lines, line)) {
+        const auto begin = line.find(marker);
+        if (begin == std::string::npos)
+            continue;
+        const auto key_begin = begin + marker.size();
+        const auto middle = line.find(") with value (", key_begin);
+        const auto end = line.rfind(')');
+        if (middle == std::string::npos || end == std::string::npos || end <= middle + 14)
+            continue;
+        const auto key = line.substr(key_begin, middle - key_begin);
+        const auto known = names.find(key);
+        if (known == names.end())
+            continue;
+        auto value = line.substr(middle + 14, end - middle - 14);
+        if (value.size() > 256)
+            continue;
+        if (key == "CurrentPlayers" || key == "NumPublicConnections" || key == "QueryPort") {
+            try {
+                size_t consumed{};
+                const auto number = std::stoll(value, &consumed);
+                const auto limit = key == "QueryPort" ? 65535 : 128;
+                if (consumed == value.size() && number >= 0 && number <= limit)
+                    result[known->second] = number;
+            } catch (...) {
+            }
+        } else {
+            result[known->second] = std::move(value);
+        }
+    }
+    result["available"] = result.contains("state") || result.contains("players");
+    return result;
 }
 Json log_tail(const fs::path &path, size_t maximum) {
     assert_plain_path(path);

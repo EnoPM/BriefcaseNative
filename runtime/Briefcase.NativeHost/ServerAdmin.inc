@@ -18,15 +18,15 @@ static void start_admin_server() noexcept {
         std::vector<Manifest> manifests;
         for(auto &s:scopes) manifests.push_back(s->manifest);
         auto management=std::make_shared<admin::Management>(administration_root,std::move(manifests));
-        auto status = [] {
+        auto status = [management] {
             uint32_t loaded = 0;
             for (const auto &s : scopes)
                 if (s->loaded)
                     ++loaded;
-            return nlohmann::json{
+            auto result = nlohmann::json{
                 {"framework", build_info.framework_version},
                 {"environment", "server"},
-                {"administrationVersion",3},
+                {"administrationVersion",4},
                 {"processId",platform::process_id()},
                 #ifdef _WIN32
                 {"gameBuild", std::format("{:08X} / {:08X}", build_info.pe_timestamp, build_info.image_size)},
@@ -42,6 +42,8 @@ static void start_admin_server() noexcept {
                 {"loadedMods", loaded},
                 {"discoveredMods", scopes.size()},
                 {"bootstrapMs", bootstrap_ms}};
+            result["session"] = management->session_status();
+            return result;
         };
         auto mods = [configs] {
             auto list = nlohmann::json::array();
@@ -69,7 +71,8 @@ static void start_admin_server() noexcept {
                                                        [](std::string_view s) { log(s); },
             [management](const std::string &op,const admin::Json &payload){
                 auto result=management->dispatch(op,payload);
-                if(op.ends_with(".write")||op=="server.restart")log("Administration: "+op+" accepted.");
+                if(op.ends_with(".write")||op=="server.restart"||op=="server.shutdown")
+                    log("Administration: "+op+" accepted.");
                 return result;
             },admin::commit_restart);
         service->start();

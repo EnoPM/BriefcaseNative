@@ -155,6 +155,7 @@
     "ui.message.disconnected": "Déconnecté.",
     "ui.message.forgotten": "Mot de passe oublié sur ce client.",
     "ui.message.restarting": "Redémarrage demandé. Patientez puis reconnectez-vous.",
+    "ui.message.shutting_down": "Arrêt du serveur demandé.",
     "ui.message.store_warning": "Connecté, mais la mémorisation locale a échoué.",
     "ui.message.failure": "La commande a échoué.",
     "ui.message.connection_failed": "Connexion impossible. Vérifiez l’adresse, le certificat et le mot de passe.",

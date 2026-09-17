@@ -32,6 +32,9 @@ void Client::publish() {
     } else if (message.starts_with("Restart requested")) {
         kind = "warning";
         key = "ui.message.restarting";
+    } else if (message.starts_with("Shutdown requested")) {
+        kind = "warning";
+        key = "ui.message.shutting_down";
     } else if (message.starts_with("Connected. Identity")) {
         kind = "warning";
         key = "ui.message.store_warning";
@@ -102,6 +105,7 @@ bool Client::submit(const std::string &op, const Json &p) {
                                                   "forget",
                                                   "server.logs",
                                                   "server.restart",
+                                                  "server.shutdown",
                                                   "server.config.read",
                                                   "server.config.write",
                                                   "mods.selection.read",
@@ -333,9 +337,9 @@ static void validate_extra(const std::string &op, const Json &j) {
         if (!j.at("text").is_string() || j["text"].get_ref<const std::string &>().size() > 262144 ||
             !j.at("source").is_string() || !j.at("truncated").is_boolean())
             throw Error("protocol_error", "Invalid remote log.");
-    } else if (op == "server.restart") {
+    } else if (op == "server.restart" || op == "server.shutdown") {
         if (!j.at("scheduled").is_boolean() || !j["scheduled"].get<bool>())
-            throw Error("protocol_error", "Restart not confirmed.");
+            throw Error("protocol_error", "Server operation not confirmed.");
     }
 }
 static std::string section_for(const std::string &op) {
@@ -347,6 +351,8 @@ static std::string section_for(const std::string &op) {
         return "balance";
     if (op == "server.logs")
         return "logs";
+    if (op == "server.shutdown")
+        return "shutdown";
     return "restart";
 }
 void Client::refresh(Connection &c) {
@@ -377,7 +383,7 @@ void Client::refresh(Connection &c) {
         extras["translations"] = std::move(catalogues);
     }
     std::lock_guard lock(mutex);
-    for (auto key : {"translations", "serverConfig", "selection", "balance", "logs", "restart"})
+    for (auto key : {"translations", "serverConfig", "selection", "balance", "logs", "restart", "shutdown"})
         state.erase(key);
     state.update(extras);
     state["server"] = std::move(status);
@@ -502,10 +508,12 @@ void Client::run() noexcept {
                     validate_extra(job.operation, response);
                     std::lock_guard lock(mutex);
                     state[section_for(job.operation)] = std::move(response);
-                    if (job.operation == "server.restart") {
+                    if (job.operation == "server.restart" || job.operation == "server.shutdown") {
                         connection.reset();
                         state["state"] = "idle";
-                        state["message"] = "Restart requested. Wait, then reconnect.";
+                        state["message"] = job.operation == "server.restart"
+                                               ? "Restart requested. Wait, then reconnect."
+                                               : "Shutdown requested.";
                     } else
                         state["message"] = job.operation.ends_with(".write")
                                                ? "Saved. Changes will apply at the next restart."

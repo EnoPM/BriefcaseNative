@@ -228,6 +228,7 @@ int main() {
         // Real encrypted server with production password verifier and production dispatcher.
         settings.port = 0;
         std::atomic<unsigned> status_reads{};
+        std::atomic<unsigned> process_action_commits{};
         std::atomic<bool> stopping{};
         Server server(
             settings, configs,
@@ -235,7 +236,13 @@ int main() {
                 ++status_reads;
                 return Json{{"framework", "fixture"}, {"ready", true}};
             },
-            [] { return Json::array({Json{{"id", "sample.settings-alpha"}}}); });
+            [] { return Json::array({Json{{"id", "sample.settings-alpha"}}}); }, {},
+            [](const std::string &operation, const Json &payload) {
+                if (operation != "server.shutdown" || !payload.empty())
+                    throw Error("unknown_operation", "Command unavailable.");
+                return Json{{"scheduled", true}};
+            },
+            [&] { ++process_action_commits; });
         server.start();
         const auto endpoint = "127.0.0.1:" + std::to_string(server.port());
         Credentials credentials;
@@ -293,6 +300,12 @@ int main() {
         check(saved["saved"]["multiplier"] == 0.1 && saved["restartRequired"] == true,
               "remote sample config did not persist");
         rejected([&] { client.request("server.stop"); }, "unknown_operation");
+        check(client.request("server.shutdown")["scheduled"] == true,
+              "shutdown acknowledgement unavailable");
+        for (int i = 0; i < 100 && process_action_commits != 1; ++i)
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        check(process_action_commits == 1,
+              "shutdown acknowledgement was not committed after the response");
         check(client.request("logout")["loggedOut"] == true, "logout rejected");
         // Admission limits count all attempts, independent of TCP connection.
         for (int i = 0; i < 2; ++i) {
