@@ -1,7 +1,7 @@
 #pragma once
 #include <array>
 namespace briefcase::deceive_inc::detail {
-// Pinned to DeceiveInc.Client.6A96564B-06283000; resolve_function validates the live build.
+// Pinned to DeceiveInc.Client.6AAC4146-05F07000; resolve_function validates the live build.
 enum class SpyFunction { Dead, Bot, Local, Controller, Location, Velocity, Eyes, ADS, Weapon, Count };
 struct SpyContract {
     const char *path;

@@ -6,5 +6,6 @@ if(-not(Test-Path -LiteralPath $launcher -PathType Leaf)){throw "Missing native 
 $arguments=@()
 if($ValidateOnly){$arguments+='--validate-only'}
 $arguments+=$ClientArguments
+$global:LASTEXITCODE=0
 & $launcher @arguments
 if($LASTEXITCODE){throw "Native client launcher failed with exit code $LASTEXITCODE"}

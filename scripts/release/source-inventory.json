@@ -57,7 +57,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "8f12c8a1d32306a78e1a1f29e14585b8e31c24d2e8cc575a9a808c89be20caa4"
+      "sha256": "60bdbbd8d9e1f9afafc6aea1ef22bfdca1d613c7d185212efeccbf30cd78c328"
     },
     {
       "path": "VERSION",
@@ -165,7 +165,7 @@
     },
     {
       "path": "docs/ServerLauncher.md",
-      "sha256": "b3e3cf0d7ad91d5eac3943995557bdfd61c60753a274546bf389459ee95ae60f"
+      "sha256": "38b3d94b8398e0c44d32db1a8dbdcc8dd208c3f8d5933bd9e016ac8ffe474738"
     },
     {
       "path": "docs/SourcePublication.md",
@@ -196,6 +196,10 @@
       "sha256": "a83fa5b707a2d1cd606d980928dcb2033c31fb1b133e7cf73bcab7b3802d52ca"
     },
     {
+      "path": "loader/Briefcase.ServerLauncher/AntiCheatConfig.hpp",
+      "sha256": "300e75f74ca99fda9984c2833fd53cf566ad0bde66e6da8d108ab8f4de0f7d39"
+    },
+    {
       "path": "loader/Briefcase.ServerLauncher/Bootstrap.cpp",
       "sha256": "58bd8375abd1e68a51238e2fcda33d3ac624bb01831f32209a0c941b8087ca7f"
     },
@@ -221,7 +225,7 @@
     },
     {
       "path": "loader/Briefcase.ServerLauncher/LinuxMain.cpp",
-      "sha256": "56dd2647b54a49b109d667aee959367dca220025fb9d24622cf4c58211d3c8c2"
+      "sha256": "790ffb729509995c898bcc09547f6795ab747606b9aa6b2980c725b523c27f67"
     },
     {
       "path": "loader/Briefcase.ServerLauncher/Main.cpp",
@@ -245,7 +249,7 @@
     },
     {
       "path": "loader/Briefcase.ServerLauncher/WindowsWorker.cpp",
-      "sha256": "7783c1e951cd2c6ffefb592aa6b41a0f799ad08706e7d8c054542a966ad389a7"
+      "sha256": "4f6c92537457948ef0f0dd6b73625c8406b501358f52637d695a62b8fdb35811"
     },
     {
       "path": "loader/Briefcase.VersionProxy/EntryGate.hpp",
@@ -429,7 +433,7 @@
     },
     {
       "path": "runtime/Briefcase.Client.Rendering/Rendering.cpp",
-      "sha256": "46992b2a1d63f81e973a5a852a006cd57dca8096263aca08866a3390dbc47bc1"
+      "sha256": "5f9f69e4ad1699f63b2fd47bc855bc12bf1fb3c555d5ae1107b0cf959c14173a"
     },
     {
       "path": "runtime/Briefcase.Client.Servers/ServerDirectory.cpp",
@@ -469,11 +473,11 @@
     },
     {
       "path": "runtime/Briefcase.NativeHost/ClientBuild.json",
-      "sha256": "2ea414637c3b84a96900c1c9c2c21a06e006ec7e848697595cad0f4739e0b3f7"
+      "sha256": "79cb5d3848f7eb97332d9b659cc9d938d8f6bfe0879071e9ad40f69b6c4fee6d"
     },
     {
       "path": "runtime/Briefcase.NativeHost/ClientHost.inc",
-      "sha256": "ebe97f21e4cc27ea7b0c02a4aeb25d24fbe09adec0fad7036aa50685edb8c116"
+      "sha256": "9aa17ad7cfbd9fc369e2a9899d8ed7bce6aebed51b1c481be8ea61b0856f85cb"
     },
     {
       "path": "runtime/Briefcase.NativeHost/ClientServers.inc",
@@ -481,7 +485,7 @@
     },
     {
       "path": "runtime/Briefcase.NativeHost/ClientServices.inc",
-      "sha256": "0b094e258031b6bb26577a99327993b65ce9676a8e1918808b69e20f037be936"
+      "sha256": "03bc50006272f7c5c445e361b612d030fef4bcc392f28c8d721d638037bb3d62"
     },
     {
       "path": "runtime/Briefcase.NativeHost/ClientStartup.hpp",
@@ -509,7 +513,7 @@
     },
     {
       "path": "runtime/Briefcase.NativeHost/GameProfile.hpp",
-      "sha256": "0ea58cab528ccb67493cb6e79511613239e70fa6e2abfc4766a1e6506b1f0274"
+      "sha256": "7298496083e0934b1f18a7d473f769e4adf340a1ce5e160f27be3ac376d1e2fa"
     },
     {
       "path": "runtime/Briefcase.NativeHost/HandleTable.hpp",
@@ -593,7 +597,7 @@
     },
     {
       "path": "runtime/Briefcase.UnrealBackend/Backend.cpp",
-      "sha256": "48ae84e1680f8402a3ba4356009192f6d0ea372f687b9dd09906d3fa8183a4b0"
+      "sha256": "a18b2499d87200abf1b2ac9c90df5ac9cbb1e56c74c497a901ab1623e9864f4a"
     },
     {
       "path": "runtime/Briefcase.UnrealBackend/Backend.hpp",
@@ -605,7 +609,7 @@
     },
     {
       "path": "runtime/Briefcase.UnrealBackend/ClientConnection.inc",
-      "sha256": "deacb556bbc1af918173cf346e76e546cd143377b967b65a8332c2739331a199"
+      "sha256": "4911acdfc23b4b48a40d9ae5cb12f4faafeb3913b79769c177001ffc8801b51a"
     },
     {
       "path": "runtime/Briefcase.UnrealBackend/HookBridge.inc",
@@ -705,11 +709,11 @@
     },
     {
       "path": "scripts/client/Package-Client.ps1",
-      "sha256": "e2fce4fad6e5079a53b47fca267526603506da15b24cb56fe198d108c661bfb3"
+      "sha256": "b49be3f1e37e78e0b0d54aaa9ca696000d2c4af59fa2e644843a3e02cce85861"
     },
     {
       "path": "scripts/client/Start-Client.ps1",
-      "sha256": "e675f4865cd991212de2a40e22663c2fb7cf257b39c0033871ee38c923aa8481"
+      "sha256": "f554e122694ddfbf21a7628e6e8d19f3feb1ba47d65b98c511b9982924bfa444"
     },
     {
       "path": "scripts/client/Stop-Client.ps1",
@@ -797,7 +801,7 @@
     },
     {
       "path": "scripts/release/Publish-Release.ps1",
-      "sha256": "e2db91151e741ed50f43ee713e6bcd3fc2f8fcc4e3899b8e40518281b5c36b4a"
+      "sha256": "95ad887628c00746ace801b574267922b34d8939e5d238d39626b8c922fef75d"
     },
     {
       "path": "scripts/release/Read-Version.ps1",
@@ -849,7 +853,7 @@
     },
     {
       "path": "sdk/Briefcase.DeceiveInc/src/SpyContracts.hpp",
-      "sha256": "65abab6d0364e86635aae6d269a75b8c0412a2c2557b0b0611bf5ac682f43d17"
+      "sha256": "de0f1fcff8e68c4825d16b5ad25a693d18248ceb577ef608c6a909bc3737c8d8"
     },
     {
       "path": "sdk/Briefcase.ModApi/include/Briefcase/ModApi.h",
@@ -953,7 +957,7 @@
     },
     {
       "path": "tests/ClientContracts.cpp",
-      "sha256": "4110a3a4eba32e205894cd9229ee506a3e3866957dfecc5b687965caa0def8be"
+      "sha256": "0c4d9b673a159934666e3853ef24d7268a07214833f070f6ffd4020949e77e17"
     },
     {
       "path": "tests/ClientDeployment.Contracts.ps1",
@@ -965,11 +969,11 @@
     },
     {
       "path": "tests/ClientMenuFixture.cpp",
-      "sha256": "95ce7ff19a19679db9b9c19444e53202dd79af6f0fb0425f0b7de1a15606b66d"
+      "sha256": "28f2ee195428a7d9ccb34295b0f41136aad58dafaeb69995e45163e4f7fffc2b"
     },
     {
       "path": "tests/ClientRenderingFixture.cpp",
-      "sha256": "0ca875a8165aba4cca4c0633648f778b84cf308f4b412a66b9e5e0b04a4b1397"
+      "sha256": "fc4d5097bdabcdf636d8267848907809c7ca0b314d4bd7918984c6484b07a22d"
     },
     {
       "path": "tests/Contracts.cpp",
@@ -1009,7 +1013,7 @@
     },
     {
       "path": "tests/LinuxLauncherContracts.py",
-      "sha256": "fe8c081dda517684c74949070a9a372ba51cc3a4bfabffea0565e4010997606d"
+      "sha256": "1a9bf38c65417188f962c6372f37091bb8684943caded490270d796b743de4fa"
     },
     {
       "path": "tests/LinuxNativeContracts.cpp",
@@ -1069,7 +1073,7 @@
     },
     {
       "path": "tests/ServerLauncherIntegration.ps1",
-      "sha256": "7359341c9fe8f8d1386504fad20339b3d2ae0d4af718cbf2559676050cca339e"
+      "sha256": "3a35ba225bf2fdf5a4c9afd50de70537ff02fc839abd1f5ec31a1beadefa12ce"
     },
     {
       "path": "tests/SourcePublicationContracts.py",

@@ -214,8 +214,16 @@ static void WINAPI hooked_sleep(DWORD ms) {
     reinterpret_cast<void(WINAPI *)(DWORD)>(sleep_original)(ms);
 }
 void backend_start(uint32_t thread, uint32_t delay_ms) {
+    if (init_state.load(std::memory_order_acquire) != 0)
+        return;
     game_thread_id = thread;
     initialize_after = GetTickCount64() + delay_ms;
+    if (!delay_ms && platform::thread_id() == game_thread_id) {
+        int expected = 0;
+        if (init_state.compare_exchange_strong(expected, 1))
+            initialize_on_game_thread();
+        return;
+    }
     // Patch only the dedicated executable's Sleep import. No system DLL detour.
     auto *base = reinterpret_cast<uint8_t *>(GetModuleHandleW(nullptr));
     auto *dos = reinterpret_cast<IMAGE_DOS_HEADER *>(base);

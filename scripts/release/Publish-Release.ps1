@@ -17,7 +17,7 @@ $clientHash=(Get-FileHash -LiteralPath $client -Algorithm SHA256).Hash.ToLowerIn
 # Verify the artifact again after transfer between jobs. No dependency build runs here.
 $stage=Join-Path $project ('artifacts/release-verify-'+[guid]::NewGuid().ToString('N'))
 Expand-PackageArchive $archive $stage
-$null=Read-FrameworkPackage $stage $Version '78afe1dbeecb09027c274def4f0ac855b447dc52ffe3cd9482c1be4341b0dae6'
+$null=Read-FrameworkPackage $stage $Version '366b09006175c3b6bd2c768787b4e0b3d4e06eee2ebed46f851784f2229066fb'
 $clientStage=Join-Path $project ('artifacts/client-release-verify-'+[guid]::NewGuid().ToString('N'))
 Expand-PackageArchive $client $clientStage
 $supportedClient=(Get-Content -LiteralPath (Join-Path $project 'runtime/Briefcase.NativeHost/ClientBuild.json') -Raw|ConvertFrom-Json).sha256

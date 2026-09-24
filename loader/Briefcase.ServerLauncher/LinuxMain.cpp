@@ -1,4 +1,5 @@
 #include "Update.hpp"
+#include "AntiCheatConfig.hpp"
 #include <array>
 #include <chrono>
 #include <csignal>
@@ -137,6 +138,8 @@ int supervise(const fs::path& game, const std::vector<std::string>& arguments) {
         write_json(package_path(root, "Briefcase/Updates/last-result.json"),
                    {{"framework", result}, {"mods", mods}, {"checkedAt", std::time(nullptr)}});
         Updater(root).cleanup([&](const std::string& message) { log(root, message); });
+        if (ensure_eac_disabled(root, "LinuxServer"))
+            log(root, "Configured sb.DisableEAC=1 for the Briefcase server.");
         int pair[2]; require(socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, pair) == 0, "Cannot create restart channel");
         Fd parent(pair[0]);
         pid_t pid;

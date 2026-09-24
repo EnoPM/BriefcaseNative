@@ -52,6 +52,8 @@ static Clock::time_point first_present{}, last_present{};
 static uint64_t stable_frames{};
 static thread_local uint64_t callback_owner{};
 static thread_local bool in_present{};
+static bool deferred_menu_logged{};
+static std::atomic<bool> unreal_requested{};
 struct Callback {
     uint64_t owner;
     BcHandle id;
@@ -64,6 +66,10 @@ static BcHandle next_callback = 1;
 static void log(const std::string &message) noexcept {
     if (host && host->log)
         host->log(message.c_str());
+}
+static void request_unreal_once() noexcept {
+    if (host && host->request_unreal && !unreal_requested.exchange(true))
+        host->request_unreal();
 }
 static double ms(Clock::time_point t) {
     return std::chrono::duration<double, std::milli>(Clock::now() - t).count();
@@ -168,8 +174,7 @@ static bool initialize_imgui(IDXGISwapChain *chain) {
         "ImGui context created lazily: {:.3f} ms; fonts {:.3f} ms; GPU resources {:.3f} ms; total {:.3f} ms",
         metrics.context_ms, metrics.fonts_ms, metrics.resources_ms, ms(resources_start)));
     active_chain = chain;
-    if (host->request_unreal)
-        host->request_unreal();
+    request_unreal_once();
     return true;
 }
 static void feed_input(const bc::input::Frame &input) {
@@ -209,6 +214,11 @@ static void feed_input(const bc::input::Frame &input) {
     }
 }
 static void menu_changed(bool open) {
+    // The Unreal window belongs to the original game thread. Request discovery
+    // here so the host can initialize immediately instead of waiting for a rare
+    // Sleep import after the game has reached its menu.
+    if (open && host && host->startup_ready && host->startup_ready())
+        request_unreal_once();
     log(open ? "Menu opened" : "Menu closed; game input restored");
 }
 static void window_closed() {
@@ -311,8 +321,16 @@ static HRESULT __stdcall hooked_present(IDXGISwapChain *chain, UINT sync, UINT f
                                          : 1. / 60.;
             last_present = now;
             auto input = bc::input::frame(viewport.frame_number, viewport.width, viewport.height);
-            const bool stable = host->startup_ready() && stable_frames >= 30 &&
+            const bool startup_ready = host->startup_ready();
+            const bool stable = startup_ready && stable_frames >= 30 &&
                                 std::chrono::duration<double>(now - first_present).count() >= 2.;
+            if (input.menu && !startup_ready) {
+                bc::input::request_menu(false);
+                if (!deferred_menu_logged) {
+                    log("Menu opening deferred until client startup is ready; gameplay input restored.");
+                    deferred_menu_logged = true;
+                }
+            }
             const bool initializing = !imgui && input.menu && stable;
             if (initializing) {
                 if (!initialize_imgui(chain)) {
@@ -489,6 +507,7 @@ static BcResult BC_CALL start(const BcClientHostApi *provided) noexcept {
     if (running.exchange(true))
         return BC_OK;
     host = provided;
+    unreal_requested = false;
     if (host->menu_key)
         bc::input::set_menu_key(host->menu_key());
     state = 1;

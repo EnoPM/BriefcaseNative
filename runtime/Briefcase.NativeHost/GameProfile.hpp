@@ -10,11 +10,11 @@ struct GameProfile {
     std::string_view sha256;
 };
 inline constexpr GameProfile server_profile{
-    Environment::server, L"DeceiveIncServer-Win64-Shipping.exe", 0x6A966107, 0x05B60000,
-    "78afe1dbeecb09027c274def4f0ac855b447dc52ffe3cd9482c1be4341b0dae6"};
+    Environment::server, L"DeceiveIncServer-Win64-Shipping.exe", 0x6AAC58E0, 0x05AF8000,
+    "366b09006175c3b6bd2c768787b4e0b3d4e06eee2ebed46f851784f2229066fb"};
 inline constexpr GameProfile client_profile{
-    Environment::client, L"DeceiveInc-Win64-Shipping.exe", 0x6A96564B, 0x06283000,
-    "b753b51f4d51adc41f7577e7e01521a62f941711ec68330cf22546f81c788a87"};
+    Environment::client, L"DeceiveInc-Win64-Shipping.exe", 0x6AAC4146, 0x05F07000,
+    "4ea95022cc2ab8dd433a964413553a2109c6d5a5daf93aee7414fe299475138f"};
 inline const GameProfile *game_profile(std::wstring_view exe, uint32_t timestamp, uint32_t size) {
     for (const auto *p : {&server_profile, &client_profile})
         if (p->executable == exe && p->timestamp == timestamp && p->image_size == size)

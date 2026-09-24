@@ -1,4 +1,5 @@
 #include "Update.hpp"
+#include "AntiCheatConfig.hpp"
 #include "LaunchWindows.hpp"
 #include <Windows.h>
 #include <TlHelp32.h>
@@ -131,6 +132,8 @@ int run(const fs::path& input_root, DWORD parent, DWORD wait_for, const std::str
     write_json(package_path(root, "Briefcase/Updates/last-result.json"),
                {{"framework", framework}, {"mods", mods}, {"checkedAt", std::time(nullptr)}});
     updater.cleanup(logger);
+    if (ensure_eac_disabled(root, "WindowsServer"))
+        logger("Configured sb.DisableEAC=1 for the Briefcase server.");
     const auto [game_port, query_port] = ports(root);
     const auto native_arguments = command_arguments(arguments, game_port, query_port);
     const auto pid = briefcase::launcher::start(game,

@@ -11,6 +11,9 @@ with tempfile.TemporaryDirectory(prefix="briefcase launcher ") as directory:
     bin = Path(directory) / "DeceiveInc/Binaries/Linux"
     runtime = bin / "Briefcase/Core"
     runtime.mkdir(parents=True)
+    engine = bin.parent.parent / "Saved/Config/LinuxServer/Engine.ini"
+    engine.parent.mkdir(parents=True)
+    engine.write_text("[ConsoleVariables]\nsb.DisableEAC=0\nFixtureSetting=7\n")
     game = bin / "DeceiveIncServer-Linux-Shipping"
     shutil.copy2(fixture, game)
     shutil.copy2(bootstrap, runtime / "libBriefcase.ServerBootstrap.so")
@@ -23,6 +26,8 @@ with tempfile.TemporaryDirectory(prefix="briefcase launcher ") as directory:
                               env=env | (extra or {}), capture_output=True, text=True, timeout=10)
     result = launch()
     assert result.returncode == 0 and "PASS host-before-main" in result.stdout, result
+    engine_text = engine.read_text()
+    assert engine_text.count("sb.DisableEAC=1") == 1 and "FixtureSetting=7" in engine_text, engine_text
     assert launch({"BC_TEST_REJECT": "1"}).returncode == 78
     assert launch({"LD_PRELOAD": str(bootstrap)}).returncode == 78
     marker=Path(directory)/"restart-pids"

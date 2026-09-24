@@ -7,6 +7,9 @@ $update=Join-Path $win64 'Briefcase/Core/Updater'
 $tools=Join-Path $win64 'Briefcase/Core/Tools'
 $admin=Join-Path $win64 'Briefcase/Admin'
 New-Item -ItemType Directory -Path $runtime,$update,$tools,$admin -Force|Out-Null
+$engine=Join-Path (Split-Path (Split-Path $win64)) 'Saved/Config/WindowsServer/Engine.ini'
+New-Item -ItemType Directory -Path ([IO.Path]::GetDirectoryName($engine)) -Force|Out-Null
+"[ConsoleVariables]`nsb.DisableEAC=0`nFixtureSetting=7`n"|Set-Content -LiteralPath $engine -NoNewline
 Copy-Item -LiteralPath (Join-Path $Build 'Briefcase.ServerLauncher.exe') -Destination $win64
 Copy-Item -LiteralPath (Join-Path $Build 'Briefcase.ServerBootstrap.dll') -Destination $runtime
 Copy-Item -LiteralPath (Join-Path $Build 'Briefcase.LauncherMockHost.dll') -Destination (Join-Path $runtime 'Briefcase.NativeHost.dll')
@@ -31,6 +34,11 @@ try {
     if($run.update -ne 'disabled' -or $run.workingDirectory -ne $win64){throw 'Update/cwd contract failed.'}
     $launch=Get-Content -LiteralPath (Join-Path $win64 'Briefcase/launch.json') -Raw|ConvertFrom-Json
     if($launch.serverWin64 -ine $win64){throw 'Fresh installation did not initialize launch.json.'}
+    $engineText=Get-Content -LiteralPath $engine -Raw
+    if($engineText -notmatch '(?m)^sb\.DisableEAC=1$' -or $engineText -notmatch '(?m)^FixtureSetting=7$' -or
+       ([regex]::Matches($engineText,'(?im)^\s*sb\.DisableEAC\s*=')).Count -ne 1){
+        throw 'Launcher did not configure EAC-free modded-server mode conservatively.'
+    }
     $child=Get-Process -Id $run.pid
     if($child.Path -ine (Join-Path $win64 'DeceiveIncServer-Win64-Shipping.exe')){throw 'Unexpected child process.'}
     if(-not(Test-Path -LiteralPath (Join-Path $win64 'entry-verified.txt'))){throw 'Game entered without preparation.'}
@@ -44,6 +52,7 @@ try {
     $oldChild=Get-Process -Id $run.pid
     Stop-Process -InputObject $oldChild -Force
     $oldChild.WaitForExit(10000)|Out-Null
+    Remove-Item -LiteralPath $engine -Force
     $restartId='a'*32
     @{requestId=$restartId;previousPid=$run.pid;workingDirectory=$win64;state='starting'}|ConvertTo-Json|Set-Content -LiteralPath (Join-Path $win64 'Briefcase/Admin/restart-result.json')
     $restart=Start-Process -FilePath (Join-Path $win64 'Briefcase.ServerLauncher.exe') -WorkingDirectory $win64 -ArgumentList @('--restart',$restartId,'--wait-parent','0') -WindowStyle Hidden -PassThru
@@ -54,6 +63,9 @@ try {
         Start-Sleep -Milliseconds 100
     }
     if($restartRun.state -ne 'started' -or $restartRun.requestId -cne $restartId -or $restartRun.previousPid -ne $run.pid){throw 'Restart result lost its request or previous process identity.'}
+    if((Get-Content -LiteralPath $engine -Raw) -notmatch '(?m)^sb\.DisableEAC=1$'){
+        throw 'Launcher did not create the EAC-free server configuration when Engine.ini was missing.'
+    }
     if((Get-Process -Id $restartRun.pid).Path -ine (Join-Path $win64 'DeceiveIncServer-Win64-Shipping.exe')){throw 'Restart returned an unexpected child process.'}
     Write-Output 'PASS complete launcher -> native update coordinator -> injection -> restart metadata -> server PID; no PowerShell runtime dependency.'
 } finally {

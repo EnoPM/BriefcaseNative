@@ -51,7 +51,9 @@ directly beside the platform's Shipping executable.
 3. Extract the ZIP directly into:
    `C:\DeceiveIncServer\DeceiveInc\Binaries\Win64`
 4. Run `Briefcase.ServerLauncher.exe` from that Win64 directory. On first launch,
-   it creates `Briefcase\launch.json` with the absolute path of this installation.
+   it creates `Briefcase\launch.json` with the absolute path of this installation
+   and configures the modded server to accept clients that run without Easy
+   Anti-Cheat.
 
 The resulting layout starts like this:
 

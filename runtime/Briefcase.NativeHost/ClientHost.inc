@@ -5,6 +5,7 @@ static ClientStartupSignal startup_signal;
 static std::vector<fs::path> startup_logs;
 static std::vector<uint64_t> startup_offsets;
 static FILETIME process_created;
+static bool saw_current_startup_log{};
 static void poll_client_startup() noexcept {
     if (client_startup_ready)
         return;
@@ -14,6 +15,7 @@ static void poll_client_startup() noexcept {
             if (!GetFileAttributesExW(startup_logs[i].c_str(), GetFileExInfoStandard, &attributes) ||
                 CompareFileTime(&attributes.ftLastWriteTime, &process_created) < 0)
                 continue;
+            saw_current_startup_log = true;
             const uint64_t length = (uint64_t(attributes.nFileSizeHigh) << 32) | attributes.nFileSizeLow;
             auto &offset = startup_offsets[i];
             if (length < offset)
@@ -35,6 +37,14 @@ static void poll_client_startup() noexcept {
                 log("Client startup gate released: shader precompilation completed / login menu reached.");
                 return;
             }
+        }
+        const auto elapsed = std::chrono::steady_clock::now() - start_time;
+        const auto fallback = saw_current_startup_log ? std::chrono::seconds(180) : std::chrono::seconds(60);
+        if (elapsed >= fallback) {
+            client_startup_ready = true;
+            log(saw_current_startup_log
+                    ? "Client startup gate released after log-signal timeout."
+                    : "Client startup gate released after 60 seconds; this game build emitted no startup log.");
         }
     } catch (...) {
     }
@@ -100,6 +110,21 @@ static BcResult BC_CALL client_mod(uint32_t index, BcClientModRow *out) noexcept
     }
 }
 static void BC_CALL request_client_unreal() noexcept {
+    if (client_unreal_dispatching.exchange(true))
+        return;
+    try {
+        if (GetCurrentThreadId() == initial_game_thread) {
+            log(std::format("Client Unreal initialization requested on game thread {}", initial_game_thread));
+            backend_start(initial_game_thread, 0);
+        } else {
+            log(std::format("Client Unreal initialization requested on thread {}; awaiting game thread {}",
+                            GetCurrentThreadId(), initial_game_thread));
+        }
+    } catch (const std::exception &e) {
+        log(std::string("ERROR arming client Unreal initialization: ") + e.what());
+    } catch (...) {
+        log("ERROR arming client Unreal initialization: unexpected failure");
+    }
     client_unreal_requested = true;
 }
 static void BC_CALL request_client_shutdown() noexcept {

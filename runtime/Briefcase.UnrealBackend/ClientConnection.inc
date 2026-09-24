@@ -1,5 +1,5 @@
 // Private client action, dispatched through the existing game-thread queue.
-// Mirrors CommunityServerConnection.cs and the generated SDK for 6A96564B-06283000.
+// Mirrors CommunityServerConnection.cs and the generated SDK for 6AAC4146-05F07000.
 BcResult backend_client_connect(std::string_view endpoint, std::string &error) {
     if (auto result = thread_check(); result != BC_OK)
         return result;

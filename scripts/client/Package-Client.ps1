@@ -28,7 +28,7 @@ foreach($kind in @('Client','Server')) {
         $relative=$_.FullName.Substring($destination.Length+1).Replace('\','/')
         [ordered]@{path=$relative;sha256=(Get-FileHash -LiteralPath $_.FullName).Hash.ToLowerInvariant();bytes=$_.Length;mode=$(if($_.Extension -in @('.exe','.dll')){493}else{420})}
     })
-    $gameHash=if($kind -eq 'Server'){'78afe1dbeecb09027c274def4f0ac855b447dc52ffe3cd9482c1be4341b0dae6'}else{(Get-Content -LiteralPath (Join-Path $project 'runtime\Briefcase.NativeHost\ClientBuild.json') -Raw|ConvertFrom-Json).sha256}
+    $gameHash=if($kind -eq 'Server'){'366b09006175c3b6bd2c768787b4e0b3d4e06eee2ebed46f851784f2229066fb'}else{(Get-Content -LiteralPath (Join-Path $project 'runtime\Briefcase.NativeHost\ClientBuild.json') -Raw|ConvertFrom-Json).sha256}
     [ordered]@{updateSchema=1;platform='windows-x64';gameSha256=$gameHash;frameworkVersion=$frameworkVersion;environment=$kind.ToLowerInvariant();configuration='Release x64';files=$records}|
         ConvertTo-Json -Depth 5|Set-Content -LiteralPath (Join-Path $destination 'Package.json') -Encoding utf8
 }

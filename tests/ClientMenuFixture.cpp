@@ -32,8 +32,8 @@ static BcResult BC_CALL home(BcClientHome *h) {
     h->unreal_state = 2;
     h->discovered = h->loaded = 1;
     strcpy_s(h->build.framework_version, "0.3.0");
-    h->build.pe_timestamp = 0x6A96564B;
-    h->build.image_size = 0x06283000;
+    h->build.pe_timestamp = 0x6AAC4146;
+    h->build.image_size = 0x05F07000;
     return BC_OK;
 }
 static BcResult BC_CALL mod(uint32_t index, BcClientModRow *out) {
@@ -114,7 +114,7 @@ static void ready_admin() {
     admin_state["state"] = "ready";
     admin_state["tls"] = "TLSv1.3";
     admin_state["pending"] = false;
-    admin_state["server"] = {{"framework", "0.3.0"},  {"gameBuild", "6A966107 / 05B60000"},
+    admin_state["server"] = {{"framework", "0.3.0"},  {"gameBuild", "6AAC58E0 / 05AF8000"},
                              {"unreal", "4.27"},      {"backendState", 2},
                              {"uptimeSeconds", 1234}, {"loadedMods", 3},
                              {"discoveredMods", 3}};

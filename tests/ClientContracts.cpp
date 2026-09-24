@@ -21,11 +21,11 @@ int main() {
             check(!bc::matches_environment(mode == Environment::client ? "server" : "client", mode));
             check(!bc::matches_environment("invalid", mode));
         }
-        check(bc::game_profile(L"DeceiveInc-Win64-Shipping.exe", 0x6A96564B, 0x06283000) ==
+        check(bc::game_profile(L"DeceiveInc-Win64-Shipping.exe", 0x6AAC4146, 0x05F07000) ==
               &bc::client_profile);
-        check(bc::game_profile(L"DeceiveIncServer-Win64-Shipping.exe", 0x6A966107, 0x05B60000) ==
+        check(bc::game_profile(L"DeceiveIncServer-Win64-Shipping.exe", 0x6AAC58E0, 0x05AF8000) ==
               &bc::server_profile);
-        check(!bc::game_profile(L"DeceiveInc-Win64-Shipping.exe", 0x6A966107, 0x05B60000));
+        check(!bc::game_profile(L"DeceiveInc-Win64-Shipping.exe", 0x6AAC58E0, 0x05AF8000));
         for (const auto &path : {"tests/data/server-startup-mod.json",
                                  "samples/Briefcase.NativeOverlaySample/briefcase.mod.json",
                                  "samples/Briefcase.NativeHello/briefcase.mod.json"}) {

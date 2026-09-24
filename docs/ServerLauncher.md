@@ -24,6 +24,15 @@ Its working directory is always that executable's Win64 directory.
 The arguments include -unattended -NoSplash -NOCONSOLE -nullrhi -nosound.
 No graphical server console, renderer, UE4SS UI or client module is required.
 
+Briefcase servers run without Easy Anti-Cheat. Before every start, the launcher
+ensures that `sb.DisableEAC=1` is present in
+`DeceiveInc/Saved/Config/WindowsServer/Engine.ini`. It replaces an existing value
+and preserves every unrelated setting in the file. This prevents the game mode
+from removing clients when the EOS anti-cheat interface reports its one-minute
+registration timeout. EOS may still write an internal authentication timeout to
+the game log; with this server setting active, that timeout does not kick the
+player.
+
 Microsoft Detours 4.0.1, linked statically under its MIT license, loads
 Briefcase/Core/Briefcase.ServerBootstrap.dll before the executable entry point.
 The native coordinator uses WinHTTP and Windows CNG from the operating system and
@@ -43,6 +52,8 @@ Never keep the old proxy alongside the injected bootstrap.
 Linux has its own native C++ launcher, preload bootstrap and updater, documented in
 LinuxServer.md. It uses Binaries/Linux, Linux game profiles and a linux-x64 release asset.
 Both platforms initialize the official update feed automatically and preserve user settings.
+The Linux launcher applies the same anti-cheat setting in
+`DeceiveInc/Saved/Config/LinuxServer/Engine.ini`.
 
 ## Validation
 

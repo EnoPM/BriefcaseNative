@@ -54,8 +54,8 @@ static BcResult BC_CALL home(BcClientHome *h) {
     h->loaded = 1;
     h->unreal_state = 2;
     h->build.size = sizeof(BcBuild);
-    h->build.pe_timestamp = 0x6A96564B;
-    h->build.image_size = 0x06283000;
+    h->build.pe_timestamp = 0x6AAC4146;
+    h->build.image_size = 0x05F07000;
     strcpy_s(h->build.framework_version, "0.3.0");
     h->build.engine_major = 4;
     h->build.engine_minor = 27;
@@ -336,10 +336,6 @@ int main() {
         check(unreal_requests == 0, "Unreal deferred through startup");
         check(!api->capturing(), "closed input not captured");
         SendMessageW(window, WM_APP + 0x4BC, TRUE, 0);
-        gfx.frames(5);
-        api->metrics(&m);
-        check(!m.context_created && !unreal_requests,
-              "F1 cannot allocate ImGui resources during shader precompilation");
         check(reinterpret_cast<void *>(&SetCursorPos) !=
                   reinterpret_cast<void *>(GetProcAddress(GetModuleHandleW(L"user32.dll"), "SetCursorPos")),
               "only fixture game cursor import is redirected before testing a virtual warp");
@@ -349,8 +345,15 @@ int main() {
         check(SetCursorPos(321, 123) != FALSE, "virtual game cursor request");
         POINT virtual_position{};
         check(GetCursorPos(&virtual_position) && virtual_position.x == 321 && virtual_position.y == 123,
-              "game sees its own requested position while the menu owns the physical cursor");
+              "game sees its own requested position while the deferred request is closing");
+        gfx.frames(5);
+        api->metrics(&m);
+        check(!m.context_created && !unreal_requests,
+              "F1 cannot allocate ImGui resources during shader precompilation");
+        check(!api->capturing(), "deferred menu cannot capture gameplay input");
         startup_allowed = true;
+        SendMessageW(window, WM_APP + 0x4BC, TRUE, 0);
+        check(unreal_requests == 1, "Unreal requested directly from the game window thread");
         gfx.frames(20);
         api->metrics(&m);
         check(m.context_created == 1 && m.open_frames > 0 && calls > 0, "lazy ImGui at first opening");
