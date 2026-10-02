@@ -24,9 +24,14 @@ Put (Join-Path $target "$entry\Data\config.json") '{"value":7}'
 Put (Join-Path $target 'Briefcase\settings.json') '{"enabledMods":["test.old"]}'
 Put (Join-Path $package 'Briefcase\Mods\test.other\Other.dll') 'new other'
 Put (Join-Path $target 'Briefcase\Mods\test.other\Other.dll') 'old other'
-Put (Join-Path $package 'Briefcase.ServerLauncher.exe') 'new launcher'
-Put (Join-Path $package 'Briefcase\Core\Briefcase.ServerBootstrap.dll') 'bootstrap'
+Put (Join-Path $package 'version.dll') 'new proxy'
+Put (Join-Path $package 'ue4ss\UE4SS.dll') 'new ue4ss runtime'
+Put (Join-Path $package 'ue4ss\UE4SS-settings.ini') 'new ue4ss settings'
+Put (Join-Path $package 'ue4ss\Mods\mods.txt') ''
 Put (Join-Path $target 'version.dll') 'old proxy'
+Put (Join-Path $target 'ue4ss\Mods\mods.txt') 'ExistingMod : 1'
+Put (Join-Path $target 'Briefcase.ServerLauncher.exe') 'old launcher'
+Put (Join-Path $target 'Briefcase\Core\Briefcase.ServerBootstrap.dll') 'old bootstrap'
 Put (Join-Path $target 'StartBriefcaseNativeServer.ps1') 'legacy launcher'
 Put (Join-Path $target 'Briefcase\Updater\Updater.ps1') 'legacy updater'
 Put (Join-Path $package 'Briefcase\Core\Tools\Briefcase.ServerUpdater.exe') 'fixture updater, never executed'
@@ -46,10 +51,12 @@ Check ((Get-Content -LiteralPath (Join-Path $target 'version.dll') -Raw) -eq 'ol
 $selection=Get-Content -LiteralPath (Join-Path $target 'Briefcase\settings.json') -Raw|ConvertFrom-Json
 Check ($selection.enabledMods.Count -eq 1 -and $selection.enabledMods[0] -eq 'test.selected')
 & $deploy -ServerWin64 $target -ModId test.selected -IncludeRuntime *> (Join-Path $fixture 'runtime.txt')
-Check (-not(Test-Path -LiteralPath (Join-Path $target 'version.dll')))
+Check ((Get-Content -LiteralPath (Join-Path $target 'version.dll') -Raw) -eq 'new proxy')
 Check (-not(Test-Path -LiteralPath (Join-Path $target 'StartBriefcaseNativeServer.ps1')))
 Check (-not(Test-Path -LiteralPath (Join-Path $target 'Briefcase\Updater\Updater.ps1')))
-Check ((Get-Content -LiteralPath (Join-Path $target 'Briefcase.ServerLauncher.exe') -Raw) -eq 'new launcher')
+Check (-not(Test-Path -LiteralPath (Join-Path $target 'Briefcase.ServerLauncher.exe')))
+Check (-not(Test-Path -LiteralPath (Join-Path $target 'Briefcase\Core\Briefcase.ServerBootstrap.dll')))
+Check ((Get-Content -LiteralPath (Join-Path $target 'ue4ss\UE4SS.dll') -Raw) -eq 'new ue4ss runtime')
 Check ((Get-Content -LiteralPath (Join-Path $target "$entry\Data\config.json") -Raw) -eq '{"value":7}')
 Check ((Get-Content -LiteralPath (Join-Path $target 'Briefcase\Mods\test.other\Other.dll') -Raw) -eq 'old other')
 # A combined test must explicitly activate both installed mods without resetting Data.

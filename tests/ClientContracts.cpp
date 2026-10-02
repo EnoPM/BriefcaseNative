@@ -23,9 +23,9 @@ int main() {
         }
         check(bc::game_profile(L"DeceiveInc-Win64-Shipping.exe", 0x6AAC4146, 0x05F07000) ==
               &bc::client_profile);
-        check(bc::game_profile(L"DeceiveIncServer-Win64-Shipping.exe", 0x6AAC58E0, 0x05AF8000) ==
+        check(bc::game_profile(L"DeceiveIncServer-Win64-Shipping.exe", 0x6AB71EA7, 0x05AFE000) ==
               &bc::server_profile);
-        check(!bc::game_profile(L"DeceiveInc-Win64-Shipping.exe", 0x6AAC58E0, 0x05AF8000));
+        check(!bc::game_profile(L"DeceiveInc-Win64-Shipping.exe", 0x6AB71EA7, 0x05AFE000));
         for (const auto &path : {"tests/data/server-startup-mod.json",
                                  "samples/Briefcase.NativeOverlaySample/briefcase.mod.json",
                                  "samples/Briefcase.NativeHello/briefcase.mod.json"}) {

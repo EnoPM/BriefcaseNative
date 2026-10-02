@@ -1,75 +1,54 @@
 param([Parameter(Mandatory=$true)][string]$Build)
 $ErrorActionPreference='Stop'
 $project=Split-Path $PSScriptRoot
-$win64=Join-Path $project ('artifacts/launcher-integration-'+[guid]::NewGuid().ToString('N')+'/DeceiveInc/Binaries/Win64')
+$win64=Join-Path $project ('artifacts/proxy-integration-'+[guid]::NewGuid().ToString('N')+'/DeceiveInc/Binaries/Win64')
 $runtime=Join-Path $win64 'Briefcase/Core'
 $update=Join-Path $win64 'Briefcase/Core/Updater'
 $tools=Join-Path $win64 'Briefcase/Core/Tools'
-$admin=Join-Path $win64 'Briefcase/Admin'
-New-Item -ItemType Directory -Path $runtime,$update,$tools,$admin -Force|Out-Null
+$ue4ss=Join-Path $win64 'ue4ss'
+New-Item -ItemType Directory -Path $runtime,$update,$tools,(Join-Path $ue4ss 'Mods') -Force|Out-Null
 $engine=Join-Path (Split-Path (Split-Path $win64)) 'Saved/Config/WindowsServer/Engine.ini'
 New-Item -ItemType Directory -Path ([IO.Path]::GetDirectoryName($engine)) -Force|Out-Null
 "[ConsoleVariables]`nsb.DisableEAC=0`nFixtureSetting=7`n"|Set-Content -LiteralPath $engine -NoNewline
-Copy-Item -LiteralPath (Join-Path $Build 'Briefcase.ServerLauncher.exe') -Destination $win64
-Copy-Item -LiteralPath (Join-Path $Build 'Briefcase.ServerBootstrap.dll') -Destination $runtime
+Copy-Item -LiteralPath (Join-Path $Build 'version.dll') -Destination $win64
 Copy-Item -LiteralPath (Join-Path $Build 'Briefcase.LauncherMockHost.dll') -Destination (Join-Path $runtime 'Briefcase.NativeHost.dll')
+Copy-Item -LiteralPath (Join-Path $Build 'Briefcase.LauncherMockHost.dll') -Destination (Join-Path $ue4ss 'UE4SS.dll')
 Copy-Item -LiteralPath (Join-Path $Build 'Briefcase.ServerLauncherContracts.exe') -Destination (Join-Path $win64 'DeceiveIncServer-Win64-Shipping.exe')
 Copy-Item -LiteralPath (Join-Path $Build 'Briefcase.ServerUpdater.exe') -Destination $tools
-@{schemaVersion=1;enabled=$false;repository='EnoPM/BriefcaseNative';timeoutSeconds=20}|ConvertTo-Json|Set-Content -LiteralPath (Join-Path $win64 'Briefcase/updater.json')
+''|Set-Content -LiteralPath (Join-Path $ue4ss 'Mods/mods.txt') -NoNewline
+'[General]'|Set-Content -LiteralPath (Join-Path $ue4ss 'UE4SS-settings.ini')
+@{schemaVersion=1;enabled=$false;updateMods=$false;repository='EnoPM/BriefcaseNative';timeoutSeconds=20}|ConvertTo-Json|Set-Content -LiteralPath (Join-Path $win64 'Briefcase/updater.json')
 $previous=$env:BC_TEST_SERVER_LIFETIME
 $env:BC_TEST_SERVER_LIFETIME='60000'
 $run=$null
-$restartRun=$null
 try {
-    $initial=Start-Process -FilePath (Join-Path $win64 'Briefcase.ServerLauncher.exe') -WorkingDirectory $project -WindowStyle Hidden -PassThru
-    if(-not $initial.WaitForExit(15000)){throw 'Initial launcher did not release itself for updates.'}
-    $record=$null
+    $initial=Start-Process -FilePath (Join-Path $win64 'DeceiveIncServer-Win64-Shipping.exe') -WorkingDirectory $win64 -WindowStyle Hidden -PassThru
+    $result=$null
     for($i=0;$i -lt 300;$i++){
-        $record=Get-ChildItem -LiteralPath (Join-Path $win64 'Briefcase/Logs') -Filter 'launch-*.json' -ErrorAction SilentlyContinue|Select-Object -First 1
-        if($record){break}
+        $result=Get-Item -LiteralPath (Join-Path $win64 'Briefcase/Updates/last-result.json') -ErrorAction SilentlyContinue
+        if($result){break}
         Start-Sleep -Milliseconds 100
     }
-    if(-not $record){throw 'Coordinator did not return while server was running.'}
-    $run=Get-Content -LiteralPath $record.FullName -Raw|ConvertFrom-Json
-    if($run.update -ne 'disabled' -or $run.workingDirectory -ne $win64){throw 'Update/cwd contract failed.'}
+    if(-not $result){throw 'Proxy update probe did not complete.'}
+    $probe=Get-Content -LiteralPath $result.FullName -Raw|ConvertFrom-Json
+    if($probe.framework -ne 'disabled'){throw 'Update probe contract failed.'}
     $launch=Get-Content -LiteralPath (Join-Path $win64 'Briefcase/launch.json') -Raw|ConvertFrom-Json
     if($launch.serverWin64 -ine $win64){throw 'Fresh installation did not initialize launch.json.'}
     $engineText=Get-Content -LiteralPath $engine -Raw
     if($engineText -notmatch '(?m)^sb\.DisableEAC=1$' -or $engineText -notmatch '(?m)^FixtureSetting=7$' -or
        ([regex]::Matches($engineText,'(?im)^\s*sb\.DisableEAC\s*=')).Count -ne 1){
-        throw 'Launcher did not configure EAC-free modded-server mode conservatively.'
+        throw 'Coordinator did not configure EAC-free server mode conservatively.'
     }
-    $child=Get-Process -Id $run.pid
-    if($child.Path -ine (Join-Path $win64 'DeceiveIncServer-Win64-Shipping.exe')){throw 'Unexpected child process.'}
-    if(-not(Test-Path -LiteralPath (Join-Path $win64 'entry-verified.txt'))){throw 'Game entered without preparation.'}
-    # The launch record is written before the three-second startup health check.
-    # Leave the fixture alive until that check and coordinator shutdown complete.
+    if($initial.HasExited){throw 'Proxy relaunched the server without an update.'}
+    if((Get-Process -Id $initial.Id).Path -ine (Join-Path $win64 'DeceiveIncServer-Win64-Shipping.exe')){throw 'Unexpected process.'}
+    if(Get-ChildItem -LiteralPath (Join-Path $win64 'Briefcase/Logs') -Filter 'launch-*.json' -ErrorAction SilentlyContinue){
+        throw 'Coordinator created an unnecessary relaunch record.'
+    }
+    if(-not(Test-Path -LiteralPath (Join-Path $win64 'entry-verified.txt'))){throw 'Game entered without proxy preparation.'}
     Start-Sleep -Seconds 4
-    $errorLog=Join-Path $win64 'Briefcase/Logs/launcher-error.log'
-    if((Test-Path -LiteralPath $errorLog) -and (Get-Item -LiteralPath $errorLog).Length){throw 'Coordinator reported a startup failure.'}
-    $coordinator=@(Get-CimInstance Win32_Process -Filter "Name LIKE 'worker-%.exe'" -ErrorAction SilentlyContinue|Where-Object {$_.ExecutablePath -like (Join-Path $win64 'Briefcase\Updates\worker-*.exe')})
-    if($coordinator.Count){throw 'Native update coordinator still waits for the running server.'}
-    $oldChild=Get-Process -Id $run.pid
-    Stop-Process -InputObject $oldChild -Force
-    $oldChild.WaitForExit(10000)|Out-Null
-    Remove-Item -LiteralPath $engine -Force
-    $restartId='a'*32
-    @{requestId=$restartId;previousPid=$run.pid;workingDirectory=$win64;state='starting'}|ConvertTo-Json|Set-Content -LiteralPath (Join-Path $win64 'Briefcase/Admin/restart-result.json')
-    $restart=Start-Process -FilePath (Join-Path $win64 'Briefcase.ServerLauncher.exe') -WorkingDirectory $win64 -ArgumentList @('--restart',$restartId,'--wait-parent','0') -WindowStyle Hidden -PassThru
-    if(-not $restart.WaitForExit(15000)){throw 'Restart launcher did not release itself.'}
-    for($i=0;$i -lt 300;$i++){
-        $restartRun=Get-Content -LiteralPath (Join-Path $win64 'Briefcase/Admin/restart-result.json') -Raw|ConvertFrom-Json
-        if($restartRun.state -eq 'started'){break}
-        Start-Sleep -Milliseconds 100
-    }
-    if($restartRun.state -ne 'started' -or $restartRun.requestId -cne $restartId -or $restartRun.previousPid -ne $run.pid){throw 'Restart result lost its request or previous process identity.'}
-    if((Get-Content -LiteralPath $engine -Raw) -notmatch '(?m)^sb\.DisableEAC=1$'){
-        throw 'Launcher did not create the EAC-free server configuration when Engine.ini was missing.'
-    }
-    if((Get-Process -Id $restartRun.pid).Path -ine (Join-Path $win64 'DeceiveIncServer-Win64-Shipping.exe')){throw 'Restart returned an unexpected child process.'}
-    Write-Output 'PASS complete launcher -> native update coordinator -> injection -> restart metadata -> server PID; no PowerShell runtime dependency.'
+    if((Get-Process -Id $initial.Id -ErrorAction SilentlyContinue) -eq $null){throw 'Original server did not remain running.'}
+    Write-Output 'PASS direct Shipping -> version proxy -> update probe -> same Shipping process; preparation occurred before CRT with Win64 cwd.'
 } finally {
     $env:BC_TEST_SERVER_LIFETIME=$previous
-    if($restartRun -and $restartRun.pid){Stop-Process -Id $restartRun.pid -Force -ErrorAction SilentlyContinue}
-    if($run -and $run.pid){Stop-Process -Id $run.pid -Force -ErrorAction SilentlyContinue}
+    if($initial){Stop-Process -Id $initial.Id -Force -ErrorAction SilentlyContinue}
 }

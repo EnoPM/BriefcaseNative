@@ -18,6 +18,7 @@ using Clock = std::chrono::steady_clock;
 static const BcClientModuleApi *api;
 static unsigned checks;
 static std::atomic<unsigned> calls{}, removed_calls{}, unreal_requests{};
+static DWORD unreal_thread{}, fixture_thread{};
 static BcHandle other{}, self{};
 static void check(bool b, const char *name) {
     ++checks;
@@ -28,6 +29,7 @@ static void BC_CALL log(const char *t) {
     std::cout << t << "\n";
 }
 static void BC_CALL unreal() {
+    unreal_thread = GetCurrentThreadId();
     ++unreal_requests;
 }
 static void BC_CALL shutdown() {}
@@ -263,6 +265,7 @@ struct Graphics {
 };
 int main() {
     try {
+        fixture_thread = GetCurrentThreadId();
         CoInitializeEx(nullptr, COINIT_MULTITHREADED);
         std::filesystem::create_directories("client-fixture");
         WNDCLASSW cls{};
@@ -352,8 +355,11 @@ int main() {
               "F1 cannot allocate ImGui resources during shader precompilation");
         check(!api->capturing(), "deferred menu cannot capture gameplay input");
         startup_allowed = true;
+        gfx.frames(2);
+        check(unreal_requests == 1, "Unreal requested automatically after startup readiness");
+        check(unreal_thread == fixture_thread, "automatic Unreal request runs on game window thread");
         SendMessageW(window, WM_APP + 0x4BC, TRUE, 0);
-        check(unreal_requests == 1, "Unreal requested directly from the game window thread");
+        check(unreal_requests == 1, "menu opening does not duplicate Unreal request");
         gfx.frames(20);
         api->metrics(&m);
         check(m.context_created == 1 && m.open_frames > 0 && calls > 0, "lazy ImGui at first opening");

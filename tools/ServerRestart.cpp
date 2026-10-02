@@ -46,7 +46,9 @@ int wmain(int argc, wchar_t **argv) {
         if (root.filename() != L"Briefcase")
             throw std::runtime_error("Restart helper is outside Briefcase");
         const auto win64 = root.parent_path(), exe = win64 / "DeceiveIncServer-Win64-Shipping.exe";
+        const auto updater = root / "Core" / "Tools" / "Briefcase.ServerUpdater.exe";
         bc::assert_plain_path(exe);
+        bc::assert_plain_path(updater);
         bc::assert_plain_path(root / "Admin");
         if (win64.filename() != L"Win64" || win64.parent_path().filename() != L"Binaries" ||
             win64.parent_path().parent_path().filename() != L"DeceiveInc")
@@ -78,13 +80,8 @@ int wmain(int argc, wchar_t **argv) {
         for (auto &arg : arguments) {
             const auto a = arg.get<std::string>();
             if (a.size() > 4096 || a.find('\0') != a.npos || a.find_first_of(" \t\r\n\"") != a.npos)
-                throw std::runtime_error("Invalid launcher argument");
+                throw std::runtime_error("Invalid server argument");
         }
-        std::wstring command;
-        const auto launcher = win64 / "Briefcase.ServerLauncher.exe";
-        bc::assert_plain_path(launcher);
-        if (!fs::is_regular_file(launcher))
-            throw std::runtime_error("Updated server launcher is missing");
         bc::assert_plain_path(exe);
         SetEvent(ready.h);
         // No process is stopped until the TLS acknowledgement has been sent.
@@ -104,11 +101,15 @@ int wmain(int argc, wchar_t **argv) {
             if (WaitForSingleObject(process.h, 10000) != WAIT_OBJECT_0)
                 throw std::runtime_error("Server has not exited");
         }
-        command = quote(launcher.wstring()) + L" --restart " + fs::path(id).wstring() +
-                  L" --wait-parent " + std::to_wstring(GetCurrentProcessId());
+        if (!fs::is_regular_file(updater))
+            throw std::runtime_error("Update coordinator is missing from the server package");
+        std::wstring command = quote(updater.wstring()) + L" --root " + quote(win64.wstring()) +
+                               L" --parent " + std::to_wstring(GetCurrentProcessId()) +
+                               L" --wait-parent " + std::to_wstring(pid) + L" --restart " +
+                               fs::path(id).wstring() + L" --";
         for (const auto &argument : arguments)
             command += L" " + quote(fs::path(argument.get<std::string>()).wstring());
-        // Write first: the child waits for our exit and then records the actual new server PID.
+        // Record the transition before the old process is replaced.
         write_file(root / "Admin" / "restart-result.json",
                    Json{{"requestId", id},
                         {"previousPid", pid},
@@ -121,9 +122,9 @@ int wmain(int argc, wchar_t **argv) {
         si.dwFlags = STARTF_USESHOWWINDOW;
         si.wShowWindow = SW_HIDE;
         PROCESS_INFORMATION pi{};
-        if (!CreateProcessW(launcher.c_str(), command.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW,
+        if (!CreateProcessW(updater.c_str(), command.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW,
                             nullptr, win64.c_str(), &si, &pi))
-            throw std::runtime_error("Server launcher failed");
+            throw std::runtime_error("Update coordinator could not restart the server");
         CloseHandle(pi.hThread);
         CloseHandle(pi.hProcess);
         return 0;

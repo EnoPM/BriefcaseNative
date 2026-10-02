@@ -64,10 +64,11 @@ function Expand-PackageArchive([string]$Archive,[string]$Stage) {
     } finally {$zip.Dispose()}
 }
 function Test-FrameworkPackagePath([string]$Relative) {
-    return ($Relative -cin @('Briefcase.ServerLauncher.exe','Package.json') -or
-        $Relative -cmatch '^Briefcase/Core/(Briefcase\.(NativeHost|ServerBootstrap)\.dll|Tools/Briefcase\.(AdminSetup|ServerRestart|ServerUpdater)\.exe)$' -or
+    return ($Relative -cin @('version.dll','Package.json','ue4ss/UE4SS.dll','ue4ss/UE4SS-settings.ini','ue4ss/Mods/mods.txt') -or
+        $Relative -cmatch '^Briefcase/Core/(Briefcase\.NativeHost\.dll|Tools/Briefcase\.(AdminSetup|ServerRestart|ServerUpdater)\.exe)$' -or
         $Relative -cmatch '^Briefcase/Core/Updater/(updater\.example\.json|build\.json)$' -or
-        $Relative -cmatch '^Briefcase/Core/(Docs|Licenses|Localization)/[A-Za-z0-9_./-]+\.(json|txt|md)$')
+        $Relative -cmatch '^Briefcase/Core/(Docs|Licenses|Localization)/[A-Za-z0-9_./-]+\.(json|txt|md)$' -or
+        $Relative -cmatch '^ue4ss/Licenses/[A-Za-z0-9_.-]+\.txt$')
 }
 function Read-FrameworkPackage([string]$Stage,[string]$Version,[string]$GameHash) {
     $expected="$(ConvertTo-PackageVersion $Version)"
@@ -84,9 +85,10 @@ function Read-FrameworkPackage([string]$Stage,[string]$Version,[string]$GameHash
            (Get-Item -LiteralPath $path).Length -ne $file.bytes -or (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash -ine $file.sha256){
             throw 'Invalid package inventory.'
         }
+        if($file.path -ceq 'ue4ss/Mods/mods.txt' -and $file.preserve -ne $true){throw 'UE4SS mod selection must be preserved.'}
     }
     foreach($file in Get-ChildItem -LiteralPath $Stage -Recurse -File){if($file.FullName -ine $manifestPath -and -not $seen.Contains($file.FullName)){throw 'Unlisted package file.'}}
-    foreach($required in @('Briefcase.ServerLauncher.exe','Briefcase/Core/Briefcase.ServerBootstrap.dll','Briefcase/Core/Briefcase.NativeHost.dll',
+    foreach($required in @('version.dll','ue4ss/UE4SS.dll','ue4ss/UE4SS-settings.ini','ue4ss/Mods/mods.txt','Briefcase/Core/Briefcase.NativeHost.dll',
         'Briefcase/Core/Tools/Briefcase.AdminSetup.exe','Briefcase/Core/Tools/Briefcase.ServerRestart.exe','Briefcase/Core/Tools/Briefcase.ServerUpdater.exe','Briefcase/Core/Updater/build.json')){
         if(-not $seen.Contains((Resolve-PackagePath $Stage $required))){throw "Incomplete package: $required"}
     }

@@ -10,6 +10,7 @@ static std::atomic<HWND> window;
 static WNDPROC previous_proc;
 static MenuChanged changed;
 static Shutdown shutdown_callback;
+static GameReady game_ready_callback;
 static std::mutex mutex;
 static Policy policy;
 static std::atomic<uint32_t> menu_key{default_menu_key}, swallowed_menu_key{};
@@ -27,6 +28,8 @@ static POINT game_cursor{};
 static HCURSOR saved_cursor_shape{};
 static bool cursor_saved{};
 static constexpr UINT menu_message = WM_APP + 0x4BC;
+static constexpr UINT game_ready_message = WM_APP + 0x4BD;
+static std::atomic<bool> game_ready_pending{};
 static auto original_async = &GetAsyncKeyState;
 static auto original_state = &GetKeyState;
 static auto original_keyboard = &GetKeyboardState;
@@ -245,6 +248,12 @@ static LRESULT CALLBACK procedure(HWND hwnd, UINT msg, WPARAM w, LPARAM l) noexc
             transition(w != 0);
             return 0;
         }
+        if (msg == game_ready_message) {
+            game_ready_pending = false;
+            if (game_ready_callback)
+                game_ready_callback();
+            return 0;
+        }
         if (msg == WM_CLOSE && shutdown_callback)
             shutdown_callback();
         if (msg == WM_NCDESTROY) {
@@ -388,7 +397,7 @@ static void patch_import(const char *name, void *replacement, void **original) {
         }
     }
 }
-bool install(HWND hwnd, MenuChanged menu_changed, Shutdown shutdown) {
+bool install(HWND hwnd, MenuChanged menu_changed, Shutdown shutdown, GameReady game_ready) {
     if (window == hwnd && previous_proc)
         return true;
     if (window)
@@ -396,6 +405,7 @@ bool install(HWND hwnd, MenuChanged menu_changed, Shutdown shutdown) {
     window = hwnd;
     changed = menu_changed;
     shutdown_callback = shutdown;
+    game_ready_callback = game_ready;
     SetLastError(0);
     previous_proc = reinterpret_cast<WNDPROC>(GetWindowLongPtrW(hwnd, GWLP_WNDPROC));
     auto prior = reinterpret_cast<WNDPROC>(
@@ -406,6 +416,8 @@ bool install(HWND hwnd, MenuChanged menu_changed, Shutdown shutdown) {
         previous_proc = nullptr;
     if (!previous_proc) {
         window = nullptr;
+        game_ready_callback = nullptr;
+        game_ready_pending = false;
         return false;
     }
     {
@@ -449,12 +461,25 @@ void stop() noexcept {
             reinterpret_cast<WNDPROC>(GetWindowLongPtrW(window, GWLP_WNDPROC)) == procedure)
             SetWindowLongPtrW(window, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(previous_proc));
         window = nullptr;
+        game_ready_callback = nullptr;
+        game_ready_pending = false;
     } catch (...) {
     }
 }
 void request_menu(bool value) noexcept {
     if (window)
         PostMessageW(window, menu_message, value, 0);
+}
+bool request_game_ready() noexcept {
+    const auto target = window.load(std::memory_order_acquire);
+    if (!target)
+        return false;
+    if (game_ready_pending.exchange(true, std::memory_order_acq_rel))
+        return true;
+    if (PostMessageW(target, game_ready_message, 0, 0))
+        return true;
+    game_ready_pending = false;
+    return false;
 }
 bool menu_open() noexcept {
     return open_flag.load(std::memory_order_relaxed);

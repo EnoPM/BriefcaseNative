@@ -210,7 +210,7 @@ Json Management::config_schema() {
     add("BotsDifficulty", "Bot difficulty", "Normal", nullptr, nullptr,
         Json::array({"Easy", "Normal", "Difficult"}));
     add("BotsAmount", "Bot count", 0, 0, 8);
-    add("MaxPlayers", "Player limit", 8, 1, 12);
+    add("MaxPlayers", "Player limit", 8, 1, 32);
     add("bRandomizeMap", "Random maps", false);
     for (auto k : {"HeatPercentDamagingCivilian", "HeatPercentDamagingStaff", "HeatPercentDamagingGuard",
                    "HeatPercentDamagingTechnician", "HeatPercentDamagingVIP"})

@@ -33,8 +33,8 @@ uint64_t number(const Json& value) {
 }
 #ifdef _WIN32
 const std::set<std::string> required{
-    "Briefcase.ServerLauncher.exe", "Briefcase/Core/Briefcase.NativeHost.dll",
-    "Briefcase/Core/Briefcase.ServerBootstrap.dll", "Briefcase/Core/Tools/Briefcase.AdminSetup.exe",
+    "version.dll", "ue4ss/UE4SS.dll", "ue4ss/UE4SS-settings.ini", "ue4ss/Mods/mods.txt",
+    "Briefcase/Core/Briefcase.NativeHost.dll", "Briefcase/Core/Tools/Briefcase.AdminSetup.exe",
     "Briefcase/Core/Tools/Briefcase.ServerRestart.exe", "Briefcase/Core/Tools/Briefcase.ServerUpdater.exe",
     "Briefcase/Core/Updater/build.json"};
 #else
@@ -44,7 +44,7 @@ const std::set<std::string> required{
 #endif
 bool native_binary(const std::string& name) {
 #ifdef _WIN32
-    return name == "Briefcase.ServerLauncher.exe" || name.ends_with(".dll") ||
+    return name == "version.dll" || name.ends_with(".dll") ||
            name == "Briefcase/Core/Tools/Briefcase.AdminSetup.exe" ||
            name == "Briefcase/Core/Tools/Briefcase.ServerRestart.exe" ||
            name == "Briefcase/Core/Tools/Briefcase.ServerUpdater.exe";
@@ -120,11 +120,18 @@ Json package_manifest(const fs::path& stage, const std::string& expected, const 
             manifest.at("platform") == platform_name && manifest.at("frameworkVersion") == expected &&
             manifest.at("gameSha256") == game_hash && matches(game_hash, "[a-f0-9]{64}"), "Incompatible package identity");
     std::set<std::string> seen;
+    bool preserves_mod_selection = false;
     require(manifest.at("files").is_array() && manifest.at("files").size() <= 4095, "Invalid package inventory");
     for (const auto& item : manifest.at("files")) {
         const auto name = item.at("path").get<std::string>();
         const auto path = package_path(stage, name);
-        require(name != "Package.json" && managed(name) && seen.insert(name).second, "Invalid manifest path");
+        const bool preserve = item.value("preserve", false);
+        require(name != "Package.json" && managed(name) && seen.insert(name).second &&
+                (!preserve || name == "ue4ss/Mods/mods.txt"), "Invalid manifest path");
+        if (name == "ue4ss/Mods/mods.txt") {
+            require(preserve, "UE4SS mod selection must be preserved");
+            preserves_mod_selection = true;
+        }
         const auto mode = number(item.at("mode"));
         require(number(item.at("bytes")) <= max_archive && (mode == 0644 || mode == 0755) &&
                 matches(item.at("sha256").get<std::string>(), "[a-f0-9]{64}") && fs::file_size(path) == item.at("bytes") &&
@@ -143,7 +150,8 @@ Json package_manifest(const fs::path& stage, const std::string& expected, const 
         if (entry.is_regular_file()) actual.insert(entry.path().lexically_relative(stage).generic_string());
     }
     auto all = seen; all.insert("Package.json");
-    require(actual == all && std::includes(seen.begin(), seen.end(), required.begin(), required.end()), "Incomplete or unlisted package content");
+    require(actual == all && preserves_mod_selection &&
+            std::includes(seen.begin(), seen.end(), required.begin(), required.end()), "Incomplete or unlisted package content");
     require(document(package_path(stage, "Briefcase/Core/Updater/build.json")).at("frameworkVersion") == expected, "Version marker mismatch");
     return manifest;
 }
@@ -234,7 +242,13 @@ void Updater::install(const fs::path& stage, const Json& supplied, const std::fu
     const auto old_path = package_path(root_, "Package.json");
     std::set<std::string> names{"Package.json"};
     std::map<std::string, Json> wanted;
-    for (const auto& item : manifest.at("files")) { const auto name = item.at("path").get<std::string>(); names.insert(name); wanted[name] = item; }
+    std::set<std::string> preserved;
+    for (const auto& item : manifest.at("files")) {
+        const auto name = item.at("path").get<std::string>();
+        names.insert(name);
+        if (item.value("preserve", false) && fs::exists(package_path(root_, name))) preserved.insert(name);
+        else wanted[name] = item;
+    }
     if (fs::exists(old_path)) {
         const auto old = document(old_path);
         require(old.at("environment") == "server" && old.at("platform") == platform_name && old.at("files").size() <= 4095, "Invalid installed manifest");
@@ -264,6 +278,7 @@ void Updater::install(const fs::path& stage, const Json& supplied, const std::fu
         for (const auto& name : names) {
             if (name == "Package.json") continue;
             const auto target = package_path(root_, name);
+            if (preserved.contains(name)) { if (after_write) after_write(index++); continue; }
             if (const auto found = wanted.find(name); found != wanted.end()) {
                 atomic(target, read(package_path(stage, name), max_archive), static_cast<unsigned>(number(found->second.at("mode"))));
                 require(digest(target) == found->second.at("sha256").get<std::string>(), "Installed file readback mismatch");
@@ -374,10 +389,27 @@ void Updater::install_mod(const fs::path& stage, const Json& supplied) {
         journal["state"] = "installed"; write_json(journal_path, journal);
     } catch (...) { recover_mod(); throw; }
 }
-Json Updater::update_mods(const std::function<void(const std::string&)>& log) {
-    recover_mod();
+Json Updater::update_mods(const std::function<void(const std::string&)>& log, bool install_changes) {
+    if (install_changes) recover_mod();
     Json result{{"state", "completed"}, {"checked", 0}, {"updated", 0}, {"current", 0},
-                {"failed", 0}, {"mods", Json::array()}};
+                {"failed", 0}, {"available", 0}, {"mods", Json::array()}};
+    if (!install_changes) {
+        const auto journal = package_path(root_, "Briefcase/Updates/mod-transaction.json");
+        if (fs::exists(journal)) {
+            try {
+                const auto state = document(journal).at("state").get<std::string>();
+                if (state != "installed" && state != "rolled-back") {
+                    result["available"] = 1;
+                    result["state"] = "recovery-required";
+                    return result;
+                }
+            } catch (...) {
+                result["available"] = 1;
+                result["state"] = "recovery-required";
+                return result;
+            }
+        }
+    }
     Json config;
     int timeout{};
     try {
@@ -428,6 +460,11 @@ Json Updater::update_mods(const std::function<void(const std::string&)>& log) {
                 result["current"] = result["current"].get<size_t>() + 1;
                 result["mods"].push_back({{"id", id}, {"state", "current"}, {"version", current}}); continue;
             }
+            if (!install_changes) {
+                result["available"] = result["available"].get<size_t>() + 1;
+                result["mods"].push_back({{"id", id}, {"state", "available"}, {"version", asset->at("version")}});
+                continue;
+            }
             const auto archive = work / "release.zip";
             fetch_(asset->at("url"), archive, timeout, asset->at("size"));
             require(fs::file_size(archive) == asset->at("size") &&
@@ -439,7 +476,7 @@ Json Updater::update_mods(const std::function<void(const std::string&)>& log) {
             result["mods"].push_back({{"id", id}, {"state", "updated"}, {"version", asset->at("version")}});
             log("Mod updated: " + id + " " + asset->at("version").get<std::string>());
         } catch (const std::exception& error) {
-            recover_mod();
+            if (install_changes) recover_mod();
             result["failed"] = result["failed"].get<size_t>() + 1;
             result["mods"].push_back({{"id", id}, {"state", "failed"}, {"message", error.what()}});
             log("Mod update unavailable for " + id + "; installed version retained: " + error.what());
@@ -503,8 +540,17 @@ void Updater::cleanup(const std::function<void(const std::string&)>& log) {
         }
     }
 }
-std::string Updater::update(const std::function<void(const std::string&)>& log) {
-    recover(); // Recovery errors must prevent launch, even with updates disabled.
+std::string Updater::update(const std::function<void(const std::string&)>& log, bool install_changes) {
+    if (install_changes) recover(); // Recovery errors must prevent launch, even with updates disabled.
+    else {
+        const auto journal = package_path(root_, "Briefcase/Updates/transaction.json");
+        if (fs::exists(journal)) {
+            try {
+                const auto state = document(journal).at("state").get<std::string>();
+                if (state != "installed" && state != "rolled-back") return "recovery-required";
+            } catch (...) { return "recovery-required"; }
+        }
+    }
     const auto config_path = package_path(root_, "Briefcase/updater.json");
     fs::path stage; Json manifest;
     try {
@@ -529,6 +575,7 @@ std::string Updater::update(const std::function<void(const std::string&)>& log) 
         fetch_("https://api.github.com/repos/" + repository + "/releases/latest", directory / "release.json", timeout, 2 * 1024 * 1024);
         const auto asset = select_asset(document(directory / "release.json"), repository, current);
         if (!asset) return "current";
+        if (!install_changes) return "available";
         const auto archive = directory / "release.zip";
         fetch_(asset->at("url"), archive, timeout, asset->at("size").get<uint64_t>());
         require(fs::file_size(archive) == asset->at("size") && digest(archive) == asset->at("sha256").get<std::string>(), "Archive digest mismatch");

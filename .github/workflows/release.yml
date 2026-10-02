@@ -131,14 +131,3 @@ jobs:
           $version = ./scripts/release/Read-Version.ps1
           $draft = $env:RELEASE_DRAFT -eq 'true'
           ./scripts/release/Publish-Release.ps1 -Version $version -Commit $env:GITHUB_SHA -Repository $env:GITHUB_REPOSITORY -Draft:$draft
-
-  linux:
-    needs: publish
-    permissions:
-      contents: write
-    uses: ./.github/workflows/linux-server-release.yml
-    with:
-      # Windows and SDK assets have already been published by the preceding job.
-      # Linux attaches its independently verified archive when it is ready.
-      publish: false
-    secrets: inherit

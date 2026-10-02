@@ -15,6 +15,14 @@ static void prepare() noexcept {
         auto init = reinterpret_cast<uint32_t(__cdecl*)(uint32_t)>(GetProcAddress(host, "BriefcasePrepare"));
         auto loop = GetProcAddress(host, "BriefcaseRun");
         if (!init || !loop || init(GetCurrentThreadId())) ExitProcess(119);
+        // During the UE4SS migration the launcher remains the single injection
+        // point. A server package can opt in by installing ue4ss/UE4SS.dll;
+        // no proxy DLL beside the game executable is required.
+        const auto ue4ss_path = root / L"ue4ss/UE4SS.dll";
+        if (std::filesystem::is_regular_file(ue4ss_path) &&
+            !LoadLibraryExW(ue4ss_path.c_str(), nullptr,
+                            LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32))
+            ExitProcess(119);
         auto worker = CreateThread(nullptr, 0, run, reinterpret_cast<void*>(loop), 0, nullptr);
         if (!worker) ExitProcess(119);
         CloseHandle(worker);

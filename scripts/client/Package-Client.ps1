@@ -2,6 +2,8 @@
 . (Join-Path $PSScriptRoot 'Common.ps1')
 $project=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 & (Join-Path $PSScriptRoot 'Test-Client.ps1')
+& (Join-Path $project 'scripts\ue4ss\Build-ServerMods.ps1') -RuntimeOnly
+& (Join-Path $project 'scripts\ue4ss\Package-UE4SS-Runtime.ps1')
 $vswhere=Join-Path ([Environment]::GetFolderPath('ProgramFilesX86')) 'Microsoft Visual Studio\Installer\vswhere.exe'
 $vs=& $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
 $cmake=Join-Path $vs 'Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe'
@@ -16,6 +18,10 @@ foreach($kind in @('Client','Server')) {
         & $cmake --install (Join-Path $project 'build') --config Release --component $component --prefix $destination
         if($LASTEXITCODE){throw "Packaging $kind/$component failed."}
     }
+    if($kind -eq 'Server'){
+        $ue4ssSource=Join-Path $project 'dist\UE4SS-Runtime\ue4ss'
+        Copy-Item -LiteralPath $ue4ssSource -Destination $destination -Recurse -Force
+    }
     $licenses=Join-Path $destination 'Briefcase\Core\Licenses'
     New-Item -ItemType Directory -Path $licenses -Force|Out-Null
     Copy-Item -Path (Join-Path $project 'dist\Win64\Briefcase\Core\Licenses\*') -Destination $licenses -Recurse -Force
@@ -26,9 +32,11 @@ foreach($kind in @('Client','Server')) {
     $frameworkVersion=& (Join-Path $project 'scripts/release/Read-Version.ps1') -ProjectRoot $project
     $records=@(Get-ChildItem -LiteralPath $destination -Recurse -File|ForEach-Object {
         $relative=$_.FullName.Substring($destination.Length+1).Replace('\','/')
-        [ordered]@{path=$relative;sha256=(Get-FileHash -LiteralPath $_.FullName).Hash.ToLowerInvariant();bytes=$_.Length;mode=$(if($_.Extension -in @('.exe','.dll')){493}else{420})}
+        $record=[ordered]@{path=$relative;sha256=(Get-FileHash -LiteralPath $_.FullName).Hash.ToLowerInvariant();bytes=$_.Length;mode=$(if($_.Extension -in @('.exe','.dll')){493}else{420})}
+        if($kind -eq 'Server' -and $relative -ceq 'ue4ss/Mods/mods.txt'){$record.preserve=$true}
+        $record
     })
-    $gameHash=if($kind -eq 'Server'){'366b09006175c3b6bd2c768787b4e0b3d4e06eee2ebed46f851784f2229066fb'}else{(Get-Content -LiteralPath (Join-Path $project 'runtime\Briefcase.NativeHost\ClientBuild.json') -Raw|ConvertFrom-Json).sha256}
+    $gameHash=if($kind -eq 'Server'){'f2125f09cbeb7922a4912706cc546477454ce229c15ed477af2731a21c828fd3'}else{(Get-Content -LiteralPath (Join-Path $project 'runtime\Briefcase.NativeHost\ClientBuild.json') -Raw|ConvertFrom-Json).sha256}
     [ordered]@{updateSchema=1;platform='windows-x64';gameSha256=$gameHash;frameworkVersion=$frameworkVersion;environment=$kind.ToLowerInvariant();configuration='Release x64';files=$records}|
         ConvertTo-Json -Depth 5|Set-Content -LiteralPath (Join-Path $destination 'Package.json') -Encoding utf8
 }

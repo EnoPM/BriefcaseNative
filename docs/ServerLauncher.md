@@ -1,62 +1,53 @@
-# Server launcher
+# Windows proxy startup
 
-Run Briefcase.ServerLauncher.exe from the server's DeceiveInc/Binaries/Win64 directory.
-The executable opens no window. It copies the native update coordinator into the update work
-directory, then exits so its installed executable can be replaced. The coordinator checks GitHub
-releases, restores interrupted transactions and installs any valid newer package before launching
-Shipping under the same launch lock. Initial launcher errors go to
-`Briefcase/Logs/launcher-error.log`; coordinator activity and errors go to
-`Briefcase/Logs/launcher.log`. Launch records include the actual server PID and update status.
+Install `version.dll`, `Briefcase/` and `ue4ss/` beside
+`DeceiveIncServer-Win64-Shipping.exe`, then start the Shipping executable directly
+from `DeceiveInc/Binaries/Win64`. That directory must also be the process working
+directory. Briefcase does not install a separate server launcher and does not
+modify the game executable on disk.
 
-On a fresh Windows installation, the coordinator creates `Briefcase/launch.json`
-with the absolute path of the Win64 directory that contains the launcher. An
-existing file is preserved and must identify that same directory; a mismatched
-file stops startup rather than authorizing a different installation.
+Windows loads the local `version.dll` proxy before the game entry point. The proxy
+forwards the operating-system version APIs to System32 and asks
+`Briefcase/Core/Tools/Briefcase.ServerUpdater.exe` to probe for updates. If none
+is available, Shipping continues in that same process and can show its vanilla
+configuration UI. An available update transfers control to the coordinator,
+which installs it and starts Shipping directly. A private environment marker
+prevents the coordinated process from repeating the probe. The proxy removes
+that marker before loading the runtime so it is not inherited by child processes.
 
-From 0.5.1, a missing Briefcase/updater.json is created automatically with updates enabled
-against EnoPM/BriefcaseNative. The first launch checks immediately; existing settings are
-preserved, including an explicit opt-out. See Updates.md for configuration and recovery.
-Administration restarts use this coordinator too. `--launch-child` is an internal injection
-entry point retained for launcher validation; normal users should omit it.
+The server process loads `Briefcase.NativeHost.dll`, any installed early mod helpers,
+and the pinned `ue4ss/UE4SS.dll` before the
+executable entry point. NativeHost provides the
+administration and lifecycle services during the migration. UE4SS owns Unreal
+discovery and native gameplay mods. The dedicated UE4SS settings disable its GUI,
+console and hot reload.
 
-The native launcher creates only the adjacent DeceiveIncServer-Win64-Shipping.exe.
-Its working directory is always that executable's Win64 directory.
-The arguments include -unattended -NoSplash -NOCONSOLE -nullrhi -nosound.
-No graphical server console, renderer, UE4SS UI or client module is required.
+The coordinator creates `Briefcase/launch.json` on a fresh installation. An
+existing file must identify the same Win64 directory; a mismatched path stops the
+coordinated launch. It also ensures that `sb.DisableEAC=1` is present in
+`DeceiveInc/Saved/Config/WindowsServer/Engine.ini` while preserving unrelated
+settings.
 
-Briefcase servers run without Easy Anti-Cheat. Before every start, the launcher
-ensures that `sb.DisableEAC=1` is present in
-`DeceiveInc/Saved/Config/WindowsServer/Engine.ini`. It replaces an existing value
-and preserves every unrelated setting in the file. This prevents the game mode
-from removing clients when the EOS anti-cheat interface reports its one-minute
-registration timeout. EOS may still write an internal authentication timeout to
-the game log; with this server setting active, that timeout does not kick the
-player.
+Briefcase framework updates preserve the installed `ue4ss/Mods/mods.txt` and do
+not own any mod directory. Administration restarts call the same update
+coordinator, so early-loading mods can be replaced before the next server process
+starts.
 
-Microsoft Detours 4.0.1, linked statically under its MIT license, loads
-Briefcase/Core/Briefcase.ServerBootstrap.dll before the executable entry point.
-The native coordinator uses WinHTTP and Windows CNG from the operating system and
-miniz 3.1.2 for validated ZIP extraction; its license is included in the package.
-The bootstrap calls the existing NativeHost on the original main thread, outside the loader lock.
-It acknowledges success only after required startup mods have initialized.
-Missing DLLs, failed preparation and timeouts stop the newly created process.
-The game executable on disk is unchanged. The server package no longer contains version.dll;
-the client continues to use its proxy.
-
-Deploy the complete framework package using scripts/deploy/Deploy-Server.ps1 -RuntimeOnly.
-This backs up and removes the old server proxy while preserving installed mods and their data.
-Never keep the old proxy alongside the injected bootstrap.
+Direct Shipping launches can use the vanilla configuration UI. When an update
+or administration restart requires a new process, the coordinator starts it
+headless with `-unattended -NoSplash -NOCONSOLE -nullrhi -nosound` and reads the
+game and query ports from `TripwireServer.ini`. Activity and failures are written to
+`Briefcase/Logs/launcher.log`; per-launch records include the resulting server PID
+and update status.
 
 ## Linux boundary
 
-Linux has its own native C++ launcher, preload bootstrap and updater, documented in
-LinuxServer.md. It uses Binaries/Linux, Linux game profiles and a linux-x64 release asset.
-Both platforms initialize the official update feed automatically and preserve user settings.
-The Linux launcher applies the same anti-cheat setting in
-`DeceiveInc/Saved/Config/LinuxServer/Engine.ini`.
+Linux continues to use its native executable launcher and preload bootstrap while
+the UE4SS server migration is validated there. See `LinuxServer.md`.
 
 ## Validation
 
-The native fixture verifies loading before EXE CRT initialization, primary-thread preparation,
-Win64 working directory, failed preparation, a missing host DLL, and command-line quoting.
-Updater and deployment tests verify preservation of mod configuration and transaction recovery.
+The proxy and updater contracts cover path validation, package identity, update
+rollback, preservation of the UE4SS mod selection and removal of the retired
+Windows launcher/bootstrap files. Deployment contracts also verify that an
+existing mod selection and mod data survive a framework update.

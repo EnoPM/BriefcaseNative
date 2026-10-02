@@ -1,149 +1,67 @@
 # BriefcaseNative
 
-BriefcaseNative is a native mod framework for the Deceive Inc. dedicated server.
-It runs the server without opening its graphical interface, loads separately
-installed native mods and checks for framework and compatible mod updates before
-every launch.
+BriefcaseNative adds a mod menu to the Windows client and native mod support to the Windows dedicated server for Deceive Inc. The server package includes a headless UE4SS runtime. Server mods are downloaded separately.
 
-The public release supports the Windows x64 client and Windows x64 or Ubuntu
-24.04 x86_64 dedicated servers.
+## Requirements
 
-## Install the Windows client
+- Windows x64 and an installed, up-to-date copy of Deceive Inc. or its dedicated server.
+- An internet connection for the first download and automatic framework updates.
+- The server's `DeceiveInc/Binaries/Win64` directory. All archives below are extracted into this directory, beside the relevant Shipping executable.
 
-1. Close Deceive Inc.
-2. Download `BriefcaseNative-Client-windows-x64-<version>.zip` from the
-   [latest release](https://github.com/EnoPM/BriefcaseNative/releases/latest).
-3. Extract it directly into the game's `DeceiveInc\Binaries\Win64` directory.
-4. Start the game with `Briefcase.ClientLauncher.exe` from that directory.
+The current release is for Windows. A new Linux release will be provided separately when its UE4SS integration is ready.
 
-The launcher verifies the supported game build and always starts
-`DeceiveInc-Win64-Shipping.exe` with Win64 as its working directory. Press F1 to
-open Briefcase. Launcher errors are written to
-`Briefcase\Logs\client-launcher-error.log`.
+## Install the client
 
-## Install the dedicated server
+1. Close the game.
+2. Download `BriefcaseNative-Client-windows-x64-<version>.zip` from the [latest release](https://github.com/EnoPM/BriefcaseNative/releases/latest).
+3. Extract it into your game's `DeceiveInc/Binaries/Win64` directory.
+4. Start `Briefcase.ClientLauncher.exe` from that directory. It launches `DeceiveInc-Win64-Shipping.exe` with Win64 as its working directory.
+5. Press **F1** in game to open the Briefcase menu. You can change this key in **Settings**.
 
-Install [SteamCMD](https://developer.valvesoftware.com/wiki/SteamCMD), then download
-the Deceive Inc. dedicated server anonymously. Choose an empty directory that will
-remain the permanent server directory.
+If the launcher cannot start the game, read `Briefcase/Logs/client-launcher-error.log`.
 
-On Windows:
+## Install a dedicated server on Windows
+
+If the dedicated server is already installed, skip to the next section. Otherwise, [download SteamCMD](https://developer.valvesoftware.com/wiki/SteamCMD), extract it, and run:
 
 ```powershell
-steamcmd.exe +force_install_dir "C:\DeceiveIncServer" +login anonymous +app_update 5007710 validate +quit
+.\steamcmd.exe +force_install_dir "C:\DeceiveIncServer" +login anonymous +app_update 5007710 validate +quit
 ```
 
-On Linux:
+Wait for SteamCMD to finish. The server executable should be at `C:\DeceiveIncServer\DeceiveInc\Binaries\Win64\DeceiveIncServer-Win64-Shipping.exe`.
 
-```bash
-./steamcmd.sh +force_install_dir /opt/deceive-inc-server +login anonymous +app_update 5007710 validate +quit
-```
-
-SteamCMD creates the game below the chosen directory. Briefcase must be installed
-directly beside the platform's Shipping executable.
-
-## Install Briefcase on Windows
+## Install Briefcase on the server
 
 1. Stop the dedicated server.
-2. Download `BriefcaseNative-Server-windows-x64-<version>.zip` from the
-   [latest release](https://github.com/EnoPM/BriefcaseNative/releases/latest).
-   The SDK and source-code archives are not server installers.
-3. Extract the ZIP directly into:
-   `C:\DeceiveIncServer\DeceiveInc\Binaries\Win64`
-4. Run `Briefcase.ServerLauncher.exe` from that Win64 directory. On first launch,
-   it creates `Briefcase\launch.json` with the absolute path of this installation
-   and configures the modded server to accept clients that run without Easy
-   Anti-Cheat.
+2. Download `BriefcaseNative-Server-windows-x64-<version>.zip` from the [latest release](https://github.com/EnoPM/BriefcaseNative/releases/latest).
+3. Extract the ZIP directly into `C:\DeceiveIncServer\DeceiveInc\Binaries\Win64`. Use your own server path if different. Do not create another `Win64` folder inside it.
+4. Start `DeceiveIncServer-Win64-Shipping.exe` **from the Win64 directory**. Keep that directory as the process working directory.
 
-The resulting layout starts like this:
+The installed `version.dll` starts Briefcase and UE4SS before the server enters the game. It does not open the vanilla server configuration window or a console. On first start, Briefcase creates its local launch and administration settings. Never share `Briefcase/Admin/server.json`; it contains the administration password.
+
+A typical installation contains:
 
 ```text
 DeceiveInc/Binaries/Win64/
 ├── DeceiveIncServer-Win64-Shipping.exe
-├── Briefcase.ServerLauncher.exe
+├── version.dll
+├── ue4ss/
+│   ├── UE4SS.dll
+│   ├── UE4SS-settings.ini
+│   └── Mods/
+│       └── mods.txt
 └── Briefcase/
-    ├── launch.json
     └── Core/
-        ├── Briefcase.NativeHost.dll
-        ├── Briefcase.ServerBootstrap.dll
-        ├── Tools/
-        │   └── Briefcase.ServerUpdater.exe
-        └── Updater/
 ```
 
-Start the server with `Briefcase.ServerLauncher.exe`. Do not start
-`DeceiveIncServer-Win64-Shipping.exe` directly: doing so bypasses Briefcase, its
-mods and its update check. The launcher opens no server UI or external console.
-An existing `Briefcase\launch.json` that identifies another installation is
-rejected instead of being overwritten.
+## Install server mods
 
-If startup fails, read `Briefcase\Logs\launcher-error.log`,
-`Briefcase\Logs\launcher.log` and the game logs.
+Each mod has its own release and installation guide. Install the Briefcase server package first, stop the server, then extract a **Windows UE4SS** mod archive into the same Win64 directory. The mod's guide provides the exact line to add to `ue4ss/Mods/mods.txt`. Keep an existing `Data/config.json` when replacing a mod, and restart the server to apply changes. UE4SS mod releases are being prepared; older archives that install into `Briefcase/Mods` are for the previous loader and must not be installed as UE4SS mods.
 
-## Install Briefcase on Linux
+The framework archive deliberately contains no gameplay mods. UE4SS starts with an empty `mods.txt`.
 
-Install the runtime libraries on Ubuntu 24.04:
+## Updates and help
 
-```bash
-sudo apt-get update
-sudo apt-get install --no-install-recommends libcurl4t64 libarchive13t64 ca-certificates unzip
-```
+Briefcase checks for a framework update before starting the server. To pause these checks during development, stop the server and set `enabled` to `false` in `Briefcase/updater.json`. When Windows UE4SS mod releases become available, install them using their individual guides and keep your existing configuration files.
 
-Then:
-
-1. Stop the dedicated server.
-2. Download `BriefcaseNative-Server-linux-x64-<version>.zip` from the
-   [latest release](https://github.com/EnoPM/BriefcaseNative/releases/latest).
-3. Extract it directly into the server's `DeceiveInc/Binaries/Linux` directory.
-4. Launch Briefcase from that directory:
-
-```bash
-cd /opt/deceive-inc-server/DeceiveInc/Binaries/Linux
-chmod +x Briefcase.ServerLauncher
-./Briefcase.ServerLauncher
-```
-
-The launcher always runs `DeceiveIncServer-Linux-Shipping` with
-`Binaries/Linux` as its working directory. No Python, .NET runtime or shell script
-is required by the installed Briefcase package.
-
-## Install mods
-
-Briefcase mods are distributed separately from the framework. Download the mod
-archive matching the server operating system and extract it into the same
-`Binaries/Win64` or `Binaries/Linux` directory. A correctly packaged mod is placed
-under `Briefcase/Mods/<mod-id>/`.
-
-Stop the server before installing or replacing a mod. Preserve an existing
-`Data/config.json` when upgrading a mod because it contains your settings. If
-`Briefcase/settings.json` does not exist, Briefcase loads all compatible installed
-server mods. A mod marked for another environment or operating system is ignored.
-
-## Automatic updates
-
-Starting with BriefcaseNative 0.5.1, the launcher creates
-`Briefcase/updater.json` on first use and checks the official GitHub release before
-starting the server. Compatible updates are installed before launch. An unavailable
-network or release does not remove the installed version.
-
-Starting with BriefcaseNative 0.6.0, mods can opt into the same pre-launch check by declaring their public GitHub
-repository in `briefcase.mod.json`. Briefcase updates those mods before loading any
-of them and preserves their existing `Data/config.json`. This also applies to a
-restart requested through server administration.
-
-Existing updater preferences are preserved. To disable automatic checks, stop the
-server and set `enabled` to `false` in `Briefcase/updater.json`. Always launch the
-server through `Briefcase.ServerLauncher.exe` on Windows or
-`./Briefcase.ServerLauncher` on Linux for updates to run.
-
-## More help
-
-- [Server administration](docs/Administration.md)
-- [Windows launcher and logs](docs/ServerLauncher.md)
-- [Linux server notes](docs/LinuxServer.md)
-- [Updater behavior and recovery](docs/Updates.md)
-- [Contributing and building from source](CONTRIBUTING.md)
-
-Before reporting a problem, include the operating system, Briefcase version, game
-server build and relevant files from `Briefcase/Logs`. Never publish
-`Briefcase/Admin/server.json`, passwords or private keys.
+For a graphical Windows installation and administration guide, see [Briefcase Server Manager](https://github.com/EnoPM/Briefcase.ServerManager). If the server fails to start, check `Briefcase/Logs/launcher-error.log`, `Briefcase/Logs/launcher.log`, and the game logs.

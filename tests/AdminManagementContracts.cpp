@@ -213,6 +213,9 @@ int main() {
               "legacy group ID leaked into translation key/fallback");
         check(Management::config_schema()["properties"]["MapRotation"]["displayName"] == "Map rotation",
               "server setting fallback is not English");
+        check(Management::config_schema()["properties"]["MaxPlayers"]["minimum"] == 1 &&
+              Management::config_schema()["properties"]["MaxPlayers"]["maximum"] == 32,
+              "server player field accepts the vanilla 1..32 range");
         auto x = balance["entries"][0];
         auto id = x["id"];
         Json changes = Json::array({{{"id", id}, {"value", 5}}});

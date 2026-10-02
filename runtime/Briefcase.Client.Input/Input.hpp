@@ -17,9 +17,11 @@ struct Frame {
 };
 using MenuChanged = void (*)(bool);
 using Shutdown = void (*)();
-bool install(HWND, MenuChanged, Shutdown);
+using GameReady = void (*)();
+bool install(HWND, MenuChanged, Shutdown, GameReady);
 void stop() noexcept;
 void request_menu(bool) noexcept;
+bool request_game_ready() noexcept;
 bool menu_open() noexcept;
 bool capturing() noexcept;
 void set_menu_key(uint32_t) noexcept;

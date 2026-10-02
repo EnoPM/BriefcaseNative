@@ -10,8 +10,8 @@ struct GameProfile {
     std::string_view sha256;
 };
 inline constexpr GameProfile server_profile{
-    Environment::server, L"DeceiveIncServer-Win64-Shipping.exe", 0x6AAC58E0, 0x05AF8000,
-    "366b09006175c3b6bd2c768787b4e0b3d4e06eee2ebed46f851784f2229066fb"};
+    Environment::server, L"DeceiveIncServer-Win64-Shipping.exe", 0x6AB71EA7, 0x05AFE000,
+    "f2125f09cbeb7922a4912706cc546477454ce229c15ed477af2731a21c828fd3"};
 inline constexpr GameProfile client_profile{
     Environment::client, L"DeceiveInc-Win64-Shipping.exe", 0x6AAC4146, 0x05F07000,
     "4ea95022cc2ab8dd433a964413553a2109c6d5a5daf93aee7414fe299475138f"};

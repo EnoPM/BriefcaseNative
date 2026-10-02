@@ -11,7 +11,9 @@ int wmain() {
     std::filesystem::path self(path);
     if (self.filename() == L"DeceiveIncServer-Win64-Shipping.exe") {
         if (!prepared_before_crt || std::filesystem::current_path() != self.parent_path()) return 11;
-        if (GetModuleHandleW(L"version.dll") && std::filesystem::exists(self.parent_path()/L"version.dll")) return 12;
+        DWORD ignored{};
+        GetFileVersionInfoSizeW(self.c_str(), &ignored); // Keep version.dll in the PE import table.
+        if (std::filesystem::exists(self.parent_path()/L"version.dll") && !GetModuleHandleW(L"version.dll")) return 12;
         std::ofstream(self.parent_path()/L"entry-verified.txt") << "prepared before CRT; cwd is Win64";
         wchar_t lifetime[16]{};
         auto delay = GetEnvironmentVariableW(L"BC_TEST_SERVER_LIFETIME", lifetime, 16) ? wcstoul(lifetime,nullptr,10) : 500;

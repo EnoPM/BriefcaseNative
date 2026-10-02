@@ -30,7 +30,7 @@ function Reject([scriptblock]$Action){$caught=$false;try{& $Action|Out-Null}catc
 $workflow=Get-Content -LiteralPath (Join-Path $project '.github/workflows/release.yml') -Raw
 Check ($workflow -match "RELEASE_DRAFT: \$\{\{ inputs\.draft \}\}" -and
        $workflow -match '-Draft:\$draft' -and
-       $workflow -match '(?s)linux:.*?needs: publish.*?publish: false') 'Windows release is not published before the Linux attachment job.'
+       $workflow -notmatch '(?m)^  linux:') 'Windows-only release workflow is invalid.'
 function git {
     $global:LASTEXITCODE=0
     if($args -contains '--verify'){

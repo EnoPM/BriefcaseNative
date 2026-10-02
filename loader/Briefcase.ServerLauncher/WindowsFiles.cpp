@@ -82,12 +82,13 @@ fs::path package_path(const fs::path& root, const std::string& name) {
 }
 bool managed(const std::string& name, bool legacy) {
     static const std::set<std::string> current{
-        "Briefcase.ServerLauncher.exe", "Package.json", "Briefcase/Core/Briefcase.NativeHost.dll",
-        "Briefcase/Core/Briefcase.ServerBootstrap.dll", "Briefcase/Core/Tools/Briefcase.AdminSetup.exe",
+        "version.dll", "Package.json", "ue4ss/UE4SS.dll", "ue4ss/UE4SS-settings.ini", "ue4ss/Mods/mods.txt",
+        "Briefcase/Core/Briefcase.NativeHost.dll", "Briefcase/Core/Tools/Briefcase.AdminSetup.exe",
         "Briefcase/Core/Tools/Briefcase.ServerRestart.exe", "Briefcase/Core/Tools/Briefcase.ServerUpdater.exe",
         "Briefcase/Core/Updater/build.json", "Briefcase/Core/Updater/updater.example.json"};
     static const std::set<std::string> retired{
-        "version.dll", "StartBriefcaseNativeServer.ps1", "Briefcase/Updater/Updater.ps1",
+        "Briefcase.ServerLauncher.exe", "Briefcase/Core/Briefcase.ServerBootstrap.dll",
+        "StartBriefcaseNativeServer.ps1", "Briefcase/Updater/Updater.ps1",
         "Briefcase/Updater/Restart-Server.ps1", "Briefcase/Updater/Launch-Server.ps1",
         "Briefcase/Runtime/Briefcase.NativeHost.dll", "Briefcase/Runtime/Briefcase.ServerBootstrap.dll",
         "Briefcase/Tools/Briefcase.AdminSetup.exe", "Briefcase/Tools/Briefcase.ServerRestart.exe",
@@ -95,6 +96,7 @@ bool managed(const std::string& name, bool legacy) {
         "Briefcase/Updater/updater.example.json"};
     return current.contains(name) || (legacy && retired.contains(name)) ||
            std::regex_match(name, std::regex("Briefcase/Core/(Docs|Licenses|Localization)/[A-Za-z0-9_./-]+\\.(json|txt|md)")) ||
+           std::regex_match(name, std::regex("ue4ss/Licenses/[A-Za-z0-9_.-]+\\.txt")) ||
            (legacy && std::regex_match(name, std::regex("Briefcase/(Docs|Licenses|Localization)/[A-Za-z0-9_./-]+\\.(json|txt|md)")));
 }
 std::string read(const fs::path& path, uint64_t limit) {

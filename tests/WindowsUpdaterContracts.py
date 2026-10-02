@@ -3,8 +3,8 @@ import hashlib, json, subprocess, sys, tempfile, unittest, zipfile
 from pathlib import Path
 
 DRIVER=str(Path(sys.argv.pop(1)).resolve())
-REQUIRED={'Briefcase.ServerLauncher.exe','Briefcase/Core/Briefcase.NativeHost.dll',
- 'Briefcase/Core/Briefcase.ServerBootstrap.dll','Briefcase/Core/Tools/Briefcase.AdminSetup.exe',
+REQUIRED={'version.dll','ue4ss/UE4SS.dll','ue4ss/UE4SS-settings.ini','ue4ss/Mods/mods.txt',
+ 'Briefcase/Core/Briefcase.NativeHost.dll','Briefcase/Core/Tools/Briefcase.AdminSetup.exe',
  'Briefcase/Core/Tools/Briefcase.ServerRestart.exe','Briefcase/Core/Tools/Briefcase.ServerUpdater.exe',
  'Briefcase/Core/Updater/build.json'}
 def digest(path): return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -30,7 +30,9 @@ class Contracts(unittest.TestCase):
   rows=[]
   for name,data in contents.items():
    path=stage/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(data)
-   rows.append(dict(path=name,bytes=len(data),sha256=digest(path),mode=493 if name.endswith(('.exe','.dll')) else 420))
+   row=dict(path=name,bytes=len(data),sha256=digest(path),mode=493 if name.endswith(('.exe','.dll')) else 420)
+   if name=='ue4ss/Mods/mods.txt':row['preserve']=True
+   rows.append(row)
   manifest=dict(updateSchema=1,environment='server',platform='windows-x64',frameworkVersion=version,gameSha256=self.hash,files=rows)
   write_json(stage/'Package.json',manifest);return stage,manifest
  def install(self,stage,manifest): self.run_native('manifest',stage,manifest['frameworkVersion'],self.hash);self.run_native('install',self.root,stage)
@@ -46,6 +48,7 @@ class Contracts(unittest.TestCase):
    digest='sha256:'+digest(archive),browser_download_url=f'https://github.com/{repository}/releases/download/v{version}/{name}')])
  def test_install_update_and_rollback(self):
   first,manifest=self.package('1.0.0');self.install(first,manifest)
+  (self.root/'ue4ss/Mods/mods.txt').write_text('MyInstalledMod : 1',encoding='utf-8')
   second,_=self.package('1.1.0')
   self.run_native('install',self.root,second,'fail',code=78)
   self.assertEqual(json.loads((self.root/'Briefcase/Core/Updater/build.json').read_text())['frameworkVersion'],'1.0.0')
@@ -53,6 +56,16 @@ class Contracts(unittest.TestCase):
   write_json(self.root/'Briefcase/updater.json',dict(schemaVersion=1,enabled=True,updateMods=True,repository='Example/Framework',timeoutSeconds=7))
   self.assertEqual(self.run_native('update',self.root,release,archive,'Example/Framework','7'),'installed')
   self.assertEqual(json.loads((self.root/'Briefcase/Core/Updater/build.json').read_text())['frameworkVersion'],'1.1.0')
+  self.assertEqual((self.root/'ue4ss/Mods/mods.txt').read_text(encoding='utf-8'),'MyInstalledMod : 1')
+ def test_probe_detects_update_without_replacing_running_files(self):
+  first,manifest=self.package('1.0.0');self.install(first,manifest)
+  second,_=self.package('1.1.0');archive=self.archive(second)
+  release=self.base/'release.json';write_json(release,self.release(archive))
+  write_json(self.root/'Briefcase/updater.json',dict(schemaVersion=1,enabled=True,updateMods=True,repository='Example/Framework',timeoutSeconds=7))
+  self.assertEqual(self.run_native('probe',self.root,release,archive,'Example/Framework','7'),'available')
+  self.assertEqual(json.loads((self.root/'Briefcase/Core/Updater/build.json').read_text())['frameworkVersion'],'1.0.0')
+  self.assertEqual(self.run_native('update',self.root,release,archive,'Example/Framework','7'),'installed')
+  self.assertEqual(self.run_native('probe',self.root,release,archive,'Example/Framework','7'),'current')
  def test_paths_json_archive_and_release_identity(self):
   for name in ('../escape','/absolute','a//b','a/./b','C:/x','a\\b','Briefcase/CON/file'):
    with self.subTest(name=name): self.run_native('path',self.root,name,code=78)
@@ -74,7 +87,7 @@ class Contracts(unittest.TestCase):
    self.run_native('url',url,code=78)
  def test_legacy_scripts_are_retired(self):
   first,manifest=self.package('1.0.0');self.install(first,manifest)
-  retired=('StartBriefcaseNativeServer.ps1','Briefcase/Updater/Updater.ps1','Briefcase/Updater/Restart-Server.ps1','Briefcase/Updater/Launch-Server.ps1')
+  retired=('Briefcase.ServerLauncher.exe','Briefcase/Core/Briefcase.ServerBootstrap.dll','StartBriefcaseNativeServer.ps1','Briefcase/Updater/Updater.ps1','Briefcase/Updater/Restart-Server.ps1','Briefcase/Updater/Launch-Server.ps1')
   installed=json.loads((self.root/'Package.json').read_text())
   for name in retired:
    path=self.root/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_text('legacy')

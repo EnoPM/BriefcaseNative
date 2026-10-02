@@ -1,6 +1,5 @@
 #include "Update.hpp"
 #include "AntiCheatConfig.hpp"
-#include "LaunchWindows.hpp"
 #include <Windows.h>
 #include <TlHelp32.h>
 #include <chrono>
@@ -29,6 +28,19 @@ std::wstring wide(const std::string& value) {
     std::wstring result(size, L'\0');
     MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.data(), static_cast<int>(value.size()), result.data(), size);
     return result;
+}
+std::wstring quote(const std::wstring& value) {
+    std::wstring result = L"\"";
+    size_t slashes = 0;
+    for (const auto character : value) {
+        if (character == L'\\') { ++slashes; continue; }
+        result.append(slashes * (character == L'\"' ? 2 : 1), L'\\');
+        slashes = 0;
+        if (character == L'\"') result += L'\\';
+        result += character;
+    }
+    result.append(slashes * 2, L'\\');
+    return result + L"\"";
 }
 void append_log(const fs::path& root, const std::string& message) {
     std::error_code ignored; fs::create_directories(root / "Briefcase/Logs", ignored);
@@ -83,7 +95,7 @@ std::wstring command_arguments(const std::vector<std::wstring>& supplied, int ga
                 "Graphical console arguments are not supported");
         if (lower == L"-unattended" || lower == L"-nosplash" || lower == L"-noconsole" ||
             lower == L"-nullrhi" || lower == L"-nosound") continue;
-        result += L" " + briefcase::launcher::quote(argument);
+        result += L" " + quote(argument);
     }
     return result;
 }
@@ -94,10 +106,27 @@ std::string stamp() {
                   value.wDay, value.wHour, value.wMinute, value.wSecond, value.wMilliseconds);
     return text;
 }
+DWORD start_direct(const fs::path& executable, const fs::path& root, const std::wstring& arguments) {
+    auto command = quote(executable.wstring()) + L" " + arguments;
+    require(SetEnvironmentVariableW(L"BRIEFCASE_PROXY_BOOTSTRAPPED", L"1"), "Cannot mark coordinated launch");
+    STARTUPINFOW startup{sizeof(startup)};
+    startup.dwFlags = STARTF_USESHOWWINDOW;
+    startup.wShowWindow = SW_HIDE;
+    PROCESS_INFORMATION process{};
+    const auto started = CreateProcessW(executable.c_str(), command.data(), nullptr, nullptr, FALSE,
+                                        CREATE_NO_WINDOW, nullptr, root.c_str(), &startup, &process);
+    SetEnvironmentVariableW(L"BRIEFCASE_PROXY_BOOTSTRAPPED", nullptr);
+    require(started, "Cannot start the dedicated server");
+    CloseHandle(process.hThread);
+    CloseHandle(process.hProcess);
+    return process.dwProcessId;
+}
 int run(const fs::path& input_root, DWORD parent, DWORD wait_for, const std::string& restart_id,
-        const std::vector<std::wstring>& arguments) {
-    wait_parent(parent);
-    wait_parent(wait_for);
+        const std::vector<std::wstring>& arguments, bool probe) {
+    if (!probe) {
+        wait_parent(parent);
+        wait_parent(wait_for);
+    }
     const auto root = plain(input_root);
     require(root.filename() == L"Win64" && root.parent_path().filename() == L"Binaries" &&
             root.parent_path().parent_path().filename() == L"DeceiveInc", "Invalid Win64 server directory");
@@ -110,6 +139,22 @@ int run(const fs::path& input_root, DWORD parent, DWORD wait_for, const std::str
     require(launch.contains("serverWin64") && launch.at("serverWin64").is_string() &&
             same_path(root, fs::path(wide(launch.at("serverWin64").get<std::string>()))),
             "Launcher is not authorized for this Win64 directory");
+    auto logger = [&](const std::string& value) { append_log(root, value); };
+    if (probe) {
+        Updater updater(root);
+        const auto framework = updater.update(logger, false);
+        const auto mods = updater.update_mods(logger, false);
+        const bool restart = framework == "available" || framework == "recovery-required" ||
+                             mods.value("available", 0) > 0;
+        write_json(package_path(root, "Briefcase/Updates/last-result.json"),
+                   {{"framework", framework}, {"mods", mods}, {"checkedAt", std::time(nullptr)}});
+        updater.cleanup(logger);
+        if (!restart && ensure_eac_disabled(root, "WindowsServer"))
+            logger("Configured sb.DisableEAC=1 for the Briefcase server.");
+        logger(restart ? "Update available; server restart required." :
+                         "No update available; continuing in the original server process.");
+        return restart ? 10 : 0;
+    }
     DWORD previous_pid{};
     if (!restart_id.empty()) {
         const auto pending = document(package_path(root, "Briefcase/Admin/restart-result.json"));
@@ -125,7 +170,6 @@ int run(const fs::path& input_root, DWORD parent, DWORD wait_for, const std::str
                             0, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OPEN_REPARSE_POINT, nullptr)};
     require(lock.value != INVALID_HANDLE_VALUE, "Another update or launch is already in progress");
     require(!server_running(game), "This dedicated server is already running");
-    auto logger = [&](const std::string& value) { append_log(root, value); };
     Updater updater(root);
     const auto framework = updater.update(logger);
     const auto mods = updater.update_mods(logger);
@@ -136,8 +180,7 @@ int run(const fs::path& input_root, DWORD parent, DWORD wait_for, const std::str
         logger("Configured sb.DisableEAC=1 for the Briefcase server.");
     const auto [game_port, query_port] = ports(root);
     const auto native_arguments = command_arguments(arguments, game_port, query_port);
-    const auto pid = briefcase::launcher::start(game,
-        package_path(root, "Briefcase/Core/Briefcase.ServerBootstrap.dll"), native_arguments);
+    const auto pid = start_direct(game, root, native_arguments);
     Json record{{"executable", utf8(game.wstring())}, {"workingDirectory", utf8(root.wstring())},
                 {"pid", pid}, {"update", framework}, {"modUpdates", mods},
                 {"startedAt", std::time(nullptr)}, {"arguments", Json::array()}};
@@ -161,10 +204,11 @@ int wmain(int argc, wchar_t** argv) {
     std::string restart_id;
     try {
         DWORD parent{}, wait_for{}; std::vector<std::wstring> arguments;
-        bool game_arguments = false;
+        bool game_arguments = false, probe = false;
         for (int index = 1; index < argc; ++index) {
             const std::wstring argument(argv[index]);
             if (!game_arguments && argument == L"--") { game_arguments = true; continue; }
+            if (!game_arguments && argument == L"--probe") { probe = true; continue; }
             if (!game_arguments && (argument == L"--root" || argument == L"--parent" ||
                                     argument == L"--wait-parent" || argument == L"--restart")) {
                 require(++index < argc, "Missing worker option value");
@@ -176,9 +220,11 @@ int wmain(int argc, wchar_t** argv) {
             }
             require(game_arguments, "Unknown worker option"); arguments.push_back(argument);
         }
-        require(!root.empty() && parent, "Missing worker launch context");
+        require(!root.empty() && (probe || parent), "Missing worker launch context");
+        require(!probe || (!parent && !wait_for && restart_id.empty() && arguments.empty()),
+                "Invalid update probe context");
         if (!restart_id.empty()) require(std::regex_match(restart_id, std::regex("[a-f0-9]{32}")), "Invalid restart identifier");
-        return run(root, parent, wait_for, restart_id, arguments);
+        return run(root, parent, wait_for, restart_id, arguments, probe);
     } catch (const std::exception& error) {
         if (!root.empty()) {
             append_log(root, std::string("Native update coordinator failed: ") + error.what());

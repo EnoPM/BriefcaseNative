@@ -41,6 +41,7 @@ static const auto start_time = std::chrono::steady_clock::now();
 static BcBuild build_info{};
 static Environment environment = Environment::server;
 static fs::path administration_root;
+static bool external_unreal_runtime{};
 struct Scope {
     uint64_t id;
     Manifest manifest;
@@ -412,6 +413,8 @@ extern "C" __declspec(dllexport) uint32_t __cdecl BriefcasePrepare(uint32_t game
         bc::log("Working directory: " + exe.parent_path().string());
         bc::game_image = base;
         bc::server_config_root = (exe.parent_path() / "../../Saved/Config/WindowsServer").lexically_normal();
+        bc::external_unreal_runtime = !client &&
+                                      std::filesystem::is_regular_file(exe.parent_path() / "ue4ss/UE4SS.dll");
         bc::discover_mods(root / "Mods");
         bc::load_phase("startup");
         bc::startup_phase = false;
@@ -421,8 +424,11 @@ extern "C" __declspec(dllexport) uint32_t __cdecl BriefcasePrepare(uint32_t game
         if (client)
             bc::log(
                 std::format("Client bootstrap completed in {:.3f} ms; Unreal deferred.", bc::bootstrap_ms));
-        else {
+        else if (!bc::external_unreal_runtime) {
             bc::backend_start(game_thread);
+            bc::log("Preparation complete; entering original EXE entry");
+        } else {
+            bc::log("External UE4SS runtime detected; internal Unreal backend disabled");
             bc::log("Preparation complete; entering original EXE entry");
         }
         return 0;
@@ -444,11 +450,13 @@ extern "C" __declspec(dllexport) uint32_t __cdecl BriefcaseRun() noexcept {
             bc::run_control_plane();
             return 0;
         }
-        for (unsigned i = 0; i < 900 && !bc::backend_ready(); ++i)
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        if (!bc::backend_ready())
-            throw std::runtime_error("Backend did not become ready within 90 seconds");
-        bc::load_phase("ready");
+        if (!bc::external_unreal_runtime) {
+            for (unsigned i = 0; i < 900 && !bc::backend_ready(); ++i)
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            if (!bc::backend_ready())
+                throw std::runtime_error("Backend did not become ready within 90 seconds");
+            bc::load_phase("ready");
+        }
         bc::start_admin_server();
         bc::run_control_plane();
         return 0;

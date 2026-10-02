@@ -14,6 +14,20 @@ Set-PinnedReplacement $initializer $marker ('            throw std::runtime_erro
 Set-PinnedReplacement $initializer '        HookProcessConsoleExec();' '        // Briefcase minimal backend: console hooks disabled.'
 Set-PinnedReplacement $initializer '        HookUStructLink();' '        // Briefcase minimal backend: struct-link hook disabled.'
 Set-PinnedReplacement $initializer '        HookStaticConstructObject();' '        // Briefcase minimal backend: mod-construction hook disabled.'
+Set-PinnedReplacement $initializer '        if (UnrealConfig.bHookLoadMap) { HookLoadMap(); }' '        // Briefcase dedicated server: the UE4SS 3.0.1 LoadMap detour is incompatible with the current game build.'
 Set-PinnedReplacement 'deps\first\SinglePassSigScanner\src\SinglePassSigScanner.cpp' '(byte*)' '(uint8_t*)'
 Set-PinnedReplacement 'deps\first\Unreal\include\Unreal\VirtualFunctionHelper.hpp' 'DispatchMap.template find<ObjectClassType>(ObjectClass)' 'DispatchMap.find(ObjectClass)'
 Set-PinnedReplacement 'deps\first\Unreal\include\Unreal\ULocalPlayer.hpp' '    // TODO: Move to its own file.' ('    enum EAspectRatioAxisConstraint : int;'+[Environment]::NewLine+'    // TODO: Move to its own file.')
+
+# UE4SS 3.0.1 originally followed ImGuiColorTextEdit master. The current
+# branch targets newer ImGui APIs and no longer builds with UE4SS's ImGui 1.89.
+Set-PinnedReplacement 'deps\third\CMakeLists.txt' '    GIT_TAG master' '    GIT_TAG af7821926251feca84e35f8fa83eee84dae90424'
+foreach($repository in @('ocornut/imgui','UE4SS-RE/ImGuiColorTextEdit','juliettef/IconFontCppHeaders','zyantific/zydis',
+                          'stevemk14ebr/PolyHook_2_0','MolecularMatters/raw_pdb')) {
+    Set-PinnedReplacement 'deps\third\CMakeLists.txt' "git@github.com:$repository.git" "https://github.com/$repository.git"
+}
+Set-PinnedReplacement 'deps\first\Profiler\CMakeLists.txt' 'git@github.com:wolfpld/tracy.git' 'https://github.com/wolfpld/tracy.git'
+
+# Keep the Win64 root small. Briefcase packages UE4SS, settings and mods below
+# Win64/ue4ss. The server launcher loads UE4SS.dll through its injection bootstrap.
+Set-PinnedReplacement 'UE4SS\proxy_generator\main.cpp' 'LoadLibrary(STR(\"UE4SS.dll\"))' 'LoadLibrary(STR(\"ue4ss\\\\UE4SS.dll\"))'

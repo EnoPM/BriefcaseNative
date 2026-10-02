@@ -1,4 +1,5 @@
 /build/
+/build-ue4ss*/
 /dist/
 /artifacts/
 /local.settings.json
@@ -11,6 +12,9 @@
 /.codex-remote-attachments/
 
 /repositories/
+/scripts/ue4ss/Package-ServerPrototype.ps1
+/docs/UE4SSMigration.md
+/resources/UE4SS/Server/Mods/
 
 __pycache__/
 *.pyc

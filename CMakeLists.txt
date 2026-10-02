@@ -47,6 +47,7 @@ target_link_libraries(Briefcase.NativeHost PRIVATE Briefcase.Core Briefcase.MinH
 target_include_directories(Briefcase.NativeHost PRIVATE runtime/Briefcase.UnrealBackend)
 add_library(version SHARED loader/Briefcase.VersionProxy/proxy.cpp loader/Briefcase.VersionProxy/forwards.asm loader/Briefcase.VersionProxy/version.def)
 set_target_properties(version PROPERTIES PREFIX "")
+target_link_libraries(version PRIVATE shell32)
 add_library(Briefcase.NativeHello SHARED samples/Briefcase.NativeHello/Hello.cpp)
 target_link_libraries(Briefcase.NativeHello PRIVATE Briefcase.ModApi)
 enable_testing()
@@ -67,8 +68,6 @@ target_include_directories(Briefcase.Miniz PUBLIC third_party/miniz-3.1.2)
 set_target_properties(Briefcase.Miniz PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED ON)
 add_library(Briefcase.ServerBootstrap SHARED loader/Briefcase.ServerLauncher/Bootstrap.cpp loader/Briefcase.ServerLauncher/Bootstrap.def)
 target_link_libraries(Briefcase.ServerBootstrap PRIVATE Briefcase.Detours)
-add_executable(Briefcase.ServerLauncher loader/Briefcase.ServerLauncher/Main.cpp)
-target_link_libraries(Briefcase.ServerLauncher PRIVATE Briefcase.Detours)
 add_library(Briefcase.WindowsServerUpdate STATIC
  loader/Briefcase.ServerLauncher/WindowsFiles.cpp
  loader/Briefcase.ServerLauncher/WindowsDownload.cpp
@@ -76,18 +75,14 @@ add_library(Briefcase.WindowsServerUpdate STATIC
 target_link_libraries(Briefcase.WindowsServerUpdate PUBLIC Briefcase.Miniz nlohmann_json::nlohmann_json bcrypt winhttp)
 target_include_directories(Briefcase.WindowsServerUpdate PUBLIC loader/Briefcase.ServerLauncher)
 add_executable(Briefcase.ServerUpdater loader/Briefcase.ServerLauncher/WindowsWorker.cpp)
-target_link_libraries(Briefcase.ServerUpdater PRIVATE Briefcase.WindowsServerUpdate Briefcase.Detours)
+target_link_libraries(Briefcase.ServerUpdater PRIVATE Briefcase.WindowsServerUpdate)
 target_link_options(Briefcase.ServerUpdater PRIVATE /SUBSYSTEM:WINDOWS /ENTRY:wmainCRTStartup)
-# No console is created when users double-click the launcher.
-target_link_options(Briefcase.ServerLauncher PRIVATE /SUBSYSTEM:WINDOWS /ENTRY:wmainCRTStartup)
 add_executable(Briefcase.ClientLauncher loader/Briefcase.ClientLauncher/Main.cpp)
 target_link_libraries(Briefcase.ClientLauncher PRIVATE nlohmann_json::nlohmann_json)
 target_link_options(Briefcase.ClientLauncher PRIVATE /SUBSYSTEM:WINDOWS /ENTRY:wmainCRTStartup)
-install(TARGETS Briefcase.ServerLauncher RUNTIME DESTINATION . COMPONENT Briefcase)
+install(TARGETS version RUNTIME DESTINATION . COMPONENT Briefcase)
 install(TARGETS Briefcase.ClientLauncher RUNTIME DESTINATION . COMPONENT Client)
 install(TARGETS Briefcase.ServerUpdater RUNTIME DESTINATION Briefcase/Core/Tools COMPONENT Briefcase)
-install(TARGETS Briefcase.ServerBootstrap RUNTIME DESTINATION Briefcase/Core COMPONENT Briefcase)
-install(FILES third_party/detours-4.0.1/LICENSE.md DESTINATION Briefcase/Core/Licenses RENAME Detours.txt COMPONENT Briefcase)
 install(TARGETS Briefcase.NativeHost RUNTIME DESTINATION Briefcase/Core COMPONENT Briefcase)
 install(TARGETS Briefcase.NativeHello RUNTIME DESTINATION Briefcase/Mods/briefcase.native-hello COMPONENT Samples)
 install(FILES samples/Briefcase.NativeHello/briefcase.mod.json DESTINATION Briefcase/Mods/briefcase.native-hello COMPONENT Samples)
@@ -294,7 +289,7 @@ install(FILES docs/Repositories.md DESTINATION Briefcase/Core/Docs COMPONENT Bri
 
 add_library(Briefcase.LauncherMockHost SHARED tests/LauncherMockHost.cpp)
 add_executable(Briefcase.ServerLauncherContracts tests/ServerLauncherContracts.cpp)
-target_link_libraries(Briefcase.ServerLauncherContracts PRIVATE Briefcase.Detours)
+target_link_libraries(Briefcase.ServerLauncherContracts PRIVATE Briefcase.Detours version)
 add_dependencies(Briefcase.ServerLauncherContracts Briefcase.ServerBootstrap Briefcase.LauncherMockHost)
 add_test(NAME ServerLauncherInjection COMMAND Briefcase.ServerLauncherContracts)
 set_tests_properties(ServerLauncherInjection PROPERTIES TIMEOUT 30)
@@ -305,8 +300,8 @@ set_tests_properties(WindowsUpdaterContracts PROPERTIES TIMEOUT 60)
 
 install(FILES docs/ServerLauncher.md DESTINATION Briefcase/Core/Docs COMPONENT Briefcase)
 
-add_test(NAME ServerLauncherCoordinator COMMAND "${BRIEFCASE_POWERSHELL}" -NoProfile -File "${CMAKE_SOURCE_DIR}/tests/ServerLauncherIntegration.ps1" -Build "$<TARGET_FILE_DIR:Briefcase.ServerLauncher>")
-set_tests_properties(ServerLauncherCoordinator PROPERTIES TIMEOUT 30)
+add_test(NAME ServerProxyCoordinator COMMAND "${BRIEFCASE_POWERSHELL}" -NoProfile -File "${CMAKE_SOURCE_DIR}/tests/ServerLauncherIntegration.ps1" -Build "$<TARGET_FILE_DIR:version>")
+set_tests_properties(ServerProxyCoordinator PROPERTIES TIMEOUT 30)
 
 add_test(NAME SourcePublicationContracts COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tests/SourcePublicationContracts.py")
 

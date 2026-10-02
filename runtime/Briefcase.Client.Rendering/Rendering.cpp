@@ -295,7 +295,7 @@ static HRESULT __stdcall hooked_present(IDXGISwapChain *chain, UINT sync, UINT f
                 if (!desc.OutputWindow)
                     chain->GetDesc(&desc);
                 active_window = desc.OutputWindow;
-                if (!bc::input::install(active_window, menu_changed, window_closed))
+                if (!bc::input::install(active_window, menu_changed, window_closed, request_unreal_once))
                     throw std::runtime_error("Window input installation failed");
                 viewport.width = desc.BufferDesc.Width;
                 viewport.height = desc.BufferDesc.Height;
@@ -322,6 +322,8 @@ static HRESULT __stdcall hooked_present(IDXGISwapChain *chain, UINT sync, UINT f
             last_present = now;
             auto input = bc::input::frame(viewport.frame_number, viewport.width, viewport.height);
             const bool startup_ready = host->startup_ready();
+            if (startup_ready && !unreal_requested.load(std::memory_order_acquire))
+                bc::input::request_game_ready();
             const bool stable = startup_ready && stable_frames >= 30 &&
                                 std::chrono::duration<double>(now - first_present).count() >= 2.;
             if (input.menu && !startup_ready) {

@@ -1,15 +1,16 @@
 # Server updates
 
-The local launcher checks the latest stable GitHub release before starting Shipping
-from `Binaries/Win64` on Windows or `Binaries/Linux` on Linux. Administration
-restarts use the same launcher. No download or replacement occurs during a match.
-Starting the game executable directly bypasses update checks.
+On Windows, the `version.dll` proxy asks the native update coordinator to check
+for newer releases before Briefcase or UE4SS is loaded. When no update is needed,
+the original Shipping process continues, including its vanilla server settings UI.
+The coordinator relaunches Shipping only to install an update. Administration
+restarts use the same coordinator. On Linux, the native launcher owns this sequence.
 
 ## Automatic activation
 
 Starting with 0.5.1, installation from an official ZIP requires no updater setup.
-On first launch, `Briefcase.ServerLauncher.exe` or `Briefcase.ServerLauncher`
-creates `Briefcase/updater.json` when absent, using:
+On first launch, the Windows proxy or Linux `Briefcase.ServerLauncher` creates
+`Briefcase/updater.json` when absent, using:
 
 ```json
 {
@@ -20,8 +21,14 @@ creates `Briefcase/updater.json` when absent, using:
 }
 ```
 
-The launcher immediately checks, then repeats the check at every launch or managed
-restart. It installs a compatible update before starting the server.
+The coordinator immediately checks, then repeats the check at every launch or
+managed restart. It installs a compatible update before starting the server.
+
+For a development installation, set `"enabled": false` in the active
+`Briefcase/updater.json` before launching Shipping. This disables both framework
+and mod release checks, so locally built binaries are not replaced by GitHub
+releases. Set it back to `true` when release updates are desired. Deployment and
+framework updates preserve the active file; they do not reset this choice.
 
 An existing file is preserved exactly, including `enabled: false`, a custom
 repository or invalid settings that produce an error. An empty repository also
@@ -83,7 +90,7 @@ platform archive named `REPOSITORY-windows-x64-MAJOR.MINOR.PATCH.zip` or
 SHA-256 hashes are validated before installation. Only files below the matching
 `Briefcase/Mods/<mod-id>/` directory are accepted.
 
-Mod updates run before any mod loads, including `startup` mods such as PlayerCap.
+Mod updates run before any mod loads, including `startup` mods.
 An administration restart returns to the launcher and performs the same checks.
 When the framework itself is replaced, its updated launcher code runs before mod
 checks continue. Set `updateMods` to `false` to disable only mod updates. Setting

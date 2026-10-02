@@ -19,10 +19,12 @@ static void BC_CALL shutdown_mods(void *) noexcept {
                     log("ERROR: mod unload threw: " + s.manifest.id);
                 }
         }
-        try {
-            backend_cleanup_owner(s.id);
-        } catch (...) {
-            log("ERROR: owner cleanup failed: " + s.manifest.id);
+        if (backend_ready()) {
+            try {
+                backend_cleanup_owner(s.id);
+            } catch (...) {
+                log("ERROR: owner cleanup failed: " + s.manifest.id);
+            }
         }
         s.accepting = false;
         s.loaded = false;
@@ -74,8 +76,12 @@ static void run_control_plane() {
     } else {
         while(WaitForSingleObject(request,100)==WAIT_TIMEOUT && !shutdown_completed) {}
         stop_admin_workers();
-        if(!shutdown_completed && backend_post(shutdown_mods,nullptr)!=BC_OK)
-            log("ERROR: cannot queue mod shutdown");
+        if (!shutdown_completed) {
+            if (!backend_ready())
+                shutdown_mods(nullptr);
+            else if (backend_post(shutdown_mods,nullptr)!=BC_OK)
+                log("ERROR: cannot queue mod shutdown");
+        }
     }
     // Keep the acknowledgment event alive until process termination.
 }

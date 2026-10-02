@@ -20,7 +20,8 @@
     "sdk",
     "tests",
     "third_party",
-    "tools"
+    "tools",
+    "ue4ss"
   ],
   "files": [
     {
@@ -36,20 +37,16 @@
       "sha256": "cd3a2dd3cbdccc09610ca8250dbf37fcc46afa756d95e3244cf305051aaa4fed"
     },
     {
-      "path": ".github/workflows/linux-server-release.yml",
-      "sha256": "f05c08f3644b7bfb8cf501dd5783916d712bf650ff0da1b64775b36ec7e0dc0f"
-    },
-    {
       "path": ".github/workflows/release.yml",
-      "sha256": "754df0b7cfafb4b47e27285f6d459540e45a148c1b65ebf367d1475c85845053"
+      "sha256": "d1341f32409ae20887d71cd77518ae077652885796e3450d012ac5c906a35049"
     },
     {
       "path": ".gitignore",
-      "sha256": "d7a81f61f056a2b9a6ec3c788ad9b6c44d719705bc4898b57d89e95b4227d504"
+      "sha256": "8f71a9d6656a9c43bcbbe980dfd3a919195ee7ee5343f72c46eb95c0edc25bbc"
     },
     {
       "path": "CMakeLists.txt",
-      "sha256": "c5a8a891aefa90ffc93092d9b895486c799fa124a8c16b62380008595edc2dc7"
+      "sha256": "c11be46d201e4c6b41323c58482ab60aeb13292517377ca67db89138ce791600"
     },
     {
       "path": "CONTRIBUTING.md",
@@ -57,7 +54,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "60bdbbd8d9e1f9afafc6aea1ef22bfdca1d613c7d185212efeccbf30cd78c328"
+      "sha256": "9dc451e4d103b370ede3e978bedd72225db2232a81e49d509a4e81b0f01bbc55"
     },
     {
       "path": "VERSION",
@@ -165,7 +162,7 @@
     },
     {
       "path": "docs/ServerLauncher.md",
-      "sha256": "38b3d94b8398e0c44d32db1a8dbdcc8dd208c3f8d5933bd9e016ac8ffe474738"
+      "sha256": "095efe3f96bad77aa15f62d4bdb3b1c4e666719cde8f71aebd17fab5d27c5c66"
     },
     {
       "path": "docs/SourcePublication.md",
@@ -189,7 +186,7 @@
     },
     {
       "path": "docs/Updates.md",
-      "sha256": "e740825eb725a4c537f1ed90ade4ec2b633ee1a4915c4275f656eb3264271a48"
+      "sha256": "bded3d4cc8ed5ca02e2e245f44d20885d62cf463d90aa8ac128581d620b70c7d"
     },
     {
       "path": "loader/Briefcase.ClientLauncher/Main.cpp",
@@ -201,7 +198,7 @@
     },
     {
       "path": "loader/Briefcase.ServerLauncher/Bootstrap.cpp",
-      "sha256": "58bd8375abd1e68a51238e2fcda33d3ac624bb01831f32209a0c941b8087ca7f"
+      "sha256": "538e270b98d22cc02f887eeb2c298c2ecafd2aaa68b4708da43a82721d0e512a"
     },
     {
       "path": "loader/Briefcase.ServerLauncher/Bootstrap.def",
@@ -233,11 +230,11 @@
     },
     {
       "path": "loader/Briefcase.ServerLauncher/Update.cpp",
-      "sha256": "2abbbdc5293660f19177f922019d99abd5bc83366237ad667d7421bfa845a7e6"
+      "sha256": "3620a2beed25b78ec7dc0ba0a518a5a921eaa4d53f78c20ff7605d302d8fad3a"
     },
     {
       "path": "loader/Briefcase.ServerLauncher/Update.hpp",
-      "sha256": "71f5ef60a558ea21efb9c1ec2c940f1e391861191269e3057387bb48fc92e969"
+      "sha256": "6b97514b89411edc14bf3fc407eb6baab124548465a8bdc5824fb6f87bcc2988"
     },
     {
       "path": "loader/Briefcase.ServerLauncher/WindowsDownload.cpp",
@@ -245,11 +242,11 @@
     },
     {
       "path": "loader/Briefcase.ServerLauncher/WindowsFiles.cpp",
-      "sha256": "1a45ffb69a32f63138408d6e1c7e80450ac0a214fc881151b9789ed247796834"
+      "sha256": "550a6a92d546ab959b0dd058197556a5bf5cefcdf284c4fc4d0f806e9ecb9a8f"
     },
     {
       "path": "loader/Briefcase.ServerLauncher/WindowsWorker.cpp",
-      "sha256": "4f6c92537457948ef0f0dd6b73625c8406b501358f52637d695a62b8fdb35811"
+      "sha256": "e5e88dedb8f0f3feaa38a6b7565638614126f6d22d25e416e243ffdd93d30835"
     },
     {
       "path": "loader/Briefcase.VersionProxy/EntryGate.hpp",
@@ -261,7 +258,7 @@
     },
     {
       "path": "loader/Briefcase.VersionProxy/proxy.cpp",
-      "sha256": "4512e21f405838ecd2feac15e95bcf2b811afcefde6eaf41fc716825ee2cc697"
+      "sha256": "9baa4b1aebb9937d651572a3e83aa5df1bc3e2f5be8938f195409b84bc89337e"
     },
     {
       "path": "loader/Briefcase.VersionProxy/version.def",
@@ -280,12 +277,16 @@
       "sha256": "441a0f397eb8ec0e3fc8fa1adc43499a28245f997e3d387261e8eb38f70ffdad"
     },
     {
+      "path": "resources/UE4SS/Server/UE4SS-settings.ini",
+      "sha256": "bd98b89b9ccba83bcf5c7f5376416debb93de84d32cd81395353e2321ef7d37a"
+    },
+    {
       "path": "runtime/Briefcase.Admin/Crypto.hpp",
       "sha256": "bf9d445e85cfb6a352de5bbc6750e5c2d20c800b074f1e402af9d1d78e9c444c"
     },
     {
       "path": "runtime/Briefcase.Admin/Management.cpp",
-      "sha256": "26cfd51f5a395d05de30e06a86c6fa4dc56deecdbbcd929d04b8a1430137115f"
+      "sha256": "23b201d50df91eca7b9e1324c78716b2d9e8343dc01980fb8e7b42362c11edbe"
     },
     {
       "path": "runtime/Briefcase.Admin/Management.hpp",
@@ -357,11 +358,11 @@
     },
     {
       "path": "runtime/Briefcase.Client.Input/Input.cpp",
-      "sha256": "70c978e9d55016e361b2877c7b36af9a33db647be45a795dbebdbd2c8dc51711"
+      "sha256": "e3ad5a57c0f59e18ab85bf916ffa9eecf3a3e5c9fee02bd14ba6c0b38eb7b036"
     },
     {
       "path": "runtime/Briefcase.Client.Input/Input.hpp",
-      "sha256": "bc490a938c1eb00ae229bbceece0a7662aeac624a80cb627b64f14b27a1864c1"
+      "sha256": "3c5208e73d730e142b2475a4c0fecea18bfa34ce836601b2aefe085c4f456328"
     },
     {
       "path": "runtime/Briefcase.Client.Input/InputPolicy.hpp",
@@ -433,7 +434,7 @@
     },
     {
       "path": "runtime/Briefcase.Client.Rendering/Rendering.cpp",
-      "sha256": "5f9f69e4ad1699f63b2fd47bc855bc12bf1fb3c555d5ae1107b0cf959c14173a"
+      "sha256": "77fb6d194cec89be1fa7f3f9ce2ce679d88cb03418c40053b2ce9791bdc2418a"
     },
     {
       "path": "runtime/Briefcase.Client.Servers/ServerDirectory.cpp",
@@ -513,7 +514,7 @@
     },
     {
       "path": "runtime/Briefcase.NativeHost/GameProfile.hpp",
-      "sha256": "7298496083e0934b1f18a7d473f769e4adf340a1ce5e160f27be3ac376d1e2fa"
+      "sha256": "4a6d03f57f214c4a670f1dec6ceb5c04123e448ad0bc78220d57fe105a5ce38d"
     },
     {
       "path": "runtime/Briefcase.NativeHost/HandleTable.hpp",
@@ -525,7 +526,7 @@
     },
     {
       "path": "runtime/Briefcase.NativeHost/Host.cpp",
-      "sha256": "9922f787e0e07b88267f35b3dabb37d41e60e0b8ce2679396cf759420796799c"
+      "sha256": "f9d888e18d2eec0f3e865f901bb1fe13e89fec3593023ce8aaac288340b0b418"
     },
     {
       "path": "runtime/Briefcase.NativeHost/LinuxHost.inc",
@@ -581,7 +582,7 @@
     },
     {
       "path": "runtime/Briefcase.NativeHost/Shutdown.inc",
-      "sha256": "f7a1fae2a735634a77f8d65bdf40213ab057680b719442831e241343dd39fc1c"
+      "sha256": "70dc7c70f03f071e95cda1324d0acb724a8fe48548e9ff76907dc4cf45698f7f"
     },
     {
       "path": "runtime/Briefcase.NativeHost/Startup.cpp",
@@ -685,11 +686,11 @@
     },
     {
       "path": "scripts/build/Patch-UE4SS.ps1",
-      "sha256": "4a6498d5a4bf9460dc9e27e0efc276f923a37bbe878b1bc166e374ddf50f501b"
+      "sha256": "c437fba9e72ae917b1d4dd5607f7e28bf5192df6c7df9059c6f9ed6c398e864e"
     },
     {
       "path": "scripts/client/Assert-Package.ps1",
-      "sha256": "acded942ccd7d5c26381cf5c1f1c0d1999a18b7fad2f92ec236049f1106a6d52"
+      "sha256": "89d899c3709f972a38466a434ed17859de1111c43f3c9411d837889bd0802482"
     },
     {
       "path": "scripts/client/Build-Client.ps1",
@@ -709,7 +710,7 @@
     },
     {
       "path": "scripts/client/Package-Client.ps1",
-      "sha256": "b49be3f1e37e78e0b0d54aaa9ca696000d2c4af59fa2e644843a3e02cce85861"
+      "sha256": "8e462d036368c870f9d50918437c04a18c046819d1fd9bbb9c237b33ff4f1cc9"
     },
     {
       "path": "scripts/client/Start-Client.ps1",
@@ -729,7 +730,7 @@
     },
     {
       "path": "scripts/deploy/Deploy-Server.ps1",
-      "sha256": "01f552db7de7d5460ecca8214020a24e3506d3f9b18f6355377da571fd8c9921"
+      "sha256": "2e26f8d9b1c43017d1e081698f689bffbf6e6bcf00c88da7045aa96e234ba9bb"
     },
     {
       "path": "scripts/deploy/Select-ServerMods.ps1",
@@ -737,7 +738,7 @@
     },
     {
       "path": "scripts/deploy/Start-Server.ps1",
-      "sha256": "60e1a1e82455eb60dc03d9153c96f4439fdb0a5b184c47437d3b6537504cc4cc"
+      "sha256": "d2535e532b411dc412990203c353baebc653932e738065efdaa749408583b991"
     },
     {
       "path": "scripts/deploy/Stop-Server.ps1",
@@ -797,11 +798,11 @@
     },
     {
       "path": "scripts/release/Package-Tools.ps1",
-      "sha256": "7dcd4ebe7a9e7aaeb1bd71882ddb4e7278f3f72be869f3a9e75dbf503b03f66a"
+      "sha256": "bc7c72eab8f55ec23913843b41eafdcaa756944a788864c46f7262ea0306a800"
     },
     {
       "path": "scripts/release/Publish-Release.ps1",
-      "sha256": "95ad887628c00746ace801b574267922b34d8939e5d238d39626b8c922fef75d"
+      "sha256": "0288fab67387524685fdf543660f4369964f95f81af0aff66575674b4f643823"
     },
     {
       "path": "scripts/release/Read-Version.ps1",
@@ -816,16 +817,28 @@
       "sha256": "c5e49e2c5b6d38f5efaeb6ee8e4488362522da592c1c505b42bc6a98993f3bf1"
     },
     {
-      "path": "scripts/test/Inspect-PlayerCap.py",
-      "sha256": "371c6a6b0283ef1ca41e2038e93f3f15d6d528dbc18afc9d5e7a90cd13d54097"
-    },
-    {
       "path": "scripts/test/Measure-Server.ps1",
       "sha256": "b4ecd93d555d4f008b0991cb5e007a894348af65f0db2880e7a734214ae889f3"
     },
     {
       "path": "scripts/test/Test.ps1",
       "sha256": "c30d36bb87d6ec381993cc6e7e23bb3014e3277eaa8c97d58abeb8f3d931a7aa"
+    },
+    {
+      "path": "scripts/ue4ss/Build-ServerMods.ps1",
+      "sha256": "b8919bb9183ff0626981759a0e07b2c8fc13cba60b990351d4c74e2ca1e5fe6a"
+    },
+    {
+      "path": "scripts/ue4ss/Package-ServerMod.ps1",
+      "sha256": "a114ec2cdc54efe9a447755cd49241785e99653c4ce3285772570ad4cda0a395"
+    },
+    {
+      "path": "scripts/ue4ss/Package-UE4SS-Runtime.ps1",
+      "sha256": "247f8f59c3ccecda61b961c523d0fa869e0c8194fe14251433b3be08e9d4b379"
+    },
+    {
+      "path": "scripts/ue4ss/Publish-ServerMod.ps1",
+      "sha256": "b4a9c89d3354dd2138f894abe50b7999b39971f898d588a449cefe60780d1e4b"
     },
     {
       "path": "scripts/update/Deploy-Updater.ps1",
@@ -854,6 +867,74 @@
     {
       "path": "sdk/Briefcase.DeceiveInc/src/SpyContracts.hpp",
       "sha256": "de0f1fcff8e68c4825d16b5ad25a693d18248ceb577ef608c6a909bc3737c8d8"
+    },
+    {
+      "path": "sdk/Briefcase.DeceiveInc/ue4ss/CMakeLists.txt",
+      "sha256": "806217abfb47c6c739010b048972fdb06e1a3dc40a20c1a343dd4c32ed87f38f"
+    },
+    {
+      "path": "sdk/Briefcase.DeceiveInc/ue4ss/include/Briefcase/DeceiveInc/Hooks.hpp",
+      "sha256": "00199991bbb0cccff469a79bbd8c55c6a49202321e9ac9e5371167a87d70a125"
+    },
+    {
+      "path": "sdk/Briefcase.DeceiveInc/ue4ss/include/Briefcase/DeceiveInc/LootDistribution.hpp",
+      "sha256": "f69fab0831e23a35bbf27043cf8839049ce3fa11f82a49a11069729fdff84924"
+    },
+    {
+      "path": "sdk/Briefcase.DeceiveInc/ue4ss/include/Briefcase/DeceiveInc/MatchState.hpp",
+      "sha256": "616a85619812fa23704638fa4707e8178abd8adb3eae18966377b7588b4321e7"
+    },
+    {
+      "path": "sdk/Briefcase.DeceiveInc/ue4ss/include/Briefcase/DeceiveInc/NativeStamina.hpp",
+      "sha256": "7176b5594f06e9a87a28c40f6be9eb8d16e9bcb81c8a52df0295c20965cccc1b"
+    },
+    {
+      "path": "sdk/Briefcase.DeceiveInc/ue4ss/include/Briefcase/DeceiveInc/Paths.hpp",
+      "sha256": "b307395a3afb647d5a5ed7ece08173c920562c5fd3e6211b83ef567df6c8031a"
+    },
+    {
+      "path": "sdk/Briefcase.DeceiveInc/ue4ss/include/Briefcase/DeceiveInc/Spy.hpp",
+      "sha256": "b489450915a1f08e595205f97f5a4fb210b109150114cc17dfb865674749d971"
+    },
+    {
+      "path": "sdk/Briefcase.DeceiveInc/ue4ss/src/Hooks.cpp",
+      "sha256": "086f70318cf7ff8f8176d504f98161c06d4e3a5f995715504c0328a19e32709e"
+    },
+    {
+      "path": "sdk/Briefcase.DeceiveInc/ue4ss/src/LootDistribution.cpp",
+      "sha256": "b48131d9726a94328fc5be26881e4bd6874952d08589f42dc23c5e559bbf7c03"
+    },
+    {
+      "path": "sdk/Briefcase.DeceiveInc/ue4ss/src/MatchState.cpp",
+      "sha256": "fde01c2631ddec9e9f22c57fbe161ffb1c44f6976872a4835b5ca959bfa8130d"
+    },
+    {
+      "path": "sdk/Briefcase.DeceiveInc/ue4ss/src/NativeStamina.cpp",
+      "sha256": "646555c7ee482caa768b8486394cca17afa2515f35f33018ff87d5c69b60531e"
+    },
+    {
+      "path": "sdk/Briefcase.DeceiveInc/ue4ss/src/NativeStaminaSites.cpp",
+      "sha256": "471180a556a4dd9be3ba2c7aa5fcebfc21ac7e7e79ea238118f9d33adeca9897"
+    },
+    {
+      "path": "sdk/Briefcase.DeceiveInc/ue4ss/src/NativeStaminaSites.hpp",
+      "sha256": "4b7a78f1cb351003c19eda78c5b6f420429c284cd9e1a933e1b1a773b4294a7a"
+    },
+    {
+      "path": "sdk/Briefcase.DeceiveInc/ue4ss/src/Paths.cpp",
+      "sha256": "5c1b14f954c4e73f59c92db21faf1fa04d0cd565f49ce8859ace7e6353bf0919"
+    },
+    {
+      "path": "sdk/Briefcase.DeceiveInc/ue4ss/src/Spy.cpp",
+      "sha256": "14042421c0f755708e09000b480657e300c931741b84c1704c15fb1b6dd22a3a"
+    },
+    {
+      "path": "sdk/Briefcase.DeceiveInc/ue4ss/tests/Contracts.cpp",
+      "sha256": "3e1956ea2f7c60d8c69c19373cc0f3bf0e6c17f16d28c513d2f1b3baa7ea84b0"
+    },
+    {
+      "path": "sdk/Briefcase.DeceiveInc/ue4ss/tests/NativeStaminaSites.cpp",
+      "sha256": "9153150dbc5c40877c6042459912916f43eade9386497bc34bffd42977c7b7de"
     },
     {
       "path": "sdk/Briefcase.ModApi/include/Briefcase/ModApi.h",
@@ -941,7 +1022,7 @@
     },
     {
       "path": "tests/AdminManagementContracts.cpp",
-      "sha256": "fb43f4825c52cd9183620fc5de6cf57357313262f79d249e47517ad35e53f17b"
+      "sha256": "5f9f155aa6a42a58ccbef5ea44b40ef32f411395e4f61c6e5d21af717807768e"
     },
     {
       "path": "tests/AdminPeerFixture.cpp",
@@ -957,7 +1038,7 @@
     },
     {
       "path": "tests/ClientContracts.cpp",
-      "sha256": "0c4d9b673a159934666e3853ef24d7268a07214833f070f6ffd4020949e77e17"
+      "sha256": "235ae8fe74bb5396e0ca45b6cbab3ea734f3074277fea82a1b2550dacab9aa85"
     },
     {
       "path": "tests/ClientDeployment.Contracts.ps1",
@@ -973,7 +1054,7 @@
     },
     {
       "path": "tests/ClientRenderingFixture.cpp",
-      "sha256": "fc4d5097bdabcdf636d8267848907809c7ca0b314d4bd7918984c6484b07a22d"
+      "sha256": "4358fd82c0fa4f0c379bb221e9e23d54a9b19103cb54e188e2034673f43c92a1"
     },
     {
       "path": "tests/Contracts.cpp",
@@ -981,7 +1062,7 @@
     },
     {
       "path": "tests/Deployment.Contracts.ps1",
-      "sha256": "ede2ce6498555f4b793ca285d39474adf52d1f2fac15423bf37d315f05fec8f4"
+      "sha256": "9ea77ae9c43ae0d6491fc26157490de6b27593a6585adf5070d6fb82f433e5a9"
     },
     {
       "path": "tests/EntryGateFixture.cpp",
@@ -1061,7 +1142,7 @@
     },
     {
       "path": "tests/ReleaseWorkflow.Contracts.ps1",
-      "sha256": "906d6c8a886b95170121c3e9666baf1a2b36b3820393bc4bee60e81ec51128ae"
+      "sha256": "640b339dde992528cdb63ee669f2504bbee91b9f6afbab53b159dcb4cb15b24a"
     },
     {
       "path": "tests/ServerDirectoryContracts.cpp",
@@ -1069,11 +1150,11 @@
     },
     {
       "path": "tests/ServerLauncherContracts.cpp",
-      "sha256": "b801f5cd851452de49cba5e8777197d76df2a87a03019f662b7087e0404ab3b7"
+      "sha256": "5eea6a1120b084eda9ccc2cb64d4df0ec6b24c6d8f81f969f7f34381625f355e"
     },
     {
       "path": "tests/ServerLauncherIntegration.ps1",
-      "sha256": "3a35ba225bf2fdf5a4c9afd50de70537ff02fc839abd1f5ec31a1beadefa12ce"
+      "sha256": "808df40bfed03f5becb0b5dadd4f68379d9b9561e1acac139289b2e0715d1d18"
     },
     {
       "path": "tests/SourcePublicationContracts.py",
@@ -1093,11 +1174,11 @@
     },
     {
       "path": "tests/WindowsUpdaterContracts.py",
-      "sha256": "a508413966f5041e5a6da82f5aca9f8e9c66e34601886ef950ca17b77f0fbb2b"
+      "sha256": "7f7c2fe48f651f54aa849788de60ad7c60acf24c6954c720b38ba84fe4082c27"
     },
     {
       "path": "tests/WindowsUpdaterDriver.cpp",
-      "sha256": "484fc26eb73f705dbc93531ef47eea8d388064c20be31924c9af96b4548668cf"
+      "sha256": "a6de38d01ccaeab5c2ace636ba15398f73cb48734b414ba887298668267fe959"
     },
     {
       "path": "tests/data/ClientSettingsFixture.hpp",
@@ -9473,7 +9554,11 @@
     },
     {
       "path": "tools/ServerRestart.cpp",
-      "sha256": "4413fdca6d30b7b7eb77f8ea5715d2e409606993ff3d3064121fb7a84c0aac7b"
+      "sha256": "694db7cd5a7dbc47e5b236222f902598fa2f628084b72890830d7c29fa928be0"
+    },
+    {
+      "path": "ue4ss/CMakeLists.txt",
+      "sha256": "a484ffe8708fc8847f2a633c484de14a16d9f8326d8ecaf3333e471f7587fd4a"
     }
   ]
 }

@@ -9,6 +9,10 @@ $expectedClient=@('version.dll','Briefcase\Core\Briefcase.NativeHost.dll','Brief
 $actualClient=@(Get-ChildItem -LiteralPath $ClientPackage -Filter *.dll -File -Recurse|
     ForEach-Object {$_.FullName.Substring($ClientPackage.TrimEnd('\').Length+1)})
 if(@(Compare-Object $expectedClient $actualClient).Count){throw 'Unexpected client DLL inventory.'}
+$expectedServer=@('version.dll','Briefcase\Core\Briefcase.NativeHost.dll','ue4ss\UE4SS.dll')
+$actualServer=@(Get-ChildItem -LiteralPath $ServerPackage -Filter *.dll -File -Recurse|
+    ForEach-Object {$_.FullName.Substring($ServerPackage.TrimEnd('\').Length+1)})
+if(@(Compare-Object $expectedServer $actualServer).Count){throw 'Unexpected server DLL inventory.'}
 foreach($package in @($ClientPackage,$ServerPackage)){
     if(-not(Test-Path -LiteralPath $package)){throw "Missing package: $package"}
     $bad=@(Get-ChildItem -LiteralPath $package -Recurse -File|Where-Object {$_.Extension -match '^\.(pdb|lib|obj|exe)$'})
@@ -16,7 +20,7 @@ foreach($package in @($ClientPackage,$ServerPackage)){
     $allowedRestart=Join-Path $ServerPackage 'Briefcase\Core\Tools\Briefcase.ServerRestart.exe'
     $allowedUpdater=Join-Path $ServerPackage 'Briefcase\Core\Tools\Briefcase.ServerUpdater.exe'
     $allowedClientLauncher=Join-Path $ClientPackage 'Briefcase.ClientLauncher.exe'
-    $bad=@($bad | Where-Object {$_.FullName -ine (Join-Path $ServerPackage 'Briefcase.ServerLauncher.exe') -and $_.FullName -ine $allowedClientLauncher -and $_.FullName -ine $allowedSetup -and $_.FullName -ine $allowedRestart -and $_.FullName -ine $allowedUpdater})
+    $bad=@($bad | Where-Object {$_.FullName -ine $allowedClientLauncher -and $_.FullName -ine $allowedSetup -and $_.FullName -ine $allowedRestart -and $_.FullName -ine $allowedUpdater})
     if($bad.Count){throw "Development artifacts in package: $($bad.Name -join ', ')"}
     foreach($file in Get-ChildItem -LiteralPath $package -Filter briefcase.mod.json -Recurse -File) {
         $manifest=Get-Content -LiteralPath $file.FullName -Raw|ConvertFrom-Json
@@ -34,11 +38,11 @@ foreach($package in @($ClientPackage,$ServerPackage)){
 $vswhere=Join-Path ([Environment]::GetFolderPath('ProgramFilesX86')) 'Microsoft Visual Studio\Installer\vswhere.exe'
 $vs=& $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
 $dumpbin=(Get-ChildItem -Path (Join-Path $vs 'VC\Tools\MSVC\*\bin\Hostx64\x64\dumpbin.exe')|Sort-Object FullName -Descending|Select-Object -First 1).FullName
-foreach($file in Get-ChildItem -LiteralPath $ServerPackage -File -Recurse | Where-Object {$_.Extension -in '.dll','.exe'}) {
+foreach($file in Get-ChildItem -LiteralPath (Join-Path $ServerPackage 'Briefcase') -File -Recurse | Where-Object {$_.Extension -in '.dll','.exe'}) {
     $imports=& $dumpbin /nologo /dependents $file.FullName
     if($LASTEXITCODE -or ($imports -match '(?i)d3d|dxgi|imgui|Client.Rendering')){throw "Graphics dependency or unreadable server binary: $($file.Name)"}
 }
-if(@(Get-ChildItem -LiteralPath $ServerPackage -Recurse|Where-Object {$_.Name -match '(?i)imgui|Client\.|OverlaySample|d3d|dxgi'}).Count){throw 'Client graphics component in server package.'}
+if(@(Get-ChildItem -LiteralPath (Join-Path $ServerPackage 'Briefcase') -Recurse|Where-Object {$_.Name -match '(?i)Client\.|OverlaySample|d3d|dxgi'}).Count){throw 'Client graphics component in server package.'}
 foreach($required in @('Briefcase.ClientLauncher.exe','Briefcase\Core\Localization\fr.json','Briefcase\Core\Localization\en.json','Briefcase\Core\Licenses\MbedTLS.txt','Briefcase\Core\Licenses\DearImGui.txt','Briefcase\loader.json')){
     if(-not(Test-Path -LiteralPath (Join-Path $ClientPackage $required))){throw "Missing client package file: $required"}
 }
@@ -57,8 +61,15 @@ foreach($required in @('Briefcase\Core\Tools\Briefcase.ServerUpdater.exe','Brief
 if(Test-Path -LiteralPath (Join-Path $ServerPackage 'Briefcase\updater.json')){throw 'Local update repository configuration in user package.'}
 
 if(Test-Path -LiteralPath (Join-Path $ServerPackage 'Briefcase/Mods')){throw 'Framework server package must not contain independent mods.'}
+$serverInventory=Get-Content -LiteralPath (Join-Path $ServerPackage 'Package.json') -Raw|ConvertFrom-Json
+$selectionRecord=@($serverInventory.files|Where-Object {$_.path -ceq 'ue4ss/Mods/mods.txt'})
+if($selectionRecord.Count -ne 1 -or $selectionRecord[0].preserve -ne $true){throw 'UE4SS mod selection is not marked for preservation.'}
 
-if(Test-Path -LiteralPath (Join-Path $ServerPackage 'version.dll')){throw 'Server package must use the launcher, not the client proxy.'}
-foreach($required in @('Briefcase.ServerLauncher.exe','Briefcase/Core/Briefcase.ServerBootstrap.dll','Briefcase/Core/Licenses/Detours.txt','Briefcase/Core/Licenses/miniz.txt')){
- if(-not(Test-Path -LiteralPath (Join-Path $ServerPackage $required))){throw "Missing launcher file: $required"}
+foreach($forbidden in @('Briefcase.ServerLauncher.exe','Briefcase/Core/Briefcase.ServerBootstrap.dll')){
+ if(Test-Path -LiteralPath (Join-Path $ServerPackage $forbidden)){throw "Legacy launcher file in proxy package: $forbidden"}
 }
+foreach($required in @('version.dll','ue4ss/UE4SS.dll','ue4ss/UE4SS-settings.ini','ue4ss/Mods/mods.txt')){
+ if(-not(Test-Path -LiteralPath (Join-Path $ServerPackage $required))){throw "Missing proxy runtime file: $required"}
+}
+$bundledUe4ssMods=@(Get-ChildItem -LiteralPath (Join-Path $ServerPackage 'ue4ss\Mods') -Directory -ErrorAction SilentlyContinue)
+if($bundledUe4ssMods.Count){throw 'Framework server package must not contain independent UE4SS mods.'}

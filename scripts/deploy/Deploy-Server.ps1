@@ -7,7 +7,7 @@ $paths = Get-DeploymentPaths -ServerWin64 $ServerWin64
 $package = if($PackagePath){[IO.Path]::GetFullPath($PackagePath)}else{Join-Path $paths.Project 'dist\Win64'}
 if($RuntimeOnly -and ($ModId -or $ActivateOnly)){throw 'RuntimeOnly cannot select or activate mods.'}
 $required = @()
-if (-not $ModId -or $IncludeRuntime) { $required += @('Briefcase.ServerLauncher.exe', 'Briefcase\Core\Briefcase.ServerBootstrap.dll', 'Briefcase\Core\Briefcase.NativeHost.dll', 'Briefcase\Core\Tools\Briefcase.ServerUpdater.exe') }
+if (-not $ModId -or $IncludeRuntime) { $required += @('version.dll', 'ue4ss\UE4SS.dll', 'ue4ss\UE4SS-settings.ini', 'ue4ss\Mods\mods.txt', 'Briefcase\Core\Briefcase.NativeHost.dll', 'Briefcase\Core\Tools\Briefcase.ServerUpdater.exe') }
 foreach ($relative in $required) {
     if (-not (Test-Path -LiteralPath (Join-Path $package $relative) -PathType Leaf)) { throw "Missing package file: $relative. Build first." }
 }
@@ -24,10 +24,10 @@ $files = @(Get-ChildItem -LiteralPath $package -File -Recurse)
 $inventory = foreach ($file in $files) {
     Assert-NoReparsePoint -Path $file.FullName
     $relative = [IO.Path]::GetRelativePath($package, $file.FullName)
-    $setupTool=$relative -cin @('Briefcase.ServerLauncher.exe','Briefcase\Core\Tools\Briefcase.AdminSetup.exe','Briefcase\Core\Tools\Briefcase.ServerRestart.exe','Briefcase\Core\Tools\Briefcase.ServerUpdater.exe')
+    $setupTool=$relative -cin @('Briefcase\Core\Tools\Briefcase.AdminSetup.exe','Briefcase\Core\Tools\Briefcase.ServerRestart.exe','Briefcase\Core\Tools\Briefcase.ServerUpdater.exe')
     if($RuntimeOnly -and $relative.StartsWith('Briefcase\Mods\',[StringComparison]::OrdinalIgnoreCase)){continue}
-    if (($file.Extension -notin @('.dll', '.json', '.txt', '.md') -and -not $setupTool)) { throw "Forbidden runtime file: $relative" }
-    if ($relative -ne 'Briefcase.ServerLauncher.exe' -and $relative -ne 'Package.json' -and $relative -ne 'version.dll' -and -not $relative.StartsWith('Briefcase\')) { throw "Unexpected package path: $relative" }
+    if (($file.Extension -notin @('.dll', '.json', '.txt', '.md', '.ini') -and -not $setupTool)) { throw "Forbidden runtime file: $relative" }
+    if ($relative -ne 'Package.json' -and $relative -ne 'version.dll' -and -not $relative.StartsWith('Briefcase\') -and -not $relative.StartsWith('ue4ss\')) { throw "Unexpected package path: $relative" }
     if ($ModId) {
         $selected = $relative.StartsWith("Briefcase\Mods\$ModId\", [StringComparison]::OrdinalIgnoreCase)
         $support = -not $relative.StartsWith('Briefcase\Mods\', [StringComparison]::OrdinalIgnoreCase)
@@ -47,18 +47,19 @@ $inventory = foreach ($file in $files) {
         Write-Host "Preserved local mod data: $relative"
         continue
     }
+    if ($relative -ieq 'ue4ss\Mods\mods.txt' -and (Test-Path -LiteralPath $destination)) {
+        Write-Host 'Preserved installed UE4SS mod selection: ue4ss\Mods\mods.txt'
+        continue
+    }
     [pscustomobject]@{ relative = $relative; source = $file.FullName; destination = $destination; sha256 = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash; replaces = (Test-Path -LiteralPath $destination) }
 }
 Assert-NoReparsePoint -Path (Join-Path $paths.Win64 'Briefcase\launch.json')
 Assert-NoReparsePoint -Path (Join-Path $paths.Win64 'Briefcase\Backups')
-$legacyProxy = Join-Path $paths.Win64 'version.dll'
-Assert-NoReparsePoint -Path $legacyProxy
-$removeProxy = (-not $ModId -or $IncludeRuntime) -and (Test-Path -LiteralPath $legacyProxy)
 $retired=@()
 $retiredDirectories=@()
 $legacyLocalization=Join-Path $paths.Win64 'Briefcase\Localization'
 if(-not $ModId -or $IncludeRuntime){
-    foreach($name in @('StartBriefcaseNativeServer.ps1')){
+    foreach($name in @('StartBriefcaseNativeServer.ps1','Briefcase.ServerLauncher.exe','Briefcase\Core\Briefcase.ServerBootstrap.dll')){
         $candidate=Join-Path $paths.Win64 $name
         Assert-NoReparsePoint -Path $candidate
         if(Test-Path -LiteralPath $candidate -PathType Leaf){$retired+=@([pscustomobject]@{relative=$name;path=$candidate})}
@@ -104,11 +105,6 @@ foreach($item in $retiredDirectories){
     New-Item -ItemType Directory -Path (Split-Path $saved) -Force|Out-Null
     Copy-Item -LiteralPath $item.path -Destination $saved -Recurse
 }
-if ($removeProxy) {
-    $savedProxy = Join-Path $backup 'version.dll'
-    Copy-Item -LiteralPath $legacyProxy -Destination $savedProxy
-    if ((Get-FileHash -LiteralPath $savedProxy).Hash -ne (Get-FileHash -LiteralPath $legacyProxy).Hash) { throw 'Proxy backup verification failed.' }
-}
 $launchConfig = Join-Path $paths.Win64 'Briefcase\launch.json'
 if (Test-Path -LiteralPath $launchConfig) { Copy-Item -LiteralPath $launchConfig -Destination (Join-Path $backup 'previous-launch.json') }
 foreach ($item in $inventory) {
@@ -116,7 +112,6 @@ foreach ($item in $inventory) {
     Copy-Item -LiteralPath $item.source -Destination $item.destination -Force
     if ((Get-FileHash -LiteralPath $item.destination -Algorithm SHA256).Hash -ne $item.sha256) { throw "Copy verification failed: $($item.relative)" }
 }
-if ($removeProxy) { Remove-Item -LiteralPath $legacyProxy }
 foreach($item in $retired){Remove-Item -LiteralPath $item.path -Force}
 foreach($item in $retiredDirectories){Remove-Item -LiteralPath $item.path -Recurse -Force}
 if((Test-Path -LiteralPath $legacyLocalization -PathType Container) -and
