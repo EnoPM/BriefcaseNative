@@ -22,6 +22,17 @@ Set-PinnedReplacement 'deps\first\Unreal\include\Unreal\ULocalPlayer.hpp' '    /
 # UE4SS 3.0.1 originally followed ImGuiColorTextEdit master. The current
 # branch targets newer ImGui APIs and no longer builds with UE4SS's ImGui 1.89.
 Set-PinnedReplacement 'deps\third\CMakeLists.txt' '    GIT_TAG master' '    GIT_TAG af7821926251feca84e35f8fa83eee84dae90424'
+# A shallow clone of the default branch does not contain this pinned commit.
+# Fetch its history so a clean release runner can check out the exact revision.
+$thirdParty = Join-Path $project 'third_party\RE-UE4SS\deps\third\CMakeLists.txt'
+$thirdPartyText = Get-Content -LiteralPath $thirdParty -Raw
+$shallowPattern = '(GIT_TAG af7821926251feca84e35f8fa83eee84dae90424\r?\n[ \t]*GIT_SHALLOW )TRUE'
+if ([regex]::Matches($thirdPartyText, $shallowPattern).Count -eq 1) {
+    $thirdPartyText = [regex]::Replace($thirdPartyText, $shallowPattern, '${1}FALSE')
+    [IO.File]::WriteAllText($thirdParty, $thirdPartyText, [Text.UTF8Encoding]::new($false))
+} elseif ($thirdPartyText -notmatch 'GIT_TAG af7821926251feca84e35f8fa83eee84dae90424\r?\n[ \t]*GIT_SHALLOW FALSE') {
+    throw 'Pinned ImGuiColorTextEdit checkout policy changed.'
+}
 foreach($repository in @('ocornut/imgui','UE4SS-RE/ImGuiColorTextEdit','juliettef/IconFontCppHeaders','zyantific/zydis',
                           'stevemk14ebr/PolyHook_2_0','MolecularMatters/raw_pdb')) {
     Set-PinnedReplacement 'deps\third\CMakeLists.txt' "git@github.com:$repository.git" "https://github.com/$repository.git"

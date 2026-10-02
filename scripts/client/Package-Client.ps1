@@ -3,6 +3,7 @@
 $project=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 & (Join-Path $PSScriptRoot 'Test-Client.ps1')
 & (Join-Path $project 'scripts\ue4ss\Build-ServerMods.ps1') -RuntimeOnly
+if ($LASTEXITCODE) { throw 'UE4SS runtime build failed.' }
 & (Join-Path $project 'scripts\ue4ss\Package-UE4SS-Runtime.ps1')
 $vswhere=Join-Path ([Environment]::GetFolderPath('ProgramFilesX86')) 'Microsoft Visual Studio\Installer\vswhere.exe'
 $vs=& $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath

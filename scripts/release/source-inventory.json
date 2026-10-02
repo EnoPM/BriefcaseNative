@@ -686,7 +686,7 @@
     },
     {
       "path": "scripts/build/Patch-UE4SS.ps1",
-      "sha256": "c437fba9e72ae917b1d4dd5607f7e28bf5192df6c7df9059c6f9ed6c398e864e"
+      "sha256": "d3409ffe444330f28b22c0c710e360ac2bfd71733a890f08801f7d6cd4df4b08"
     },
     {
       "path": "scripts/client/Assert-Package.ps1",
@@ -710,7 +710,7 @@
     },
     {
       "path": "scripts/client/Package-Client.ps1",
-      "sha256": "8e462d036368c870f9d50918437c04a18c046819d1fd9bbb9c237b33ff4f1cc9"
+      "sha256": "fa4892a265b0d7b21c74d87ca149a3daac8f5563c648b2bdb9372bfcd0af71bd"
     },
     {
       "path": "scripts/client/Start-Client.ps1",
