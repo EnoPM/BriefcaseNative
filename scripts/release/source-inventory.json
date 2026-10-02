@@ -34,6 +34,10 @@
       "sha256": "2580e70f8ded73954bdee6c74ef010da836c6002e1a6461d3efb4d313f58e509"
     },
     {
+      "path": ".github/FUNDING.yml",
+      "sha256": "aa506b30b76ff7b33208f04bbf47eff00b1ab90fd48eb024245014bc049af84a"
+    },
+    {
       "path": ".github/workflows/linux-server-core.yml",
       "sha256": "cd3a2dd3cbdccc09610ca8250dbf37fcc46afa756d95e3244cf305051aaa4fed"
     },
