@@ -686,7 +686,7 @@
     },
     {
       "path": "scripts/build/Patch-UE4SS.ps1",
-      "sha256": "d3409ffe444330f28b22c0c710e360ac2bfd71733a890f08801f7d6cd4df4b08"
+      "sha256": "1844d9d6ce7be7dd8fd2032493a2f33183c59e162a034762e198546599a8199e"
     },
     {
       "path": "scripts/client/Assert-Package.ps1",

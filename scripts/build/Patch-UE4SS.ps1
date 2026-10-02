@@ -18,6 +18,9 @@ Set-PinnedReplacement $initializer '        if (UnrealConfig.bHookLoadMap) { Hoo
 Set-PinnedReplacement 'deps\first\SinglePassSigScanner\src\SinglePassSigScanner.cpp' '(byte*)' '(uint8_t*)'
 Set-PinnedReplacement 'deps\first\Unreal\include\Unreal\VirtualFunctionHelper.hpp' 'DispatchMap.template find<ObjectClassType>(ObjectClass)' 'DispatchMap.find(ObjectClass)'
 Set-PinnedReplacement 'deps\first\Unreal\include\Unreal\ULocalPlayer.hpp' '    // TODO: Move to its own file.' ('    enum EAspectRatioAxisConstraint : int;'+[Environment]::NewLine+'    // TODO: Move to its own file.')
+# Ninja builds multiple UE4SS translation units concurrently. /Zi shares a
+# target PDB between compiler processes and can fail with C1041 on clean CI.
+Set-PinnedReplacement 'cmake\CompilerOptions\msvc.cmake' 'set(Shipping_FLAGS "/Zi" PARENT_SCOPE)' 'set(Shipping_FLAGS "/Z7" PARENT_SCOPE)'
 
 # UE4SS 3.0.1 originally followed ImGuiColorTextEdit master. The current
 # branch targets newer ImGui APIs and no longer builds with UE4SS's ImGui 1.89.
