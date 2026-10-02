@@ -10,6 +10,8 @@ BriefcaseNative adds a mod menu to the Windows client and native mod support to 
 
 The current release is for Windows. A new Linux release will be provided separately when its UE4SS integration is ready.
 
+BriefcaseNative is licensed under the [MIT License](LICENSE). Bundled third-party components retain their own licenses, included in the installation packages.
+
 ## Install the client
 
 1. Close the game.

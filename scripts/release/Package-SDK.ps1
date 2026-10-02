@@ -25,6 +25,7 @@ function New-BriefcaseSdk([ValidateSet('server','client')][string]$Environment) 
  }
  Copy-Item -LiteralPath (Join-Path $project 'build/_deps/json-src/include/nlohmann') -Destination (Join-Path $stage 'third_party/include') -Recurse
  Copy-Item -LiteralPath (Join-Path $project 'build/_deps/json-src/LICENSE.MIT') -Destination (Join-Path $stage 'Licenses/nlohmann-json.txt')
+ Copy-Item -LiteralPath (Join-Path $project 'LICENSE') -Destination (Join-Path $stage 'Licenses/BriefcaseNative.txt')
  $config=(Get-Content -LiteralPath (Join-Path $project 'sdk/BriefcaseNativeSDKConfig.cmake.in') -Raw).Replace('@VERSION@',$version).Replace('@ENVIRONMENT@',$Environment)
  [IO.File]::WriteAllText((Join-Path $stage 'cmake/BriefcaseNativeSDKConfig.cmake'),$config)
  $versionConfig=@'

@@ -87,6 +87,8 @@ install(TARGETS Briefcase.NativeHost RUNTIME DESTINATION Briefcase/Core COMPONEN
 install(TARGETS Briefcase.NativeHello RUNTIME DESTINATION Briefcase/Mods/briefcase.native-hello COMPONENT Samples)
 install(FILES samples/Briefcase.NativeHello/briefcase.mod.json DESTINATION Briefcase/Mods/briefcase.native-hello COMPONENT Samples)
 install(FILES third_party/RE-UE4SS/LICENSE DESTINATION Briefcase/Core/Licenses RENAME UE4SS.txt COMPONENT Briefcase)
+install(FILES LICENSE DESTINATION Briefcase/Core/Licenses RENAME BriefcaseNative.txt COMPONENT Briefcase)
+install(FILES LICENSE DESTINATION Briefcase/Core/Licenses RENAME BriefcaseNative.txt COMPONENT Client)
 install(FILES third_party/miniz-3.1.2/LICENSE DESTINATION Briefcase/Core/Licenses RENAME miniz.txt COMPONENT Briefcase)
 install(FILES "${json_SOURCE_DIR}/LICENSE.MIT" DESTINATION Briefcase/Core/Licenses RENAME nlohmann-json.txt COMPONENT Briefcase)
 install(FILES "${zydis_SOURCE_DIR}/LICENSE" DESTINATION Briefcase/Core/Licenses RENAME Zydis.txt COMPONENT Briefcase)

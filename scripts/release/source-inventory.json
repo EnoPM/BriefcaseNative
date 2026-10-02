@@ -7,6 +7,7 @@
     ".gitignore",
     "CMakeLists.txt",
     "CONTRIBUTING.md",
+    "LICENSE",
     "README.md",
     "VERSION",
     "cmake",
@@ -46,15 +47,19 @@
     },
     {
       "path": "CMakeLists.txt",
-      "sha256": "c11be46d201e4c6b41323c58482ab60aeb13292517377ca67db89138ce791600"
+      "sha256": "19d836b78eb3231a309c12a763c87f98da7c1da09c5834b4f844158180abce04"
     },
     {
       "path": "CONTRIBUTING.md",
       "sha256": "4c6657b184e01bb0549c2deff90b2ce14eea06fba9fa7189354a98c8241540f3"
     },
     {
+      "path": "LICENSE",
+      "sha256": "3b75f0fc556ed072cb1fd99c1892fb861453b8119464a6fee29b855dd825d9bd"
+    },
+    {
       "path": "README.md",
-      "sha256": "9dc451e4d103b370ede3e978bedd72225db2232a81e49d509a4e81b0f01bbc55"
+      "sha256": "a0329637d46ec2b45d30feeb32bc839ce2cabbc3b36d6e4f6adb208c71393454"
     },
     {
       "path": "VERSION",
@@ -690,7 +695,7 @@
     },
     {
       "path": "scripts/client/Assert-Package.ps1",
-      "sha256": "89d899c3709f972a38466a434ed17859de1111c43f3c9411d837889bd0802482"
+      "sha256": "c89b5373494410a1bf1f2b30876d525a8990fab5b91e4c913c107f2f34cc73ef"
     },
     {
       "path": "scripts/client/Build-Client.ps1",
@@ -786,7 +791,7 @@
     },
     {
       "path": "scripts/release/Assert-SDK.ps1",
-      "sha256": "b41ab2b43fae39f0cbaa4302fc0ca841bfb8392a184ca94da8ef1f882877a28f"
+      "sha256": "bb83598a6bcbeaf602577971c830d306a80a22527c3bbf66183fb4691023d726"
     },
     {
       "path": "scripts/release/Assert-Source.py",
@@ -794,7 +799,7 @@
     },
     {
       "path": "scripts/release/Package-SDK.ps1",
-      "sha256": "c173bce28e6ec5748e87a76f751f7d23ecb86da0f7fe40ce5cd3eb870935dd05"
+      "sha256": "7c5d8cf3fbc25ddafe27493e727ee8bbdf02b3505a406f6d070280dc3e525a00"
     },
     {
       "path": "scripts/release/Package-Tools.ps1",
@@ -830,7 +835,7 @@
     },
     {
       "path": "scripts/ue4ss/Package-ServerMod.ps1",
-      "sha256": "a114ec2cdc54efe9a447755cd49241785e99653c4ce3285772570ad4cda0a395"
+      "sha256": "ca7f9832a4ab2dbe2f95dda4cb400d28e11641ac2d1958ed2e604a73e23b12ac"
     },
     {
       "path": "scripts/ue4ss/Package-UE4SS-Runtime.ps1",

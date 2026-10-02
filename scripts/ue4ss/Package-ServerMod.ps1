@@ -43,13 +43,16 @@ try {
     New-Item -ItemType Directory -Path $dist -Force | Out-Null
     Copy-Item -LiteralPath $binary -Destination (Join-Path $dlls 'main.dll')
     if ($PreEntry) { Copy-Item -LiteralPath $early -Destination $mod }
-    foreach ($relative in @('Data\config.json', 'README.md')) {
+    foreach ($relative in @('Data\config.json', 'README.md', 'LICENSE')) {
         $source = Join-Path $repository $relative
         if (Test-Path -LiteralPath $source -PathType Leaf) {
             $target = Join-Path $mod $relative
             New-Item -ItemType Directory -Path (Split-Path $target) -Force | Out-Null
             Copy-Item -LiteralPath $source -Destination $target
         }
+    }
+    if (-not (Test-Path -LiteralPath (Join-Path $mod 'LICENSE') -PathType Leaf)) {
+        throw 'Mod license is missing.'
     }
     $jsonLicense = Join-Path $build '_deps\nlohmann_json-src\LICENSE.MIT'
     if (Test-Path -LiteralPath $jsonLicense -PathType Leaf) {
@@ -64,7 +67,7 @@ try {
     try {
         $entries = @($zip.Entries | Where-Object { -not [string]::IsNullOrEmpty($_.Name) } |
             ForEach-Object FullName)
-        $required = @("ue4ss/Mods/$InstallName/dlls/main.dll")
+        $required = @("ue4ss/Mods/$InstallName/dlls/main.dll", "ue4ss/Mods/$InstallName/LICENSE")
         if ($PreEntry) { $required += "ue4ss/Mods/$InstallName/BriefcasePreEntry.dll" }
         foreach ($name in $required) {
             if ($name -cnotin $entries) { throw "Mod archive is missing $name" }

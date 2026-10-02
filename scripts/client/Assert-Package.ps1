@@ -15,6 +15,12 @@ $actualServer=@(Get-ChildItem -LiteralPath $ServerPackage -Filter *.dll -File -R
 if(@(Compare-Object $expectedServer $actualServer).Count){throw 'Unexpected server DLL inventory.'}
 foreach($package in @($ClientPackage,$ServerPackage)){
     if(-not(Test-Path -LiteralPath $package)){throw "Missing package: $package"}
+    $frameworkLicense=Join-Path $package 'Briefcase\Core\Licenses\BriefcaseNative.txt'
+    if(-not(Test-Path -LiteralPath $frameworkLicense -PathType Leaf) -or
+       (Get-FileHash -LiteralPath $frameworkLicense -Algorithm SHA256).Hash -ne
+       (Get-FileHash -LiteralPath (Join-Path $project 'LICENSE') -Algorithm SHA256).Hash){
+        throw 'Missing or incorrect BriefcaseNative license in package.'
+    }
     $bad=@(Get-ChildItem -LiteralPath $package -Recurse -File|Where-Object {$_.Extension -match '^\.(pdb|lib|obj|exe)$'})
     $allowedSetup=Join-Path $ServerPackage 'Briefcase\Core\Tools\Briefcase.AdminSetup.exe'
     $allowedRestart=Join-Path $ServerPackage 'Briefcase\Core\Tools\Briefcase.ServerRestart.exe'
