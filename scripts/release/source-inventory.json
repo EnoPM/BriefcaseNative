@@ -883,7 +883,7 @@
     },
     {
       "path": "sdk/Briefcase.DeceiveInc/ue4ss/include/Briefcase/DeceiveInc/Hooks.hpp",
-      "sha256": "00199991bbb0cccff469a79bbd8c55c6a49202321e9ac9e5371167a87d70a125"
+      "sha256": "bdce8c1aa1bfd7541cc0d01df379f5c973b8c1e31f75e16cadddfdd6f24d6a9e"
     },
     {
       "path": "sdk/Briefcase.DeceiveInc/ue4ss/include/Briefcase/DeceiveInc/LootDistribution.hpp",
@@ -895,7 +895,7 @@
     },
     {
       "path": "sdk/Briefcase.DeceiveInc/ue4ss/include/Briefcase/DeceiveInc/NativeStamina.hpp",
-      "sha256": "7176b5594f06e9a87a28c40f6be9eb8d16e9bcb81c8a52df0295c20965cccc1b"
+      "sha256": "91953029c869a88fef194a6c7e9232bde9364b91bf0c95d4b4be01ac749a657c"
     },
     {
       "path": "sdk/Briefcase.DeceiveInc/ue4ss/include/Briefcase/DeceiveInc/Paths.hpp",
@@ -907,7 +907,7 @@
     },
     {
       "path": "sdk/Briefcase.DeceiveInc/ue4ss/src/Hooks.cpp",
-      "sha256": "086f70318cf7ff8f8176d504f98161c06d4e3a5f995715504c0328a19e32709e"
+      "sha256": "5a9cc99cba1f016c419d8e60a8a3a5e99343bed180e43b1aa36653d7229002bd"
     },
     {
       "path": "sdk/Briefcase.DeceiveInc/ue4ss/src/LootDistribution.cpp",
@@ -919,15 +919,15 @@
     },
     {
       "path": "sdk/Briefcase.DeceiveInc/ue4ss/src/NativeStamina.cpp",
-      "sha256": "646555c7ee482caa768b8486394cca17afa2515f35f33018ff87d5c69b60531e"
+      "sha256": "874773efec32150c978f9db0ad0430b7563dfa9721fce455789d780ece502c22"
     },
     {
       "path": "sdk/Briefcase.DeceiveInc/ue4ss/src/NativeStaminaSites.cpp",
-      "sha256": "471180a556a4dd9be3ba2c7aa5fcebfc21ac7e7e79ea238118f9d33adeca9897"
+      "sha256": "74d546ffe35e4f9026b232dc21d18499ae21d56ca9272f1a763038f5f2e2f655"
     },
     {
       "path": "sdk/Briefcase.DeceiveInc/ue4ss/src/NativeStaminaSites.hpp",
-      "sha256": "4b7a78f1cb351003c19eda78c5b6f420429c284cd9e1a933e1b1a773b4294a7a"
+      "sha256": "6e3e7b61053cd029a1672934ce41f153b346c7abf45ad13b0a6eaa3106bd4e05"
     },
     {
       "path": "sdk/Briefcase.DeceiveInc/ue4ss/src/Paths.cpp",
@@ -943,7 +943,7 @@
     },
     {
       "path": "sdk/Briefcase.DeceiveInc/ue4ss/tests/NativeStaminaSites.cpp",
-      "sha256": "9153150dbc5c40877c6042459912916f43eade9386497bc34bffd42977c7b7de"
+      "sha256": "9697735072671911d869be6ab1ef1e3617acf277dce0155e5bd9fb36ec7050fd"
     },
     {
       "path": "sdk/Briefcase.ModApi/include/Briefcase/ModApi.h",
