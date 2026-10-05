@@ -112,4 +112,47 @@ std::uintptr_t find_native_reduce_stamina(std::span<const std::uint8_t> executab
     return *candidate;
 }
 
+std::uintptr_t find_native_reset_stamina(std::span<const std::uint8_t> executable_text,
+                                         std::uintptr_t text_address,
+                                         std::uintptr_t thunk_address) {
+    if (!text_address || thunk_address < text_address ||
+        thunk_address - text_address >= executable_text.size())
+        throw std::runtime_error("Reflected ResetStaminaToMax thunk is outside game code");
+
+    const auto start = static_cast<std::size_t>(thunk_address - text_address);
+    const auto code = executable_text.subspan(start, std::min<std::size_t>(128, executable_text.size() - start));
+    ZydisDecoder decoder{};
+    if (!ZYAN_SUCCESS(ZydisDecoderInit(&decoder, ZYDIS_MACHINE_MODE_LONG_64,
+                                       ZYDIS_STACK_WIDTH_64)))
+        throw std::runtime_error("Cannot initialize ResetStaminaToMax decoder");
+
+    std::size_t cursor{};
+    while (cursor < code.size()) {
+        Instruction instruction{};
+        if (!decode(decoder, code, cursor, instruction))
+            throw std::runtime_error("Cannot decode reflected ResetStaminaToMax thunk");
+        if (instruction.code.mnemonic == ZYDIS_MNEMONIC_JMP) {
+            if (instruction.code.operand_count_visible != 1 ||
+                instruction.operands[0].type != ZYDIS_OPERAND_TYPE_IMMEDIATE ||
+                !instruction.operands[0].imm.is_relative)
+                break;
+            const auto destination = static_cast<std::int64_t>(thunk_address + instruction.offset) +
+                                     instruction.code.length + instruction.operands[0].imm.value.s;
+            if (destination <= 0)
+                break;
+            const auto target = static_cast<std::uintptr_t>(destination);
+            if (target < text_address || target - text_address >= executable_text.size() ||
+                (target >= thunk_address && target < thunk_address + code.size()))
+                break;
+            return target;
+        }
+        if (instruction.code.mnemonic == ZYDIS_MNEMONIC_RET ||
+            instruction.code.meta.category == ZYDIS_CATEGORY_COND_BR ||
+            instruction.code.meta.category == ZYDIS_CATEGORY_CALL ||
+            instruction.code.meta.category == ZYDIS_CATEGORY_UNCOND_BR)
+            break;
+    }
+    throw std::runtime_error("Reflected ResetStaminaToMax thunk layout changed");
+}
+
 } // namespace briefcase::deceive::detail

@@ -34,4 +34,26 @@ class NativeStaminaHook final {
 [[nodiscard]] NativeStaminaHook hook_native_reduce_stamina(
     NativeStaminaCallback before, NativeStaminaCallback after = {});
 
+// Observes direct native resets, including calls that bypass ProcessEvent.
+class NativeResetStaminaHook final {
+  public:
+    NativeResetStaminaHook() noexcept;
+    NativeResetStaminaHook(const NativeResetStaminaHook &) = delete;
+    NativeResetStaminaHook &operator=(const NativeResetStaminaHook &) = delete;
+    NativeResetStaminaHook(NativeResetStaminaHook &&) noexcept;
+    NativeResetStaminaHook &operator=(NativeResetStaminaHook &&) noexcept;
+    ~NativeResetStaminaHook();
+
+    [[nodiscard]] explicit operator bool() const noexcept { return implementation_ != nullptr; }
+    void reset() noexcept;
+
+  private:
+    struct Implementation;
+    explicit NativeResetStaminaHook(std::unique_ptr<Implementation>) noexcept;
+    std::unique_ptr<Implementation> implementation_;
+    friend NativeResetStaminaHook hook_native_reset_stamina(std::function<void(Spy)>);
+};
+
+[[nodiscard]] NativeResetStaminaHook hook_native_reset_stamina(std::function<void(Spy)> after);
+
 } // namespace briefcase::deceive

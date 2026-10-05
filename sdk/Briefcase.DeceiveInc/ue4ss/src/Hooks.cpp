@@ -1,6 +1,8 @@
 #include <Briefcase/DeceiveInc/Hooks.hpp>
 
 #include <Unreal/UFunction.hpp>
+#include <Unreal/UClass.hpp>
+#include <Unreal/UObject.hpp>
 #include <Unreal/UObjectGlobals.hpp>
 #include <stdexcept>
 #include <utility>
@@ -79,6 +81,37 @@ FunctionHook hook_reset_stamina(SpyCallback after) {
                                                          void *) { callback(Spy{context.Context}); }}
                        : UnrealScriptFunctionCallable{no_op};
     const auto ids = UObjectGlobals::RegisterHook(function, no_op, std::move(post), nullptr);
+    return {function, ids.first, ids.second};
+}
+
+namespace {
+auto register_spy_lifecycle(const wchar_t *path, SpyCallback after, UClass *filter = nullptr) {
+    auto *function = required(path);
+    auto post = UnrealScriptFunctionCallable{[callback = std::move(after), filter](
+                                                UnrealScriptFunctionCallableContext &context,
+                                                void *) {
+        if (context.Context && (!filter || context.Context->IsA(filter)))
+            callback(Spy{context.Context});
+    }};
+    const auto ids = UObjectGlobals::RegisterHook(function, no_op, std::move(post), nullptr);
+    return std::pair{function, ids};
+}
+} // namespace
+
+FunctionHook hook_spy_server_begin_play(SpyCallback after) {
+    if (!after) throw std::invalid_argument("A Spy begin-play callback is required");
+    auto [function, ids] = register_spy_lifecycle(
+        STR("/Script/DeceiveInc.Spy:BP_OnServerBeginPlay"), std::move(after));
+    return {function, ids.first, ids.second};
+}
+
+FunctionHook hook_actor_receive_begin_play(SpyCallback after) {
+    if (!after) throw std::invalid_argument("An Actor begin-play callback is required");
+    auto *spy_class = UObjectGlobals::StaticFindObject<UClass *>(
+        nullptr, nullptr, STR("/Script/DeceiveInc.Spy"));
+    if (!spy_class) throw std::runtime_error("DeceiveInc.Spy class is unavailable");
+    auto [function, ids] = register_spy_lifecycle(
+        STR("/Script/Engine.Actor:ReceiveBeginPlay"), std::move(after), spy_class);
     return {function, ids.first, ids.second};
 }
 

@@ -21,6 +21,8 @@ class FunctionHook final {
     friend FunctionHook hook_reduce_stamina(std::function<void(Spy, float &)>,
                                              std::function<void(Spy, float &)>);
     friend FunctionHook hook_reset_stamina(std::function<void(Spy)>);
+    friend FunctionHook hook_spy_server_begin_play(std::function<void(Spy)>);
+    friend FunctionHook hook_actor_receive_begin_play(std::function<void(Spy)>);
     FunctionHook(void *function, int pre, int post) noexcept
         : function_(function), pre_(pre), post_(post) {}
 
@@ -35,5 +37,7 @@ using SpyCallback = std::function<void(Spy)>;
 [[nodiscard]] FunctionHook hook_reduce_stamina(StaminaCallback before = {},
                                                 StaminaCallback after = {});
 [[nodiscard]] FunctionHook hook_reset_stamina(SpyCallback after);
+[[nodiscard]] FunctionHook hook_spy_server_begin_play(SpyCallback after);
+[[nodiscard]] FunctionHook hook_actor_receive_begin_play(SpyCallback after);
 
 } // namespace briefcase::deceive

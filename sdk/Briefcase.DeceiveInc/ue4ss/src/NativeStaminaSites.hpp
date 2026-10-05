@@ -14,4 +14,10 @@ namespace briefcase::deceive::detail {
     std::span<const std::uint8_t> executable_text, std::uintptr_t text_address,
     std::uintptr_t thunk_address);
 
+// ResetStaminaToMax's reflected entry tail-jumps into its native implementation.
+// Resolve that jump rather than relying on a build-specific address.
+[[nodiscard]] std::uintptr_t find_native_reset_stamina(
+    std::span<const std::uint8_t> executable_text, std::uintptr_t text_address,
+    std::uintptr_t thunk_address);
+
 } // namespace briefcase::deceive::detail

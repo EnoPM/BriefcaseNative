@@ -50,6 +50,17 @@ std::uintptr_t native_reduce_stamina_address() {
         text, reinterpret_cast<std::uintptr_t>(text.data()),
         reinterpret_cast<std::uintptr_t>(function->GetFuncPtr()));
 }
+
+std::uintptr_t native_reset_stamina_address() {
+    auto *function = RC::Unreal::UObjectGlobals::StaticFindObject<RC::Unreal::UFunction *>(
+        nullptr, nullptr, STR("/Script/DeceiveInc.Spy:ResetStaminaToMax"));
+    if (!function || !function->GetFuncPtr())
+        throw std::runtime_error("Reflected Spy:ResetStaminaToMax is unavailable");
+    const auto text = game_code();
+    return detail::find_native_reset_stamina(
+        text, reinterpret_cast<std::uintptr_t>(text.data()),
+        reinterpret_cast<std::uintptr_t>(function->GetFuncPtr()));
+}
 } // namespace
 
 struct NativeStaminaHook::Implementation {
@@ -119,6 +130,63 @@ NativeStaminaHook hook_native_reduce_stamina(NativeStaminaCallback before,
         std::make_unique<NativeStaminaHook::Implementation>(std::move(before), std::move(after))};
 }
 
+struct NativeResetStaminaHook::Implementation {
+    using Original = void (*)(RC::Unreal::UObject *);
+    inline static Implementation *active{};
+
+    std::function<void(Spy)> after;
+    std::uint64_t trampoline{};
+    std::unique_ptr<PLH::x64Detour> detour;
+
+    explicit Implementation(std::function<void(Spy)> callback) : after(std::move(callback)) {
+        if (active)
+            throw std::runtime_error("Native ResetStaminaToMax hook is already installed");
+        const auto target = native_reset_stamina_address();
+        detour = std::make_unique<PLH::x64Detour>(static_cast<std::uint64_t>(target),
+                                                  reinterpret_cast<std::uint64_t>(&dispatch),
+                                                  &trampoline);
+        active = this;
+        if (!detour->hook()) {
+            active = nullptr;
+            detour.reset();
+            throw std::runtime_error("Unable to install native ResetStaminaToMax hook");
+        }
+    }
+
+    ~Implementation() {
+        if (detour)
+            detour->unHook();
+        if (active == this)
+            active = nullptr;
+    }
+
+    static void dispatch(RC::Unreal::UObject *object) noexcept {
+        auto *self = active;
+        if (!self || !self->trampoline)
+            return;
+        reinterpret_cast<Original>(self->trampoline)(object);
+        try {
+            self->after(Spy{object});
+        } catch (...) {
+        }
+    }
+};
+
+NativeResetStaminaHook::NativeResetStaminaHook(std::unique_ptr<Implementation> implementation) noexcept
+    : implementation_(std::move(implementation)) {}
+NativeResetStaminaHook::NativeResetStaminaHook() noexcept = default;
+NativeResetStaminaHook::NativeResetStaminaHook(NativeResetStaminaHook &&) noexcept = default;
+NativeResetStaminaHook &NativeResetStaminaHook::operator=(NativeResetStaminaHook &&) noexcept = default;
+NativeResetStaminaHook::~NativeResetStaminaHook() = default;
+void NativeResetStaminaHook::reset() noexcept { implementation_.reset(); }
+
+NativeResetStaminaHook hook_native_reset_stamina(std::function<void(Spy)> after) {
+    if (!after)
+        throw std::invalid_argument("A native ResetStaminaToMax callback is required");
+    return NativeResetStaminaHook{std::make_unique<NativeResetStaminaHook::Implementation>(
+        std::move(after))};
+}
+
 } // namespace briefcase::deceive
 #else
 #include <stdexcept>
@@ -132,6 +200,16 @@ NativeStaminaHook::~NativeStaminaHook() = default;
 void NativeStaminaHook::reset() noexcept { implementation_.reset(); }
 NativeStaminaHook hook_native_reduce_stamina(NativeStaminaCallback, NativeStaminaCallback) {
     throw std::runtime_error("Native stamina hooks are not available on this platform");
+}
+struct NativeResetStaminaHook::Implementation {};
+NativeResetStaminaHook::NativeResetStaminaHook(std::unique_ptr<Implementation>) noexcept {}
+NativeResetStaminaHook::NativeResetStaminaHook() noexcept = default;
+NativeResetStaminaHook::NativeResetStaminaHook(NativeResetStaminaHook &&) noexcept = default;
+NativeResetStaminaHook &NativeResetStaminaHook::operator=(NativeResetStaminaHook &&) noexcept = default;
+NativeResetStaminaHook::~NativeResetStaminaHook() = default;
+void NativeResetStaminaHook::reset() noexcept {}
+NativeResetStaminaHook hook_native_reset_stamina(std::function<void(Spy)>) {
+    throw std::runtime_error("Native ResetStaminaToMax hook currently supports Windows servers only");
 }
 } // namespace briefcase::deceive
 #endif

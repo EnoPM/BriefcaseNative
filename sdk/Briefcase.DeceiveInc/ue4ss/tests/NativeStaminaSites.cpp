@@ -35,6 +35,13 @@ void call(std::vector<std::uint8_t> &code, std::size_t at, std::size_t destinati
     std::memcpy(code.data() + at + 1, &displacement, sizeof(displacement));
 }
 
+void jump(std::vector<std::uint8_t> &code, std::size_t at, std::size_t destination) {
+    code[at] = 0xe9;
+    const auto displacement = static_cast<std::int32_t>(destination) -
+                              static_cast<std::int32_t>(at + 5);
+    std::memcpy(code.data() + at + 1, &displacement, sizeof(displacement));
+}
+
 std::vector<std::uint8_t> fixture() {
     std::vector<std::uint8_t> code(512, 0x90);
     // Unreal's reflected thunk first materializes a float parameter on its
@@ -51,7 +58,18 @@ std::vector<std::uint8_t> fixture() {
     return code;
 }
 
-std::uintptr_t resolve_shipping_image(const char *path, const char *thunk_rva_text) {
+std::vector<std::uint8_t> reset_fixture() {
+    std::vector<std::uint8_t> code(512, 0x90);
+    constexpr std::array<std::uint8_t, 4> parameter{0x48, 0x8b, 0x42, 0x20};
+    std::memcpy(code.data() + thunk, parameter.data(), parameter.size());
+    jump(code, thunk + 4, target);
+    code[target] = 0x53;
+    code[target + 1] = 0xc3;
+    return code;
+}
+
+std::uintptr_t resolve_shipping_image(const char *path, const char *thunk_rva_text,
+                                      bool reset = false) {
     std::ifstream input(path, std::ios::binary);
     if (!input) throw std::runtime_error("Cannot open Shipping executable");
     const std::vector<std::uint8_t> image{std::istreambuf_iterator<char>(input), {}};
@@ -75,9 +93,11 @@ std::uintptr_t resolve_shipping_image(const char *path, const char *thunk_rva_te
             throw std::runtime_error("Shipping code section is outside file");
         const auto text = std::span{image.data() + section.PointerToRawData,
                                     static_cast<std::size_t>(section.SizeOfRawData)};
-        const auto resolved = briefcase::deceive::detail::find_native_reduce_stamina(
-            text, nt->OptionalHeader.ImageBase + section.VirtualAddress,
-            nt->OptionalHeader.ImageBase + thunk_rva);
+        const auto address = nt->OptionalHeader.ImageBase + section.VirtualAddress;
+        const auto thunk_address = nt->OptionalHeader.ImageBase + thunk_rva;
+        const auto resolved = reset
+            ? briefcase::deceive::detail::find_native_reset_stamina(text, address, thunk_address)
+            : briefcase::deceive::detail::find_native_reduce_stamina(text, address, thunk_address);
         return resolved - nt->OptionalHeader.ImageBase;
     }
     throw std::runtime_error("Shipping code section is missing");
@@ -124,12 +144,39 @@ int main(int argc, char **argv) {
             (void)briefcase::deceive::detail::find_native_reduce_stamina(
                 code, base, base + code.size());
         });
+        auto reset = reset_fixture();
+        const auto find_reset = [&](const auto &bytes) {
+            return briefcase::deceive::detail::find_native_reset_stamina(
+                bytes, base, base + thunk);
+        };
+        require(find_reset(reset) == base + target);
+        auto moved_reset = reset_fixture();
+        jump(moved_reset, thunk + 4, target + 0x40);
+        require(find_reset(moved_reset) == base + target + 0x40);
+        auto indirect_reset = reset_fixture();
+        indirect_reset[thunk + 4] = 0xff;
+        reject([&] { (void)find_reset(indirect_reset); });
+        auto outside_reset = reset_fixture();
+        jump(outside_reset, thunk + 4, 0x400);
+        reject([&] { (void)find_reset(outside_reset); });
+        auto early_return = reset_fixture();
+        early_return[thunk + 4] = 0xc3;
+        reject([&] { (void)find_reset(early_return); });
+        auto call_before_jump = reset_fixture();
+        call(call_before_jump, thunk + 4, target + 0x20);
+        jump(call_before_jump, thunk + 9, target);
+        reject([&] { (void)find_reset(call_before_jump); });
         std::cout << "PASS native stamina thunk discovery and fail-closed contracts\n";
-        if (argc == 3) {
+        if (argc == 4) {
+            const auto site = resolve_shipping_image(argv[1], argv[2]);
+            std::cout << "Shipping native ReduceStamina RVA: 0x" << std::hex << site << '\n';
+            const auto reset_site = resolve_shipping_image(argv[1], argv[3], true);
+            std::cout << "Shipping native ResetStaminaToMax RVA: 0x" << std::hex << reset_site << '\n';
+        } else if (argc == 3) {
             const auto site = resolve_shipping_image(argv[1], argv[2]);
             std::cout << "Shipping native ReduceStamina RVA: 0x" << std::hex << site << '\n';
         } else if (argc != 1) {
-            throw std::runtime_error("Usage: test [Shipping.exe thunk-rva]");
+            throw std::runtime_error("Usage: test [Shipping.exe reduce-thunk-rva [reset-thunk-rva]]");
         }
         return 0;
     } catch (const std::exception &error) {
