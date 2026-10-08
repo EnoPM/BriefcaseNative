@@ -1,0 +1,6 @@
+[2026.10.02-14.03.15:534][360]LogDIGameRules: ADeceiveIncMatchGameState::OnNewGamePhaseSet[1527] :: Spy Game Phase : {ESpyGamePhase::VAULT_LOCKED}
+[2026.10.02-14.04.53:326][306]LogTemp: UHealthComponent::ProcessDamage[406] :: {BPSpy_Vigil_Main_V1_C_2147470741} Health Changed: 51.0 (6.25)
+[2026.10.02-14.04.54:377][338]LogTemp: UInteractableComponent::CompleteInteraction[705] :: CompleteInteraction [BP_VaultUnlockTerminal_C_2147475839]: <BPSpy_Squire_Shadow_Mask_Dark_V1_C_2147473066>
+[2026.10.02-14.04.54:414][338]LogWindows: Error: Unhandled Exception: EXCEPTION_ACCESS_VIOLATION reading address 0x00000000000011e1
+	"matchResult": "MissionSucess_ObjectiveExtracted, WinningFID: 0",
+[2026.10.02-14.46.29:706][244]LogGameplayResourcesComponent: UGameplayResourcesComponent::AddResource[385] :: 1 Resource of type EGameplayResourcesType::Mission_Objective added to BPSpy_Squire_Shadow_Mask_Dark_V1_C_2147472948

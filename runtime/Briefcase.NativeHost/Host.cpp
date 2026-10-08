@@ -413,10 +413,14 @@ extern "C" __declspec(dllexport) uint32_t __cdecl BriefcasePrepare(uint32_t game
         bc::log("Working directory: " + exe.parent_path().string());
         bc::game_image = base;
         bc::server_config_root = (exe.parent_path() / "../../Saved/Config/WindowsServer").lexically_normal();
-        bc::external_unreal_runtime = !client &&
-                                      std::filesystem::is_regular_file(exe.parent_path() / "ue4ss/UE4SS.dll");
-        bc::discover_mods(root / "Mods");
-        bc::load_phase("startup");
+        bc::external_unreal_runtime =
+            std::filesystem::is_regular_file(exe.parent_path() / "ue4ss/UE4SS.dll");
+        if (!client) {
+            bc::discover_mods(root / "Mods");
+            bc::load_phase("startup");
+        } else {
+            bc::log("Client mods and their menus are owned by UE4SS; legacy native mod loader disabled");
+        }
         bc::startup_phase = false;
         bc::bootstrap_ms =
             std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - bc::start_time)
@@ -443,11 +447,7 @@ extern "C" __declspec(dllexport) uint32_t __cdecl BriefcasePrepare(uint32_t game
 extern "C" __declspec(dllexport) uint32_t __cdecl BriefcaseRun() noexcept {
     try {
         if (bc::environment == bc::Environment::client) {
-            wchar_t path[32768]{};
-            GetModuleFileNameW(nullptr, path, 32768);
-            bc::start_client_module(std::filesystem::path(path).parent_path() / "Briefcase");
-            bc::load_phase("ready", true);
-            bc::run_control_plane();
+            bc::log("Client UE4SS runtime active; framework menu and administration client disabled");
             return 0;
         }
         if (!bc::external_unreal_runtime) {
@@ -457,7 +457,8 @@ extern "C" __declspec(dllexport) uint32_t __cdecl BriefcaseRun() noexcept {
                 throw std::runtime_error("Backend did not become ready within 90 seconds");
             bc::load_phase("ready");
         }
-        bc::start_admin_server();
+        // Server administration is moving to the standalone local manager.
+        // The framework process exposes no client/server administration endpoint.
         bc::run_control_plane();
         return 0;
     } catch (const std::exception &e) {

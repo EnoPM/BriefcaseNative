@@ -120,24 +120,6 @@ int supervise(const fs::path& game, const std::vector<std::string>& arguments) {
     std::signal(SIGINT, stop); std::signal(SIGTERM, stop);
     while (!stopping) {
         require(!game_running(game), "Dedicated server already running");
-        const auto result = Updater(root).update([&](const std::string& message) { log(root, message); });
-        if (stopping) return 0;
-        if (result == "installed") {
-            Updater(root).cleanup([&](const std::string& message) { log(root, message); });
-            // CLOEXEC releases the existing lock only if exec succeeds. No unlock gap.
-            const auto target = package_path(root, "Briefcase.ServerLauncher");
-            std::vector<std::string> values{target.string(), "--server", game.string(), "--"};
-            values.insert(values.end(), arguments.begin(), arguments.end());
-            std::vector<char*> argv;
-            for (auto& value : values) argv.push_back(value.data());
-            argv.push_back(nullptr);
-            execv(target.c_str(), argv.data());
-            throw std::runtime_error("Cannot restart updated launcher");
-        }
-        const auto mods = Updater(root).update_mods([&](const std::string& message) { log(root, message); });
-        write_json(package_path(root, "Briefcase/Updates/last-result.json"),
-                   {{"framework", result}, {"mods", mods}, {"checkedAt", std::time(nullptr)}});
-        Updater(root).cleanup([&](const std::string& message) { log(root, message); });
         if (ensure_eac_disabled(root, "LinuxServer"))
             log(root, "Configured sb.DisableEAC=1 for the Briefcase server.");
         int pair[2]; require(socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, pair) == 0, "Cannot create restart channel");

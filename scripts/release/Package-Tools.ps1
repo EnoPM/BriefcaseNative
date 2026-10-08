@@ -64,8 +64,9 @@ function Expand-PackageArchive([string]$Archive,[string]$Stage) {
     } finally {$zip.Dispose()}
 }
 function Test-FrameworkPackagePath([string]$Relative) {
-    return ($Relative -cin @('version.dll','Package.json','ue4ss/UE4SS.dll','ue4ss/UE4SS-settings.ini','ue4ss/Mods/mods.txt') -or
-        $Relative -cmatch '^Briefcase/Core/(Briefcase\.NativeHost\.dll|Tools/Briefcase\.(AdminSetup|ServerRestart|ServerUpdater)\.exe)$' -or
+    return ($Relative -cin @('version.dll','Package.json','ue4ss/UE4SS.dll','ue4ss/UE4SS-settings.ini','ue4ss/Mods/mods.txt',
+        'ue4ss/Mods/BriefcaseServerBridge/dlls/main.dll','ue4ss/Mods/BriefcaseServerBridge/enabled.txt') -or
+        $Relative -cmatch '^Briefcase/Core/(Briefcase\.NativeHost\.dll|Tools/Briefcase\.AdminSetup\.exe)$' -or
         $Relative -cmatch '^Briefcase/Core/Updater/(updater\.example\.json|build\.json)$' -or
         $Relative -cmatch '^Briefcase/Core/(Docs|Licenses|Localization)/[A-Za-z0-9_./-]+\.(json|txt|md)$' -or
         $Relative -cmatch '^ue4ss/Licenses/[A-Za-z0-9_.-]+\.txt$')
@@ -88,19 +89,20 @@ function Read-FrameworkPackage([string]$Stage,[string]$Version,[string]$GameHash
         if($file.path -ceq 'ue4ss/Mods/mods.txt' -and $file.preserve -ne $true){throw 'UE4SS mod selection must be preserved.'}
     }
     foreach($file in Get-ChildItem -LiteralPath $Stage -Recurse -File){if($file.FullName -ine $manifestPath -and -not $seen.Contains($file.FullName)){throw 'Unlisted package file.'}}
-    foreach($required in @('version.dll','ue4ss/UE4SS.dll','ue4ss/UE4SS-settings.ini','ue4ss/Mods/mods.txt','Briefcase/Core/Briefcase.NativeHost.dll',
-        'Briefcase/Core/Tools/Briefcase.AdminSetup.exe','Briefcase/Core/Tools/Briefcase.ServerRestart.exe','Briefcase/Core/Tools/Briefcase.ServerUpdater.exe','Briefcase/Core/Updater/build.json')){
+    foreach($required in @('version.dll','ue4ss/UE4SS.dll','ue4ss/UE4SS-settings.ini','ue4ss/Mods/mods.txt',
+        'ue4ss/Mods/BriefcaseServerBridge/dlls/main.dll','ue4ss/Mods/BriefcaseServerBridge/enabled.txt','Briefcase/Core/Briefcase.NativeHost.dll',
+        'Briefcase/Core/Tools/Briefcase.AdminSetup.exe','Briefcase/Core/Updater/build.json')){
         if(-not $seen.Contains((Resolve-PackagePath $Stage $required))){throw "Incomplete package: $required"}
     }
     if((Get-Content -LiteralPath (Resolve-PackagePath $Stage 'Briefcase/Core/Updater/build.json') -Raw|ConvertFrom-Json).frameworkVersion -cne $expected){throw 'Version marker mismatch.'}
     return $manifest
 }
 function Test-ClientPackagePath([string]$Relative) {
-    return ($Relative -cin @('Briefcase.ClientLauncher.exe','version.dll','Briefcase/loader.json',
-            'Briefcase/Core/Briefcase.NativeHost.dll','Briefcase/Core/Client/Briefcase.Client.Rendering.dll',
-            'Briefcase/Mods/briefcase.native-overlay-sample/Briefcase.NativeOverlaySample.dll',
-            'Briefcase/Mods/briefcase.native-overlay-sample/briefcase.mod.json') -or
-        $Relative -cmatch '^Briefcase/Core/(Docs|Licenses|Localization)/[A-Za-z0-9_./-]+\.(json|txt|md)$')
+    return ($Relative -cin @('Briefcase.ClientLauncher.exe','version.dll',
+            'Briefcase/Core/Briefcase.NativeHost.dll','ue4ss/UE4SS.dll',
+            'ue4ss/UE4SS-settings.ini','ue4ss/Mods/mods.txt') -or
+        $Relative -cmatch '^Briefcase/Core/(Docs|Licenses|Localization)/[A-Za-z0-9_./-]+\.(json|txt|md)$' -or
+        $Relative -cmatch '^ue4ss/Licenses/[A-Za-z0-9_.-]+\.txt$')
 }
 function Read-ClientPackage([string]$Stage,[string]$Version,[string]$GameHash) {
     $expected="$(ConvertTo-PackageVersion $Version)"
@@ -119,10 +121,11 @@ function Read-ClientPackage([string]$Stage,[string]$Version,[string]$GameHash) {
         }
     }
     foreach($file in Get-ChildItem -LiteralPath $Stage -Recurse -File){if($file.FullName -ine $manifestPath -and -not $seen.Contains($file.FullName)){throw 'Unlisted client package file.'}}
-    foreach($required in @('Briefcase.ClientLauncher.exe','version.dll','Briefcase/loader.json','Briefcase/Core/Briefcase.NativeHost.dll',
-        'Briefcase/Core/Client/Briefcase.Client.Rendering.dll','Briefcase/Mods/briefcase.native-overlay-sample/Briefcase.NativeOverlaySample.dll',
-        'Briefcase/Mods/briefcase.native-overlay-sample/briefcase.mod.json')){
+    foreach($required in @('Briefcase.ClientLauncher.exe','version.dll','Briefcase/Core/Briefcase.NativeHost.dll',
+        'ue4ss/UE4SS.dll','ue4ss/UE4SS-settings.ini','ue4ss/Mods/mods.txt')){
         if(-not $seen.Contains((Resolve-PackagePath $Stage $required))){throw "Incomplete client package: $required"}
     }
+    $selection=@($manifest.files|Where-Object {$_.path -ceq 'ue4ss/Mods/mods.txt'})
+    if($selection.Count -ne 1 -or $selection[0].preserve -ne $true){throw 'Client UE4SS mod selection must be preserved.'}
     return $manifest
 }

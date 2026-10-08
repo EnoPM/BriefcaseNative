@@ -449,6 +449,34 @@ BcResult backend_invoke_outputs(uint64_t owner, BcHandle self, BcHandle h, const
 BcResult backend_invoke(uint64_t owner, BcHandle self, BcHandle fn, const BcNamedValue *args, uint32_t count, BcValue *out) {
     return backend_invoke_outputs(owner,self,fn,args,count,nullptr,0,out);
 }
+#ifdef _WIN32
+// A reflected lookup may resolve a non-class or stale class during level
+// travel. UE4SS's IsChildOf/IsA walk superclass pointers without checking
+// each one, so isolate invalid metadata while mods sample actors.
+static bool safe_actor_class(UClass *klass, UClass *actor_class) noexcept {
+    __try {
+        return klass->GetClassPrivate()->IsChildOf(UClass::StaticClass()) &&
+               actor_class->GetClassPrivate()->IsChildOf(UClass::StaticClass()) &&
+               klass->IsChildOf(actor_class);
+    }
+    __except (GetExceptionCode() == EXCEPTION_ACCESS_VIOLATION ? EXCEPTION_EXECUTE_HANDLER : EXCEPTION_CONTINUE_SEARCH) {
+        return false;
+    }
+}
+static bool safe_actor_match(UObject *object, UClass *klass) noexcept {
+    __try { return object->IsA(klass); }
+    __except (GetExceptionCode() == EXCEPTION_ACCESS_VIOLATION ? EXCEPTION_EXECUTE_HANDLER : EXCEPTION_CONTINUE_SEARCH) {
+        return false;
+    }
+}
+#else
+static bool safe_actor_class(UClass *klass, UClass *actor_class) noexcept {
+    return klass->GetClassPrivate()->IsChildOf(UClass::StaticClass()) &&
+           actor_class->GetClassPrivate()->IsChildOf(UClass::StaticClass()) &&
+           klass->IsChildOf(actor_class);
+}
+static bool safe_actor_match(UObject *object, UClass *klass) noexcept { return object->IsA(klass); }
+#endif
 BcResult backend_enumerate_actors(uint64_t owner, BcHandle context, const char *path, BcHandle *out, uint32_t capacity, uint32_t *count) {
     if(auto e=thread_check();e!=BC_OK)return e;
     if(!out || !count || !capacity || capacity>512)return BC_INVALID_ARGUMENT;
@@ -456,12 +484,12 @@ BcResult backend_enumerate_actors(uint64_t owner, BcHandle context, const char *
     const auto name=wide(path);
     auto *klass=UObjectGlobals::StaticFindObject<UClass *>(nullptr,nullptr,name.c_str());
     auto *actor_class=UObjectGlobals::StaticFindObject<UClass *>(nullptr,nullptr,STR("/Script/Engine.Actor"));
-    if(!klass || !actor_class || !klass->IsChildOf(actor_class))return BC_INVALID_ARGUMENT;
+    if(!klass || !actor_class || !safe_actor_class(klass,actor_class))return BC_INVALID_ARGUMENT;
     auto *world=context?object_for(owner,context):nullptr;
     if(context && !world)return BC_STALE_HANDLE;
     std::vector<UObject*> found;
     auto add=[&](UObject *o) {
-        if(alive(o) && !o->HasAnyFlags(static_cast<EObjectFlags>(0x18030)) && o->IsA(klass))
+        if(alive(o) && !o->HasAnyFlags(static_cast<EObjectFlags>(0x18030)) && safe_actor_match(o,klass))
             found.push_back(o);
     };
     if(world) {

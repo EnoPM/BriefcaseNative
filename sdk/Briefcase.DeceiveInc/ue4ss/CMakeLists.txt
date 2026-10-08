@@ -5,6 +5,8 @@ add_library(Briefcase.DeceiveInc.Static STATIC
   src/NativeStamina.cpp
   src/NativeStaminaSites.cpp
   src/Paths.cpp
+  src/ServerEventCollector.cpp
+  src/ServerEvents.cpp
   src/Spy.cpp)
 
 target_include_directories(Briefcase.DeceiveInc.Static PUBLIC include)
@@ -18,6 +20,9 @@ if(BUILD_TESTING)
   add_executable(Briefcase.DeceiveInc.Contracts tests/Contracts.cpp)
   target_include_directories(Briefcase.DeceiveInc.Contracts PRIVATE include)
   add_test(NAME Briefcase.DeceiveInc.Contracts COMMAND Briefcase.DeceiveInc.Contracts)
+  add_executable(Briefcase.ServerEvents.Contracts tests/ServerEvents.cpp src/ServerEvents.cpp)
+  target_include_directories(Briefcase.ServerEvents.Contracts PRIVATE include)
+  add_test(NAME Briefcase.ServerEvents.Contracts COMMAND Briefcase.ServerEvents.Contracts)
   if(WIN32)
     add_executable(Briefcase.NativeStamina.Sites tests/NativeStaminaSites.cpp src/NativeStaminaSites.cpp)
     target_link_libraries(Briefcase.NativeStamina.Sites PRIVATE Zydis)

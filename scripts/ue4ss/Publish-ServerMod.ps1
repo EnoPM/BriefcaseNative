@@ -4,7 +4,8 @@ param(
     [Parameter(Mandatory)][ValidatePattern('^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$')][string]$Repository,
     [Parameter(Mandatory)][ValidatePattern('^[a-f0-9]{40}$')][string]$Commit,
     [Parameter(Mandatory)][string]$Archive,
-    [switch]$Draft
+    [switch]$Draft,
+    [switch]$Client
 )
 
 $ErrorActionPreference = 'Stop'
@@ -27,15 +28,18 @@ if ($LASTEXITCODE -or $actual -cne $Commit) { throw 'Release commit does not mat
 $tag = "v$version"
 & git -c "safe.directory=$($source.Replace('\','/'))" -C $source rev-parse --verify --quiet "refs/tags/$tag^{commit}" *> $null
 if ($LASTEXITCODE -eq 0) { throw 'This mod version has already been tagged.' }
-$identity = (& gh api "repos/$Repository" | ConvertFrom-Json).full_name
-if ($LASTEXITCODE -or $identity -cne $Repository) { throw 'GitHub repository identity mismatch.' }
+$repositoryInfo = & gh api "repos/$Repository" | ConvertFrom-Json
+if ($LASTEXITCODE -or $repositoryInfo.full_name -cne $Repository) { throw 'GitHub repository identity mismatch.' }
+if ($Client -and $repositoryInfo.private -ne $true) { throw 'Client mod publication requires the private repository.' }
 $hash = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
 $size = (Get-Item -LiteralPath $archivePath).Length
 $notes = Join-Path $source ('build\release-notes-' + [guid]::NewGuid().ToString('N') + '.md')
 try {
-    @("$RepositoryName $version for Windows x64 dedicated servers.", '',
-      'Install the matching BriefcaseNative Windows server release first, then follow the README included in this archive.',
-      'Stop the server before replacing mod files. Keep your existing Data/config.json when upgrading.') |
+    $kind = if($Client){'clients'}else{'dedicated servers'}
+    $frameworkPackage = if($Client){'client'}else{'server'}
+    @("$RepositoryName $version for Windows x64 $kind.", '',
+      "Install the matching BriefcaseNative Windows $frameworkPackage release first, then follow the README included in this archive.",
+      'Keep your existing Data/config.json when upgrading.') |
         Set-Content -LiteralPath $notes -Encoding utf8
     & gh release create $tag $archivePath --repo $Repository --target $Commit --title "$RepositoryName $version" --notes-file $notes --draft
     if ($LASTEXITCODE) { throw 'Failed to create the draft release.' }

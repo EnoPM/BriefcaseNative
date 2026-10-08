@@ -19,6 +19,10 @@ class Spy {
     [[nodiscard]] RC::Unreal::UObject *object() const noexcept { return object_; }
     [[nodiscard]] bool is_template() const noexcept;
     [[nodiscard]] bool is_authoritative_player() const;
+    [[nodiscard]] bool is_dead() const;
+    [[nodiscard]] bool is_bot() const;
+    [[nodiscard]] bool is_in_ads() const;
+    [[nodiscard]] RC::Unreal::UObject *controller() const;
     [[nodiscard]] std::uint8_t role() const;
     [[nodiscard]] float stamina() const;
     [[nodiscard]] float cover_ratio() const;

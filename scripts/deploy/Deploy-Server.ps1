@@ -7,7 +7,7 @@ $paths = Get-DeploymentPaths -ServerWin64 $ServerWin64
 $package = if($PackagePath){[IO.Path]::GetFullPath($PackagePath)}else{Join-Path $paths.Project 'dist\Win64'}
 if($RuntimeOnly -and ($ModId -or $ActivateOnly)){throw 'RuntimeOnly cannot select or activate mods.'}
 $required = @()
-if (-not $ModId -or $IncludeRuntime) { $required += @('version.dll', 'ue4ss\UE4SS.dll', 'ue4ss\UE4SS-settings.ini', 'ue4ss\Mods\mods.txt', 'Briefcase\Core\Briefcase.NativeHost.dll', 'Briefcase\Core\Tools\Briefcase.ServerUpdater.exe') }
+if (-not $ModId -or $IncludeRuntime) { $required += @('version.dll', 'ue4ss\UE4SS.dll', 'ue4ss\UE4SS-settings.ini', 'ue4ss\Mods\mods.txt', 'Briefcase\Core\Briefcase.NativeHost.dll') }
 foreach ($relative in $required) {
     if (-not (Test-Path -LiteralPath (Join-Path $package $relative) -PathType Leaf)) { throw "Missing package file: $relative. Build first." }
 }
@@ -24,7 +24,7 @@ $files = @(Get-ChildItem -LiteralPath $package -File -Recurse)
 $inventory = foreach ($file in $files) {
     Assert-NoReparsePoint -Path $file.FullName
     $relative = [IO.Path]::GetRelativePath($package, $file.FullName)
-    $setupTool=$relative -cin @('Briefcase\Core\Tools\Briefcase.AdminSetup.exe','Briefcase\Core\Tools\Briefcase.ServerRestart.exe','Briefcase\Core\Tools\Briefcase.ServerUpdater.exe')
+    $setupTool=$relative -cin @('Briefcase\Core\Tools\Briefcase.AdminSetup.exe')
     if($RuntimeOnly -and $relative.StartsWith('Briefcase\Mods\',[StringComparison]::OrdinalIgnoreCase)){continue}
     if (($file.Extension -notin @('.dll', '.json', '.txt', '.md', '.ini') -and -not $setupTool)) { throw "Forbidden runtime file: $relative" }
     if ($relative -ne 'Package.json' -and $relative -ne 'version.dll' -and -not $relative.StartsWith('Briefcase\') -and -not $relative.StartsWith('ue4ss\')) { throw "Unexpected package path: $relative" }
@@ -59,7 +59,9 @@ $retired=@()
 $retiredDirectories=@()
 $legacyLocalization=Join-Path $paths.Win64 'Briefcase\Localization'
 if(-not $ModId -or $IncludeRuntime){
-    foreach($name in @('StartBriefcaseNativeServer.ps1','Briefcase.ServerLauncher.exe','Briefcase\Core\Briefcase.ServerBootstrap.dll')){
+    foreach($name in @('StartBriefcaseNativeServer.ps1','Briefcase.ServerLauncher.exe',
+        'Briefcase\Core\Briefcase.ServerBootstrap.dll','Briefcase\Core\Tools\Briefcase.ServerInjector.exe',
+        'Briefcase\Core\Tools\Briefcase.ServerUpdater.exe','Briefcase\Core\Tools\Briefcase.ServerRestart.exe')){
         $candidate=Join-Path $paths.Win64 $name
         Assert-NoReparsePoint -Path $candidate
         if(Test-Path -LiteralPath $candidate -PathType Leaf){$retired+=@([pscustomobject]@{relative=$name;path=$candidate})}

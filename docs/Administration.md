@@ -194,13 +194,11 @@ other sections and existing administration passwords are preserved. Each change
 creates a backup in `Briefcase/Admin`. Active values are the service's startup
 snapshot rather than live game-memory measurements.
 
-The server package includes `Briefcase.ServerRestart`. Its helper verifies the
-exact process path and creation time, holds the process handle and prepares the
-launch command before shutdown. After the TLS response is acknowledged, it requests
-mod cleanup, terminates a remaining process and starts Shipping with the platform
-binaries directory as working directory. Existing arguments are preserved and
-ports are reread from configuration. The client cannot provide a path or system
-command. Results are written to `Admin/restart-result.json`.
+Use Briefcase ServerApp to restart a managed server. The server package does not
+include a restart coordinator or injection tools. ServerApp requests runtime
+cleanup, waits for the process to stop, then starts Shipping headless with its
+private injection components. In-server restart requests are unavailable in this
+configuration.
 
 ## Labels, languages and search
 

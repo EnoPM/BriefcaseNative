@@ -47,7 +47,6 @@ target_link_libraries(Briefcase.NativeHost PRIVATE Briefcase.Core Briefcase.MinH
 target_include_directories(Briefcase.NativeHost PRIVATE runtime/Briefcase.UnrealBackend)
 add_library(version SHARED loader/Briefcase.VersionProxy/proxy.cpp loader/Briefcase.VersionProxy/forwards.asm loader/Briefcase.VersionProxy/version.def)
 set_target_properties(version PROPERTIES PREFIX "")
-target_link_libraries(version PRIVATE shell32)
 add_library(Briefcase.NativeHello SHARED samples/Briefcase.NativeHello/Hello.cpp)
 target_link_libraries(Briefcase.NativeHello PRIVATE Briefcase.ModApi)
 enable_testing()
@@ -68,6 +67,9 @@ target_include_directories(Briefcase.Miniz PUBLIC third_party/miniz-3.1.2)
 set_target_properties(Briefcase.Miniz PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED ON)
 add_library(Briefcase.ServerBootstrap SHARED loader/Briefcase.ServerLauncher/Bootstrap.cpp loader/Briefcase.ServerLauncher/Bootstrap.def)
 target_link_libraries(Briefcase.ServerBootstrap PRIVATE Briefcase.Detours)
+add_executable(Briefcase.ServerInjector loader/Briefcase.ServerLauncher/AppInjector.cpp)
+target_link_libraries(Briefcase.ServerInjector PRIVATE Briefcase.Detours)
+add_library(Briefcase.LauncherMockPreEntry SHARED tests/LauncherMockPreEntry.cpp)
 add_library(Briefcase.WindowsServerUpdate STATIC
  loader/Briefcase.ServerLauncher/WindowsFiles.cpp
  loader/Briefcase.ServerLauncher/WindowsDownload.cpp
@@ -82,7 +84,7 @@ target_link_libraries(Briefcase.ClientLauncher PRIVATE nlohmann_json::nlohmann_j
 target_link_options(Briefcase.ClientLauncher PRIVATE /SUBSYSTEM:WINDOWS /ENTRY:wmainCRTStartup)
 install(TARGETS version RUNTIME DESTINATION . COMPONENT Briefcase)
 install(TARGETS Briefcase.ClientLauncher RUNTIME DESTINATION . COMPONENT Client)
-install(TARGETS Briefcase.ServerUpdater RUNTIME DESTINATION Briefcase/Core/Tools COMPONENT Briefcase)
+install(TARGETS Briefcase.ServerInjector Briefcase.ServerBootstrap RUNTIME DESTINATION Native COMPONENT ServerApp)
 install(TARGETS Briefcase.NativeHost RUNTIME DESTINATION Briefcase/Core COMPONENT Briefcase)
 install(TARGETS Briefcase.NativeHello RUNTIME DESTINATION Briefcase/Mods/briefcase.native-hello COMPONENT Samples)
 install(FILES samples/Briefcase.NativeHello/briefcase.mod.json DESTINATION Briefcase/Mods/briefcase.native-hello COMPONENT Samples)
@@ -142,10 +144,6 @@ add_library(Briefcase.NativeOverlaySample SHARED samples/Briefcase.NativeOverlay
 target_link_libraries(Briefcase.NativeOverlaySample PRIVATE Briefcase.ClientModApi)
 install(TARGETS version RUNTIME DESTINATION . COMPONENT Client)
 install(TARGETS Briefcase.NativeHost RUNTIME DESTINATION Briefcase/Core COMPONENT Client)
-install(TARGETS Briefcase.Client.Rendering RUNTIME DESTINATION Briefcase/Core/Client COMPONENT Client)
-install(TARGETS Briefcase.NativeOverlaySample RUNTIME DESTINATION Briefcase/Mods/briefcase.native-overlay-sample COMPONENT Client)
-install(FILES samples/Briefcase.NativeOverlaySample/briefcase.mod.json DESTINATION Briefcase/Mods/briefcase.native-overlay-sample COMPONENT Client)
-install(FILES third_party/imgui-1.91.9b/LICENSE.txt DESTINATION Briefcase/Core/Licenses RENAME DearImGui.txt COMPONENT Client)
 
 set_tests_properties(ClientContracts PROPERTIES WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 add_executable(Briefcase.ClientRenderingFixture tests/ClientRenderingFixture.cpp)
@@ -213,7 +211,6 @@ add_test(NAME AdminClientContracts COMMAND Briefcase.AdminClientContracts)
 set_tests_properties(AdminClientContracts PROPERTIES TIMEOUT 30)
 
 install(FILES docs/Administration.md DESTINATION Briefcase/Core/Docs COMPONENT Briefcase)
-install(FILES docs/Administration.md DESTINATION Briefcase/Core/Docs COMPONENT Client)
 
 find_program(BRIEFCASE_POWERSHELL NAMES pwsh REQUIRED)
 add_test(NAME AdminSetupContracts COMMAND "${BRIEFCASE_POWERSHELL}" -NoProfile -File "${CMAKE_SOURCE_DIR}/tests/AdminSetupContracts.ps1" -Setup "$<TARGET_FILE:Briefcase.AdminSetup>")
@@ -231,7 +228,6 @@ set_tests_properties(AdminCryptoContracts PROPERTIES TIMEOUT 30)
 add_executable(Briefcase.ServerRestart tools/ServerRestart.cpp)
 target_link_libraries(Briefcase.ServerRestart PRIVATE Briefcase.Admin.Service)
 target_link_libraries(Briefcase.Admin.Service PUBLIC shell32)
-install(TARGETS Briefcase.ServerRestart RUNTIME DESTINATION Briefcase/Core/Tools COMPONENT Briefcase)
 
 add_executable(Briefcase.AdminManagementContracts tests/AdminManagementContracts.cpp)
 target_link_libraries(Briefcase.AdminManagementContracts PRIVATE Briefcase.Admin.Client)
@@ -248,7 +244,6 @@ target_link_libraries(Briefcase.Client.Localization PUBLIC Briefcase.Localizatio
 target_link_libraries(Briefcase.NativeHost PRIVATE Briefcase.Client.Localization)
 target_link_libraries(Briefcase.Client.Menu PRIVATE Briefcase.Localization)
 target_link_libraries(Briefcase.Admin.Client PUBLIC Briefcase.Localization)
-install(DIRECTORY resources/Localization/ DESTINATION Briefcase/Core/Localization COMPONENT Client)
 install(DIRECTORY resources/Localization/ DESTINATION Briefcase/Core/Localization COMPONENT Briefcase)
 
 add_executable(Briefcase.LocalizationContracts tests/LocalizationContracts.cpp)
@@ -256,7 +251,6 @@ target_link_libraries(Briefcase.LocalizationContracts PRIVATE Briefcase.Client.L
 add_test(NAME LocalizationContracts COMMAND Briefcase.LocalizationContracts)
 set_tests_properties(LocalizationContracts PROPERTIES TIMEOUT 15)
 
-install(FILES docs/Localization.md DESTINATION Briefcase/Core/Docs COMPONENT Client)
 install(FILES docs/Localization.md DESTINATION Briefcase/Core/Docs COMPONENT Briefcase)
 
 add_library(Briefcase.Client.Settings STATIC runtime/Briefcase.Client.Settings/Store.cpp)
@@ -278,7 +272,6 @@ target_compile_definitions(Briefcase.SpyContracts PRIVATE BRIEFCASE_SOURCE="${CM
 add_test(NAME SpyContracts COMMAND Briefcase.SpyContracts)
 
 
-install(FILES docs/ClientModConfiguration.md docs/SpyApi.md DESTINATION Briefcase/Core/Docs COMPONENT Client)
 
 
 # Offline updater stays outside the game runtime. Configuration is an example only.
@@ -292,7 +285,7 @@ install(FILES docs/Repositories.md DESTINATION Briefcase/Core/Docs COMPONENT Bri
 add_library(Briefcase.LauncherMockHost SHARED tests/LauncherMockHost.cpp)
 add_executable(Briefcase.ServerLauncherContracts tests/ServerLauncherContracts.cpp)
 target_link_libraries(Briefcase.ServerLauncherContracts PRIVATE Briefcase.Detours version)
-add_dependencies(Briefcase.ServerLauncherContracts Briefcase.ServerBootstrap Briefcase.LauncherMockHost)
+add_dependencies(Briefcase.ServerLauncherContracts Briefcase.ServerBootstrap Briefcase.ServerInjector Briefcase.LauncherMockHost Briefcase.LauncherMockPreEntry)
 add_test(NAME ServerLauncherInjection COMMAND Briefcase.ServerLauncherContracts)
 set_tests_properties(ServerLauncherInjection PROPERTIES TIMEOUT 30)
 add_executable(Briefcase.WindowsUpdaterDriver tests/WindowsUpdaterDriver.cpp)

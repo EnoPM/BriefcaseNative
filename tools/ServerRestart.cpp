@@ -102,7 +102,7 @@ int wmain(int argc, wchar_t **argv) {
                 throw std::runtime_error("Server has not exited");
         }
         if (!fs::is_regular_file(updater))
-            throw std::runtime_error("Update coordinator is missing from the server package");
+            throw std::runtime_error("Restart coordinator is missing from the server package");
         std::wstring command = quote(updater.wstring()) + L" --root " + quote(win64.wstring()) +
                                L" --parent " + std::to_wstring(GetCurrentProcessId()) +
                                L" --wait-parent " + std::to_wstring(pid) + L" --restart " +
@@ -124,7 +124,7 @@ int wmain(int argc, wchar_t **argv) {
         PROCESS_INFORMATION pi{};
         if (!CreateProcessW(updater.c_str(), command.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW,
                             nullptr, win64.c_str(), &si, &pi))
-            throw std::runtime_error("Update coordinator could not restart the server");
+            throw std::runtime_error("Restart coordinator could not restart the server");
         CloseHandle(pi.hThread);
         CloseHandle(pi.hProcess);
         return 0;

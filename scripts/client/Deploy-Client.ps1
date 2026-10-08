@@ -11,12 +11,13 @@ $stamp=Get-Date -Format 'yyyyMMdd-HHmmss-fff'
 $backup=Assert-ClientDescendant (Join-Path $paths.Root "BriefcaseDeploymentBackups\$stamp") $paths.Root
 $files=@(Get-ChildItem -LiteralPath $package -File -Recurse|Where-Object {$_.Name -ne 'Package.json'})
 $retired=@()
-foreach($name in @('StartBriefcaseNativeClient.ps1','Briefcase\launch.json')){
+foreach($name in @('StartBriefcaseNativeClient.ps1','Briefcase\launch.json','Briefcase\loader.json')){
     $candidate=Assert-ClientDescendant (Join-Path $paths.Win64 $name) $paths.Root
     if(Test-Path -LiteralPath $candidate -PathType Leaf){$retired+=@([pscustomobject]@{relative=$name;path=$candidate})}
 }
 $retiredDirectories=@()
-foreach($name in @('Briefcase\Docs','Briefcase\Licenses')){
+foreach($name in @('Briefcase\Docs','Briefcase\Licenses','Briefcase\Core\Client',
+    'Briefcase\Mods\briefcase.native-overlay-sample')){
     $candidate=Assert-ClientDescendant (Join-Path $paths.Win64 $name) $paths.Root
     if(Test-Path -LiteralPath $candidate -PathType Container){$retiredDirectories+=@([pscustomobject]@{relative=$name;path=$candidate})}
 }
@@ -45,7 +46,7 @@ foreach($item in $retiredDirectories){
 foreach($file in $files) {
     $relative=$file.FullName.Substring($package.Length+1)
     $target=Assert-ClientDescendant (Join-Path $paths.Win64 $relative) $paths.Root
-    if($relative -eq 'Briefcase\loader.json' -and (Test-Path -LiteralPath $target)){continue}
+    if($relative -eq 'ue4ss\Mods\mods.txt' -and (Test-Path -LiteralPath $target)){continue}
     if((Test-Path -LiteralPath $target) -and (Get-FileHash -LiteralPath $target).Hash -eq (Get-FileHash -LiteralPath $file.FullName).Hash){continue}
     if(Test-Path -LiteralPath $target) {
         $saved=Assert-ClientDescendant (Join-Path $backup $relative) $paths.Root

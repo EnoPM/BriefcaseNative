@@ -107,22 +107,56 @@ std::string stamp() {
     return text;
 }
 DWORD start_direct(const fs::path& executable, const fs::path& root, const std::wstring& arguments) {
-    auto command = quote(executable.wstring()) + L" " + arguments;
-    require(SetEnvironmentVariableW(L"BRIEFCASE_PROXY_BOOTSTRAPPED", L"1"), "Cannot mark coordinated launch");
+    wchar_t configured[32768]{};
+    const auto length = GetEnvironmentVariableW(L"BRIEFCASE_SERVERAPP_INJECTOR", configured, 32768);
+    require(length > 0 && length < 32768,
+            "ServerApp is required to restart this managed server");
+    const fs::path injector = plain(configured);
+    require(injector.filename() == L"Briefcase.ServerInjector.exe" && fs::is_regular_file(injector) &&
+                fs::is_regular_file(plain(injector.parent_path() / L"Briefcase.ServerBootstrap.dll")),
+            "ServerApp injection components are unavailable");
+    SECURITY_ATTRIBUTES security{sizeof(security), nullptr, TRUE};
+    HANDLE read_raw{}, write_raw{};
+    require(CreatePipe(&read_raw, &write_raw, &security, 0), "Cannot capture ServerApp injector output");
+    Handle read{read_raw}, write{write_raw};
+    require(SetHandleInformation(read.value, HANDLE_FLAG_INHERIT, 0), "Cannot protect injector pipe");
+    auto command = quote(injector.wstring()) + L" --server " + quote(executable.wstring()) + L" " + arguments;
     STARTUPINFOW startup{sizeof(startup)};
-    startup.dwFlags = STARTF_USESHOWWINDOW;
+    startup.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
     startup.wShowWindow = SW_HIDE;
-    PROCESS_INFORMATION process{};
-    const auto started = CreateProcessW(executable.c_str(), command.data(), nullptr, nullptr, FALSE,
-                                        CREATE_NO_WINDOW, nullptr, root.c_str(), &startup, &process);
-    SetEnvironmentVariableW(L"BRIEFCASE_PROXY_BOOTSTRAPPED", nullptr);
-    require(started, "Cannot start the dedicated server");
-    CloseHandle(process.hThread);
-    CloseHandle(process.hProcess);
-    return process.dwProcessId;
+    Handle input{CreateFileW(L"NUL", GENERIC_READ, FILE_SHARE_READ, &security, OPEN_EXISTING,
+                             FILE_ATTRIBUTE_NORMAL, nullptr)};
+    require(input.value != INVALID_HANDLE_VALUE, "Cannot prepare injector input");
+    startup.hStdOutput = write.value;
+    startup.hStdError = write.value;
+    startup.hStdInput = input.value;
+    PROCESS_INFORMATION child{};
+    require(CreateProcessW(injector.c_str(), command.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW,
+                           nullptr, root.c_str(), &startup, &child), "Cannot start ServerApp injector");
+    Handle process{child.hProcess}, thread{child.hThread};
+    CloseHandle(write.value);
+    write.value = INVALID_HANDLE_VALUE;
+    require(WaitForSingleObject(process.value, 100000) == WAIT_OBJECT_0,
+            "ServerApp injector did not finish");
+    std::string output;
+    char buffer[64]{};
+    DWORD count{};
+    while (ReadFile(read.value, buffer, sizeof(buffer), &count, nullptr) && count) {
+        output.append(buffer, count);
+        require(output.size() <= 64, "Unexpected ServerApp injector output");
+    }
+    DWORD exit_code{};
+    require(GetExitCodeProcess(process.value, &exit_code) && exit_code == 0,
+            "ServerApp injector could not restart Shipping");
+    const auto start = output.find_first_not_of("0123456789");
+    require(start != std::string::npos && start > 0 && output.find_first_not_of("\r\n ", start) == std::string::npos,
+            "ServerApp injector did not return a server PID");
+    const auto pid = std::stoul(output.substr(0, start));
+    require(pid > 0 && pid <= MAXDWORD, "Invalid restarted server PID");
+    return static_cast<DWORD>(pid);
 }
 int run(const fs::path& input_root, DWORD parent, DWORD wait_for, const std::string& restart_id,
-        const std::vector<std::wstring>& arguments, bool probe) {
+        const std::vector<std::wstring>& arguments, bool probe, bool install_only) {
     if (!probe) {
         wait_parent(parent);
         wait_parent(wait_for);
@@ -141,19 +175,9 @@ int run(const fs::path& input_root, DWORD parent, DWORD wait_for, const std::str
             "Launcher is not authorized for this Win64 directory");
     auto logger = [&](const std::string& value) { append_log(root, value); };
     if (probe) {
-        Updater updater(root);
-        const auto framework = updater.update(logger, false);
-        const auto mods = updater.update_mods(logger, false);
-        const bool restart = framework == "available" || framework == "recovery-required" ||
-                             mods.value("available", 0) > 0;
-        write_json(package_path(root, "Briefcase/Updates/last-result.json"),
-                   {{"framework", framework}, {"mods", mods}, {"checkedAt", std::time(nullptr)}});
-        updater.cleanup(logger);
-        if (!restart && ensure_eac_disabled(root, "WindowsServer"))
+        if (ensure_eac_disabled(root, "WindowsServer"))
             logger("Configured sb.DisableEAC=1 for the Briefcase server.");
-        logger(restart ? "Update available; server restart required." :
-                         "No update available; continuing in the original server process.");
-        return restart ? 10 : 0;
+        return 0;
     }
     DWORD previous_pid{};
     if (!restart_id.empty()) {
@@ -170,19 +194,16 @@ int run(const fs::path& input_root, DWORD parent, DWORD wait_for, const std::str
                             0, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OPEN_REPARSE_POINT, nullptr)};
     require(lock.value != INVALID_HANDLE_VALUE, "Another update or launch is already in progress");
     require(!server_running(game), "This dedicated server is already running");
-    Updater updater(root);
-    const auto framework = updater.update(logger);
-    const auto mods = updater.update_mods(logger);
-    write_json(package_path(root, "Briefcase/Updates/last-result.json"),
-               {{"framework", framework}, {"mods", mods}, {"checkedAt", std::time(nullptr)}});
-    updater.cleanup(logger);
+    if (install_only) {
+        throw std::runtime_error("Native updates are managed by Briefcase ServerApp");
+    }
     if (ensure_eac_disabled(root, "WindowsServer"))
         logger("Configured sb.DisableEAC=1 for the Briefcase server.");
     const auto [game_port, query_port] = ports(root);
     const auto native_arguments = command_arguments(arguments, game_port, query_port);
     const auto pid = start_direct(game, root, native_arguments);
     Json record{{"executable", utf8(game.wstring())}, {"workingDirectory", utf8(root.wstring())},
-                {"pid", pid}, {"update", framework}, {"modUpdates", mods},
+                {"pid", pid},
                 {"startedAt", std::time(nullptr)}, {"arguments", Json::array()}};
     for (const auto& argument : arguments) record["arguments"].push_back(utf8(argument));
     write_json(package_path(root, "Briefcase/Logs/launch-" + stamp() + ".json"), record);
@@ -204,11 +225,12 @@ int wmain(int argc, wchar_t** argv) {
     std::string restart_id;
     try {
         DWORD parent{}, wait_for{}; std::vector<std::wstring> arguments;
-        bool game_arguments = false, probe = false;
+        bool game_arguments = false, probe = false, install_only = false;
         for (int index = 1; index < argc; ++index) {
             const std::wstring argument(argv[index]);
             if (!game_arguments && argument == L"--") { game_arguments = true; continue; }
             if (!game_arguments && argument == L"--probe") { probe = true; continue; }
+            if (!game_arguments && argument == L"--install-only") { install_only = true; continue; }
             if (!game_arguments && (argument == L"--root" || argument == L"--parent" ||
                                     argument == L"--wait-parent" || argument == L"--restart")) {
                 require(++index < argc, "Missing worker option value");
@@ -220,11 +242,13 @@ int wmain(int argc, wchar_t** argv) {
             }
             require(game_arguments, "Unknown worker option"); arguments.push_back(argument);
         }
-        require(!root.empty() && (probe || parent), "Missing worker launch context");
+        require(!root.empty() && (probe || parent || install_only), "Missing worker launch context");
         require(!probe || (!parent && !wait_for && restart_id.empty() && arguments.empty()),
                 "Invalid update probe context");
+        require(!install_only || (!probe && !parent && !wait_for && restart_id.empty() && arguments.empty()),
+                "Invalid installation-only context");
         if (!restart_id.empty()) require(std::regex_match(restart_id, std::regex("[a-f0-9]{32}")), "Invalid restart identifier");
-        return run(root, parent, wait_for, restart_id, arguments, probe);
+        return run(root, parent, wait_for, restart_id, arguments, probe, install_only);
     } catch (const std::exception& error) {
         if (!root.empty()) {
             append_log(root, std::string("Native update coordinator failed: ") + error.what());

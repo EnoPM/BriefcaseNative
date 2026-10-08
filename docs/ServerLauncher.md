@@ -1,53 +1,17 @@
-# Windows proxy startup
+# Windows server startup
 
-Install `version.dll`, `Briefcase/` and `ue4ss/` beside
-`DeceiveIncServer-Win64-Shipping.exe`, then start the Shipping executable directly
-from `DeceiveInc/Binaries/Win64`. That directory must also be the process working
-directory. Briefcase does not install a separate server launcher and does not
-modify the game executable on disk.
+Briefcase ServerApp owns the work that can be done before starting a dedicated server: checking release versions, downloading and validating archives, installing framework and mod updates, and preparing `Engine.ini`. Its installed mod records preserve the catalog URL and version so a later catalog refresh can identify updates. A user can also install or update components explicitly while the server is stopped.
 
-Windows loads the local `version.dll` proxy before the game entry point. The proxy
-forwards the operating-system version APIs to System32 and asks
-`Briefcase/Core/Tools/Briefcase.ServerUpdater.exe` to probe for updates. If none
-is available, Shipping continues in that same process and can show its vanilla
-configuration UI. An available update transfers control to the coordinator,
-which installs it and starts Shipping directly. A private environment marker
-prevents the coordinated process from repeating the probe. The proxy removes
-that marker before loading the runtime so it is not inherited by child processes.
+On a ServerApp launch, `Native/Briefcase.ServerInjector.exe` beside the application starts Shipping headless with the app's `Native/Briefcase.ServerBootstrap.dll` injected through Detours. Neither injection component is included in the Briefcase server archive or copied into the game directory. The injected bootstrap loads Briefcase NativeHost, early mod helpers, and UE4SS before the game's entry point. The injector waits for a preparation handshake and returns the actual server PID to ServerApp.
 
-The server process loads `Briefcase.NativeHost.dll`, any installed early mod helpers,
-and the pinned `ue4ss/UE4SS.dll` before the
-executable entry point. NativeHost provides the
-administration and lifecycle services during the migration. UE4SS owns Unreal
-discovery and native gameplay mods. The dedicated UE4SS settings disable its GUI,
-console and hot reload.
+The package keeps `version.dll` for users who launch Shipping directly. Before its first managed launch, ServerApp renames that file to `version.dll.disabled` and informs the user. A direct Steam launch then remains unmodded even though the Briefcase and UE4SS files are still installed. On a later package update ServerApp disables the newly installed proxy again before launch. As a defense in depth, the injector also sets `BRIEFCASE_EXTERNAL_BOOTSTRAP=1`; if a proxy is unexpectedly present, it only forwards version APIs and does not install its own entry gate.
 
-The coordinator creates `Briefcase/launch.json` on a fresh installation. An
-existing file must identify the same Win64 directory; a mismatched path stops the
-coordinated launch. It also ensures that `sb.DisableEAC=1` is present in
-`DeceiveInc/Saved/Config/WindowsServer/Engine.ini` while preserving unrelated
-settings.
+ServerApp checks its own injection components and the server's Briefcase NativeHost separately. It removes any injection files left in the server folder by a previous development package. Its `Briefcase/updater.json` is set to disabled before launch so an older proxy cannot run a second update path.
 
-Briefcase framework updates preserve the installed `ue4ss/Mods/mods.txt` and do
-not own any mod directory. Administration restarts call the same update
-coordinator, so early-loading mods can be replaced before the next server process
-starts.
+ServerApp's package installer checks the GitHub release SHA-256 digest, the package manifest, the exact game build hash, every package file's size and SHA-256, and its allowed destination. It stages files before replacement, preserves marked files such as `ue4ss/Mods/mods.txt`, and restores prior files if an installation fails. A small journal lets the app restore an interrupted installation before the next launch. Game and mod configuration remains in the server directory.
 
-Direct Shipping launches can use the vanilla configuration UI. When an update
-or administration restart requires a new process, the coordinator starts it
-headless with `-unattended -NoSplash -NOCONSOLE -nullrhi -nosound` and reads the
-game and query ports from `TripwireServer.ini`. Activity and failures are written to
-`Briefcase/Logs/launcher.log`; per-launch records include the resulting server PID
-and update status.
-
-## Linux boundary
-
-Linux continues to use its native executable launcher and preload bootstrap while
-the UE4SS server migration is validated there. See `LinuxServer.md`.
+ServerApp owns server restarts. The older in-server restart helper and native update coordinator are not included in new Briefcase archives. Linux's experimental launcher likewise no longer checks releases during startup; Linux distribution will be handled separately.
 
 ## Validation
 
-The proxy and updater contracts cover path validation, package identity, update
-rollback, preservation of the UE4SS mod selection and removal of the retired
-Windows launcher/bootstrap files. Deployment contracts also verify that an
-existing mod selection and mod data survive a framework update.
+`ServerLauncherInjection` checks preparation before the EXE entry point and failure handling. `ServerProxyCoordinator` checks both a direct proxy launch and a ServerApp-style injected launch with the proxy still present, including the absence of native update activity.

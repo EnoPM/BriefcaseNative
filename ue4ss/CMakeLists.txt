@@ -24,6 +24,24 @@ FetchContent_MakeAvailable(nlohmann_json)
 
 add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/../sdk/Briefcase.DeceiveInc/ue4ss"
                  "${CMAKE_CURRENT_BINARY_DIR}/Briefcase.DeceiveInc")
+
+# This framework-owned server bridge is separate from user gameplay mods. It
+# streams authoritative local state to ServerApp through a Windows named pipe.
+if(WIN32)
+  add_executable(Briefcase.ServerEquipmentIds.Tests tests/ServerEquipmentIds.cpp)
+  add_test(NAME ServerEquipmentIds COMMAND Briefcase.ServerEquipmentIds.Tests)
+  add_library(Briefcase.ServerBridge.UE4SS SHARED ServerBridge.cpp)
+  target_include_directories(Briefcase.ServerBridge.UE4SS PRIVATE
+    $<TARGET_PROPERTY:UE4SS,INTERFACE_INCLUDE_DIRECTORIES>
+    $<TARGET_PROPERTY:Unreal,INTERFACE_INCLUDE_DIRECTORIES>)
+  target_compile_definitions(Briefcase.ServerBridge.UE4SS PRIVATE
+    $<TARGET_PROPERTY:UE4SS,INTERFACE_COMPILE_DEFINITIONS>
+    $<TARGET_PROPERTY:Unreal,INTERFACE_COMPILE_DEFINITIONS>)
+  target_link_libraries(Briefcase.ServerBridge.UE4SS PRIVATE
+    "$<TARGET_LINKER_FILE:UE4SS>" nlohmann_json::nlohmann_json advapi32)
+  add_dependencies(Briefcase.ServerBridge.UE4SS UE4SS)
+  set_target_properties(Briefcase.ServerBridge.UE4SS PROPERTIES OUTPUT_NAME main)
+endif()
 # Independent mod repositories are optional local siblings. The framework
 # release checks out none of them and contains no gameplay mod binaries.
 option(BRIEFCASE_BUILD_LOCAL_MODS "Discover independent local mod repositories" ON)

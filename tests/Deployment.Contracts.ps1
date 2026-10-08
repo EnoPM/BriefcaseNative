@@ -32,9 +32,11 @@ Put (Join-Path $target 'version.dll') 'old proxy'
 Put (Join-Path $target 'ue4ss\Mods\mods.txt') 'ExistingMod : 1'
 Put (Join-Path $target 'Briefcase.ServerLauncher.exe') 'old launcher'
 Put (Join-Path $target 'Briefcase\Core\Briefcase.ServerBootstrap.dll') 'old bootstrap'
+Put (Join-Path $target 'Briefcase\Core\Tools\Briefcase.ServerInjector.exe') 'old injector'
+Put (Join-Path $target 'Briefcase\Core\Tools\Briefcase.ServerUpdater.exe') 'old updater'
+Put (Join-Path $target 'Briefcase\Core\Tools\Briefcase.ServerRestart.exe') 'old restart helper'
 Put (Join-Path $target 'StartBriefcaseNativeServer.ps1') 'legacy launcher'
 Put (Join-Path $target 'Briefcase\Updater\Updater.ps1') 'legacy updater'
-Put (Join-Path $package 'Briefcase\Core\Tools\Briefcase.ServerUpdater.exe') 'fixture updater, never executed'
 Put (Join-Path $package 'Briefcase\Core\Briefcase.NativeHost.dll') 'new runtime'
 function Get-CimInstance {param($ClassName,$Filter) @()}
 $checks=0
@@ -56,6 +58,9 @@ Check (-not(Test-Path -LiteralPath (Join-Path $target 'StartBriefcaseNativeServe
 Check (-not(Test-Path -LiteralPath (Join-Path $target 'Briefcase\Updater\Updater.ps1')))
 Check (-not(Test-Path -LiteralPath (Join-Path $target 'Briefcase.ServerLauncher.exe')))
 Check (-not(Test-Path -LiteralPath (Join-Path $target 'Briefcase\Core\Briefcase.ServerBootstrap.dll')))
+Check (-not(Test-Path -LiteralPath (Join-Path $target 'Briefcase\Core\Tools\Briefcase.ServerInjector.exe')))
+Check (-not(Test-Path -LiteralPath (Join-Path $target 'Briefcase\Core\Tools\Briefcase.ServerUpdater.exe')))
+Check (-not(Test-Path -LiteralPath (Join-Path $target 'Briefcase\Core\Tools\Briefcase.ServerRestart.exe')))
 Check ((Get-Content -LiteralPath (Join-Path $target 'ue4ss\UE4SS.dll') -Raw) -eq 'new ue4ss runtime')
 Check ((Get-Content -LiteralPath (Join-Path $target "$entry\Data\config.json") -Raw) -eq '{"value":7}')
 Check ((Get-Content -LiteralPath (Join-Path $target 'Briefcase\Mods\test.other\Other.dll') -Raw) -eq 'old other')
@@ -75,17 +80,16 @@ foreach($invalid in @(@('test.selected','test.selected'),@('test.missing'),@('..
     Check $failed
     Check ([IO.File]::ReadAllText((Join-Path $target 'Briefcase\settings.json')) -ceq $previous)
 }
-# Runtime-only update includes the one approved setup executable and preserves all mods/settings.
+# Runtime-only update includes the approved setup executable and preserves all mods/settings.
 Put (Join-Path $package 'Briefcase\Core\Tools\Briefcase.AdminSetup.exe') 'fixture setup, never executed'
-Put (Join-Path $package 'Briefcase\Core\Tools\Briefcase.ServerRestart.exe') 'fixture restart, never executed'
 Put (Join-Path $target "$entry\Selected.dll") 'keep current mod'
 & $deploy -ServerWin64 $target -RuntimeOnly *> (Join-Path $fixture 'runtime-only.txt')
 Check ((Get-Content -LiteralPath (Join-Path $target "$entry\Selected.dll") -Raw) -eq 'keep current mod')
 Check ((Get-Content -LiteralPath (Join-Path $target "$entry\Data\config.json") -Raw) -eq '{"value":7}')
 Check ([IO.File]::ReadAllText((Join-Path $target 'Briefcase\settings.json')) -ceq $previous)
 Check ((Get-Content -LiteralPath (Join-Path $target 'Briefcase\Core\Tools\Briefcase.AdminSetup.exe') -Raw) -eq 'fixture setup, never executed')
-Check ((Get-Content -LiteralPath (Join-Path $target 'Briefcase\Core\Tools\Briefcase.ServerRestart.exe') -Raw) -eq 'fixture restart, never executed')
-Check ((Get-Content -LiteralPath (Join-Path $target 'Briefcase\Core\Tools\Briefcase.ServerUpdater.exe') -Raw) -eq 'fixture updater, never executed')
+Check (-not(Test-Path -LiteralPath (Join-Path $target 'Briefcase\Core\Tools\Briefcase.ServerRestart.exe')))
+Check (-not(Test-Path -LiteralPath (Join-Path $target 'Briefcase\Core\Tools\Briefcase.ServerUpdater.exe')))
 Put (Join-Path $package 'Briefcase\Core\Tools\Unexpected.exe') 'not allowed'
 $failed=$false
 try { & $deploy -ServerWin64 $target -RuntimeOnly -PlanOnly *> (Join-Path $fixture 'invalid-exe.txt') } catch {$failed=$true}

@@ -5,12 +5,19 @@ static bool prepared_before_crt = [] {
     wchar_t value[16]{};
     return GetEnvironmentVariableW(L"BC_TEST_PREPARED", value, 16) != 0;
 }();
+static bool preentry_before_crt = [] {
+    wchar_t value[16]{};
+    return GetEnvironmentVariableW(L"BC_TEST_PREENTRY", value, 16) != 0;
+}();
 int wmain() {
     using namespace briefcase::launcher;
     wchar_t path[32768]{}; GetModuleFileNameW(nullptr, path, 32768);
     std::filesystem::path self(path);
     if (self.filename() == L"DeceiveIncServer-Win64-Shipping.exe") {
-        if (!prepared_before_crt || std::filesystem::current_path() != self.parent_path()) return 11;
+        const auto expect_preentry = std::filesystem::exists(
+            self.parent_path()/L"ue4ss/Mods/BriefcaseLauncherProbe/BriefcasePreEntry.dll");
+        if (!prepared_before_crt || (expect_preentry && !preentry_before_crt) ||
+            std::filesystem::current_path() != self.parent_path()) return 11;
         DWORD ignored{};
         GetFileVersionInfoSizeW(self.c_str(), &ignored); // Keep version.dll in the PE import table.
         if (std::filesystem::exists(self.parent_path()/L"version.dll") && !GetModuleHandleW(L"version.dll")) return 12;
@@ -23,10 +30,14 @@ int wmain() {
         auto stage = self.parent_path()/L"launcher-fixture"/std::to_wstring(GetTickCount64())/L"DeceiveInc/Binaries/Win64";
         std::filesystem::create_directories(stage/L"Briefcase/Core");
         auto exe=stage/L"DeceiveIncServer-Win64-Shipping.exe";
-        auto dll=stage/L"Briefcase/Core/Briefcase.ServerBootstrap.dll";
+        auto dll=self.parent_path()/L"Briefcase.ServerBootstrap.dll";
         std::filesystem::copy_file(self,exe);
-        std::filesystem::copy_file(self.parent_path()/L"Briefcase.ServerBootstrap.dll",dll);
         std::filesystem::copy_file(self.parent_path()/L"Briefcase.LauncherMockHost.dll",stage/L"Briefcase/Core/Briefcase.NativeHost.dll");
+        auto mod = stage/L"ue4ss/Mods/BriefcaseLauncherProbe";
+        std::filesystem::create_directories(mod);
+        std::ofstream(stage/L"ue4ss/Mods/mods.txt") << "BriefcaseLauncherProbe : 1\n";
+        std::filesystem::copy_file(self.parent_path()/L"Briefcase.LauncherMockPreEntry.dll",
+                                   mod/L"BriefcasePreEntry.dll");
         auto pid=start(exe,dll,L"-NOCONSOLE -nullrhi",5000);
         Handle child(OpenProcess(SYNCHRONIZE|PROCESS_QUERY_LIMITED_INFORMATION,FALSE,pid));
         if (!child.value || WaitForSingleObject(child.value,5000)!=WAIT_OBJECT_0) return 2;

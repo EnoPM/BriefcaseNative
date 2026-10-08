@@ -355,14 +355,18 @@ int main() {
               "F1 cannot allocate ImGui resources during shader precompilation");
         check(!api->capturing(), "deferred menu cannot capture gameplay input");
         startup_allowed = true;
-        gfx.frames(2);
+        gfx.frames(20);
         check(unreal_requests == 1, "Unreal requested automatically after startup readiness");
         check(unreal_thread == fixture_thread, "automatic Unreal request runs on game window thread");
+        api->metrics(&m);
+        check(m.context_created == 1 && m.closed_frames > 0 && calls > 0,
+              "render subscribers run without opening the menu");
+        check(!m.menu_open && !api->capturing(), "overlay rendering keeps gameplay input free");
         SendMessageW(window, WM_APP + 0x4BC, TRUE, 0);
         check(unreal_requests == 1, "menu opening does not duplicate Unreal request");
         gfx.frames(20);
         api->metrics(&m);
-        check(m.context_created == 1 && m.open_frames > 0 && calls > 0, "lazy ImGui at first opening");
+        check(m.context_created == 1 && m.open_frames > 0 && calls > 0, "menu opens after overlay startup");
         check(removed_calls == 0, "removed callback not dispatched from snapshot");
         check(unreal_requests == 1, "Unreal request once");
         check(m.callback_count == 2, "self-removal and exception cleanup");

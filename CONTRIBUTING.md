@@ -102,10 +102,9 @@ Never regenerate it from an unreviewed working tree.
 `MAJOR.MINOR.PATCH` values. CMake, package manifests, SDK metadata and archive names
 derive from it. Do not replace assets belonging to an existing release.
 
-A push to `main` that changes `VERSION` automatically builds and tests Windows and
-Linux. It publishes the verified Windows server, Windows client, server SDK and
-client SDK first, then attaches the independently verified Linux server archive
-when that build finishes. A push that does not change `VERSION` does not publish.
+A push to `main` that changes `VERSION` automatically builds and tests Windows.
+It publishes the verified Windows server, Windows client, server SDK and client
+SDK archives. A push that does not change `VERSION` does not publish.
 The same workflow can be started manually and kept as a draft.
 
 The release workflow requires the repository secret `UPSTREAM_READ_TOKEN` with read

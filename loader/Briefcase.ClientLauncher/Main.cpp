@@ -111,7 +111,7 @@ int launch(const fs::path& root, const std::vector<std::wstring>& supplied, bool
     validate_game(game);
     require_file(root / L"version.dll", "Briefcase client proxy is missing");
     require_file(root / L"Briefcase/Core/Briefcase.NativeHost.dll", "Briefcase client runtime is missing");
-    require_file(root / L"Briefcase/Core/Client/Briefcase.Client.Rendering.dll", "Briefcase client renderer is missing");
+    require_file(root / L"ue4ss/UE4SS.dll", "Briefcase client UE4SS runtime is missing");
     if (validate_only) return 0;
     if (client_running(game)) throw std::runtime_error("This Deceive Inc. client is already running");
     const auto game_log = root / L"Briefcase/Logs/DeceiveInc-client.log";

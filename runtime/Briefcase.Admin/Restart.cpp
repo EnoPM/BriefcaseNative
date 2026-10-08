@@ -47,7 +47,7 @@ Json schedule_restart(const fs::path &root) {
     const auto helper = restart_helper_path(root);
     assert_plain_path(helper);
     if (!fs::is_regular_file(helper))
-        throw Error("unavailable", "Restart helper is missing from the server package.");
+        throw Error("unavailable", "Restart this managed server from Briefcase ServerApp.");
     FILETIME created{}, exit{}, kernel{}, user{};
     if (!GetProcessTimes(GetCurrentProcess(), &created, &exit, &kernel, &user))
         throw Error("unavailable", "Process identity unavailable.");

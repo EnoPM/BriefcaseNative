@@ -27,6 +27,16 @@
 #include <DynamicOutput/DynamicOutput.hpp>
 #endif
 #include <Unreal/FProperty.hpp>
+#ifdef _WIN32
+#include <Unreal/Property/FArrayProperty.hpp>
+#include <Unreal/FString.hpp>
+#include <Unreal/FScriptArray.hpp>
+#include <cstdio>
+#include <fstream>
+#include <filesystem>
+#include <nlohmann/json.hpp>
+#endif
+#include <Unreal/FWeakObjectPtr.hpp>
 #include <Unreal/GameplayStatics.hpp>
 #include <Unreal/AActor.hpp>
 #include <Unreal/Hooks.hpp>
@@ -73,14 +83,16 @@ struct Task {
     uint64_t owner;
 };
 static std::deque<Task> queue;
-static HandleTable<UObject> handles;
+// A raw UObject address can outlive the object during map travel. Resolve each
+// handle through Unreal's index and serial before dereferencing that address.
+static HandleTable<UObject, FWeakObjectPtr> handles;
 static std::unordered_set<uint64_t> disabled_owners;
 static std::mutex deleted_mutex;
-static std::vector<HandleTable<UObject>::Revoked> deleted_queue;
+static std::vector<HandleTable<UObject, FWeakObjectPtr>::Revoked> deleted_queue;
 static std::atomic<bool> deleted_pending{};
 static std::atomic<BcTask> shutdown_handler{};
 static std::atomic<void *> shutdown_user{};
-static void dispatch_deleted(const std::vector<HandleTable<UObject>::Revoked> &) noexcept;
+static void dispatch_deleted(const std::vector<HandleTable<UObject, FWeakObjectPtr>::Revoked> &) noexcept;
 static void reflected_event_pre(UObject *, UFunction *, void *) noexcept;
 static void reflected_event_post(UObject *, UFunction *, void *) noexcept;
 static thread_local unsigned dispatch_depth;
@@ -136,7 +148,7 @@ static void pump() noexcept {
         return;
     pumping = true;
     if (deleted_pending.load(std::memory_order_acquire)) {
-        std::vector<HandleTable<UObject>::Revoked> events;
+        std::vector<HandleTable<UObject, FWeakObjectPtr>::Revoked> events;
         {
             std::lock_guard lock(deleted_mutex);
             events.swap(deleted_queue);

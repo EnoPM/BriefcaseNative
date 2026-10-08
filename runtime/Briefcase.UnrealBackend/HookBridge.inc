@@ -253,7 +253,7 @@ BcResult backend_deleted(uint64_t owner, BcDeletedCallback callback, void *user,
     *out = token;
     return BC_OK;
 }
-static void dispatch_deleted(const std::vector<HandleTable<UObject>::Revoked> &events) noexcept {
+static void dispatch_deleted(const std::vector<HandleTable<UObject, FWeakObjectPtr>::Revoked> &events) noexcept {
     try {
         const auto snapshot = deletion_callbacks;
         for (const auto &event : events)

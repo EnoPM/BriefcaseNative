@@ -3,7 +3,7 @@
 Linux targets the dedicated server only; the client remains Windows-only. The
 Linux host shares the Windows loader, public C ABI, configuration, reflection,
 hook dispatch and TLS administration services. Startup patches, native detours,
-supervised restart and updates before launch are implemented.
+and supervised restart are implemented. The launcher does not check for updates during startup.
 
 Automated tests and actual headless startup/restart passed under WSL2. Connected
 player sessions and extended production use still need validation. Version 0.5.0
@@ -80,11 +80,9 @@ Launch `./Briefcase.ServerLauncher` directly from the installation's Binaries/Li
 directory (launching its absolute path elsewhere also uses Binaries/Linux as the
 game's working directory). Python remains a development/CI requirement only.
 
-From 0.5.1, extracting the package and launching it is enough to enable automatic
-updates from EnoPM/BriefcaseNative. The launcher creates Briefcase/updater.json only
-if absent and checks before the first server start and subsequent restarts. Existing
-settings, including enabled: false, are preserved. No GitHub token is needed for
-the official public release feed. See Updates.md for offline behavior and recovery.
+The launcher starts the installed version without contacting GitHub. Linux package
+updates currently require a separate installation step; a future Linux management
+workflow can provide the same pre-start update checks as Windows ServerApp.
 
 The native launcher dynamically links the distribution's maintained libcurl and
 libarchive libraries. On Ubuntu 24.04, install runtime libraries with:
@@ -131,7 +129,7 @@ must use this manual installation once: its older updater cannot accept the new
 package layout. New installations simply extract the native archive into Binaries/Linux.
 Package versions come exclusively from the root VERSION file; published assets must never be overwritten.
 
-## Supervision and updates
+## Supervision
 
 The launcher uses Binaries/Linux as cwd and passes unattended, null-RHI,
 no-console, no-splash and no-sound flags. Extra arguments are preserved without
@@ -139,23 +137,14 @@ shell evaluation. A per-installation lock prevents concurrent launchers.
 Unexpected game exits are reported without an automatic crash/restart loop.
 SIGINT/SIGTERM stops the child, with bounded escalation if necessary.
 
-Briefcase/updater.json configures updates. Deployment or the first launch initializes
-the official feed only if the file is absent. With enabled=true, the supervisor checks the configured GitHub
-repository before first launch and before administration restarts. A newer stable
-Linux asset is installed before the game starts. Network failure or a release
-without Linux assets keeps the installed version.
-
-The updater verifies the GitHub digest, ZIP inventory, executable identity and
-per-file hashes. Mods and user configuration are outside its managed scope.
-Durable backups and a journal allow recovery after interrupted installation.
-Recovery runs even with updates disabled. A damaged backup blocks launch rather
-than starting mixed versions. After installation the supervisor reloads its
-updated executable before starting the game. No interpreter or shell is invoked.
+The launcher's explicit archive-install path verifies the package inventory and
+recovers an interrupted installation before startup. It performs no release
+download or mod update check during startup or administration restart.
 
 Remote restart uses an inherited Unix sequenced-packet socket. The game verifies
 the parent's PID/UID, then receives acknowledgement before replying to the admin
 client. Commit follows transmission of the TLS response. The supervisor waits
-for termination, checks updates and starts a new process with the same arguments.
+for termination and starts a new process with the same arguments.
 A directly launched game cannot request an unsupervised restart.
 
 Logs are Briefcase/Logs/launcher.log and Briefcase/Logs/BriefcaseNative.log.

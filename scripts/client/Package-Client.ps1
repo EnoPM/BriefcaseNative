@@ -19,22 +19,24 @@ foreach($kind in @('Client','Server')) {
         & $cmake --install (Join-Path $project 'build') --config Release --component $component --prefix $destination
         if($LASTEXITCODE){throw "Packaging $kind/$component failed."}
     }
-    if($kind -eq 'Server'){
-        $ue4ssSource=Join-Path $project 'dist\UE4SS-Runtime\ue4ss'
-        Copy-Item -LiteralPath $ue4ssSource -Destination $destination -Recurse -Force
+    $ue4ssSource=Join-Path $project 'dist\UE4SS-Runtime\ue4ss'
+    Copy-Item -LiteralPath $ue4ssSource -Destination $destination -Recurse -Force
+    if($kind -eq 'Server') {
+        $bridge=Join-Path $project 'build-ue4ss-ninja\main.dll'
+        if(-not(Test-Path -LiteralPath $bridge -PathType Leaf)){throw 'Server bridge build is missing.'}
+        $bridgeDirectory=Join-Path $destination 'ue4ss\Mods\BriefcaseServerBridge\dlls'
+        New-Item -ItemType Directory -Path $bridgeDirectory -Force|Out-Null
+        Copy-Item -LiteralPath $bridge -Destination (Join-Path $bridgeDirectory 'main.dll') -Force
+        Set-Content -LiteralPath (Join-Path (Split-Path $bridgeDirectory -Parent) 'enabled.txt') -Value '' -Encoding ascii
     }
     $licenses=Join-Path $destination 'Briefcase\Core\Licenses'
     New-Item -ItemType Directory -Path $licenses -Force|Out-Null
     Copy-Item -Path (Join-Path $project 'dist\Win64\Briefcase\Core\Licenses\*') -Destination $licenses -Recurse -Force
-    if($kind -eq 'Client'){
-        '{"schemaVersion":1,"enabledMods":["briefcase.native-overlay-sample"]}'|
-            Set-Content -LiteralPath (Join-Path $destination 'Briefcase\loader.json') -Encoding utf8
-    }
     $frameworkVersion=& (Join-Path $project 'scripts/release/Read-Version.ps1') -ProjectRoot $project
     $records=@(Get-ChildItem -LiteralPath $destination -Recurse -File|ForEach-Object {
         $relative=$_.FullName.Substring($destination.Length+1).Replace('\','/')
         $record=[ordered]@{path=$relative;sha256=(Get-FileHash -LiteralPath $_.FullName).Hash.ToLowerInvariant();bytes=$_.Length;mode=$(if($_.Extension -in @('.exe','.dll')){493}else{420})}
-        if($kind -eq 'Server' -and $relative -ceq 'ue4ss/Mods/mods.txt'){$record.preserve=$true}
+        if($relative -ceq 'ue4ss/Mods/mods.txt'){$record.preserve=$true}
         $record
     })
     $gameHash=if($kind -eq 'Server'){'f2125f09cbeb7922a4912706cc546477454ce229c15ed477af2731a21c828fd3'}else{(Get-Content -LiteralPath (Join-Path $project 'runtime\Briefcase.NativeHost\ClientBuild.json') -Raw|ConvertFrom-Json).sha256}

@@ -60,6 +60,12 @@ try {
         New-Item -ItemType Directory -Path $licenses -Force | Out-Null
         Copy-Item -LiteralPath $jsonLicense -Destination (Join-Path $licenses 'nlohmann-json.txt')
     }
+    $imguiLicense = Join-Path $repository 'ue4ss\third_party\imgui-1.91.9b\LICENSE.txt'
+    if (Test-Path -LiteralPath $imguiLicense -PathType Leaf) {
+        $licenses = Join-Path $mod 'Licenses'
+        New-Item -ItemType Directory -Path $licenses -Force | Out-Null
+        Copy-Item -LiteralPath $imguiLicense -Destination (Join-Path $licenses 'DearImGui.txt')
+    }
     if (Test-Path -LiteralPath $archive) { Remove-Item -LiteralPath $archive -Force }
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     [IO.Compression.ZipFile]::CreateFromDirectory($stage, $archive)

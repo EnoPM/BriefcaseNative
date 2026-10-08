@@ -64,6 +64,46 @@ bool Spy::is_authoritative_player() const {
     return object_->IsA(spy_class()) && !is_template() && role() == 3;
 }
 
+bool Spy::is_dead() const {
+    require_live(object_);
+    struct Params { bool ReturnValue{}; } params;
+    auto *call = function(STR("/Script/DeceiveInc.Spy:IsDead"));
+    if (call->GetParmsSize() != sizeof(params))
+        throw std::runtime_error("Spy.IsDead parameter layout changed");
+    object_->ProcessEvent(call, &params);
+    return params.ReturnValue;
+}
+
+bool Spy::is_bot() const {
+    require_live(object_);
+    struct Params { bool ReturnValue{}; } params;
+    auto *call = function(STR("/Script/DeceiveInc.Spy:IsBot"));
+    if (call->GetParmsSize() != sizeof(params))
+        throw std::runtime_error("Spy.IsBot parameter layout changed");
+    object_->ProcessEvent(call, &params);
+    return params.ReturnValue;
+}
+
+bool Spy::is_in_ads() const {
+    require_live(object_);
+    struct Params { bool ReturnValue{}; } params;
+    auto *call = function(STR("/Script/DeceiveInc.Spy:IsInADS"));
+    if (call->GetParmsSize() != sizeof(params))
+        throw std::runtime_error("Spy.IsInADS parameter layout changed");
+    object_->ProcessEvent(call, &params);
+    return params.ReturnValue;
+}
+
+RC::Unreal::UObject *Spy::controller() const {
+    require_live(object_);
+    struct Params { RC::Unreal::UObject *ReturnValue{}; } params;
+    auto *call = function(STR("/Script/Engine.Pawn:GetController"));
+    if (call->GetParmsSize() != sizeof(params))
+        throw std::runtime_error("Spy.GetController parameter layout changed");
+    object_->ProcessEvent(call, &params);
+    return params.ReturnValue;
+}
+
 std::uint8_t Spy::role() const { return read<std::uint8_t>(object_, STR("Role")); }
 float Spy::stamina() const { return read<float>(object_, STR("StaminaCurrent")); }
 float Spy::cover_ratio() const { return read<float>(object_, STR("CoverRatio")); }

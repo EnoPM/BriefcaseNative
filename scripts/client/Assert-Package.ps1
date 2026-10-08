@@ -4,12 +4,11 @@ $ErrorActionPreference='Stop'
 $project=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 if(-not $ClientPackage){$ClientPackage=Join-Path $project 'dist\Client'}
 if(-not $ServerPackage){$ServerPackage=Join-Path $project 'dist\Server'}
-$expectedClient=@('version.dll','Briefcase\Core\Briefcase.NativeHost.dll','Briefcase\Core\Client\Briefcase.Client.Rendering.dll',
-    'Briefcase\Mods\briefcase.native-overlay-sample\Briefcase.NativeOverlaySample.dll')
+$expectedClient=@('version.dll','Briefcase\Core\Briefcase.NativeHost.dll','ue4ss\UE4SS.dll')
 $actualClient=@(Get-ChildItem -LiteralPath $ClientPackage -Filter *.dll -File -Recurse|
     ForEach-Object {$_.FullName.Substring($ClientPackage.TrimEnd('\').Length+1)})
 if(@(Compare-Object $expectedClient $actualClient).Count){throw 'Unexpected client DLL inventory.'}
-$expectedServer=@('version.dll','Briefcase\Core\Briefcase.NativeHost.dll','ue4ss\UE4SS.dll')
+$expectedServer=@('version.dll','Briefcase\Core\Briefcase.NativeHost.dll','ue4ss\UE4SS.dll','ue4ss\Mods\BriefcaseServerBridge\dlls\main.dll')
 $actualServer=@(Get-ChildItem -LiteralPath $ServerPackage -Filter *.dll -File -Recurse|
     ForEach-Object {$_.FullName.Substring($ServerPackage.TrimEnd('\').Length+1)})
 if(@(Compare-Object $expectedServer $actualServer).Count){throw 'Unexpected server DLL inventory.'}
@@ -23,10 +22,8 @@ foreach($package in @($ClientPackage,$ServerPackage)){
     }
     $bad=@(Get-ChildItem -LiteralPath $package -Recurse -File|Where-Object {$_.Extension -match '^\.(pdb|lib|obj|exe)$'})
     $allowedSetup=Join-Path $ServerPackage 'Briefcase\Core\Tools\Briefcase.AdminSetup.exe'
-    $allowedRestart=Join-Path $ServerPackage 'Briefcase\Core\Tools\Briefcase.ServerRestart.exe'
-    $allowedUpdater=Join-Path $ServerPackage 'Briefcase\Core\Tools\Briefcase.ServerUpdater.exe'
     $allowedClientLauncher=Join-Path $ClientPackage 'Briefcase.ClientLauncher.exe'
-    $bad=@($bad | Where-Object {$_.FullName -ine $allowedClientLauncher -and $_.FullName -ine $allowedSetup -and $_.FullName -ine $allowedRestart -and $_.FullName -ine $allowedUpdater})
+    $bad=@($bad | Where-Object {$_.FullName -ine $allowedClientLauncher -and $_.FullName -ine $allowedSetup})
     if($bad.Count){throw "Development artifacts in package: $($bad.Name -join ', ')"}
     foreach($file in Get-ChildItem -LiteralPath $package -Filter briefcase.mod.json -Recurse -File) {
         $manifest=Get-Content -LiteralPath $file.FullName -Raw|ConvertFrom-Json
@@ -49,8 +46,12 @@ foreach($file in Get-ChildItem -LiteralPath (Join-Path $ServerPackage 'Briefcase
     if($LASTEXITCODE -or ($imports -match '(?i)d3d|dxgi|imgui|Client.Rendering')){throw "Graphics dependency or unreadable server binary: $($file.Name)"}
 }
 if(@(Get-ChildItem -LiteralPath (Join-Path $ServerPackage 'Briefcase') -Recurse|Where-Object {$_.Name -match '(?i)Client\.|OverlaySample|d3d|dxgi'}).Count){throw 'Client graphics component in server package.'}
-foreach($required in @('Briefcase.ClientLauncher.exe','Briefcase\Core\Localization\fr.json','Briefcase\Core\Localization\en.json','Briefcase\Core\Licenses\MbedTLS.txt','Briefcase\Core\Licenses\DearImGui.txt','Briefcase\loader.json')){
+foreach($required in @('Briefcase.ClientLauncher.exe','Briefcase\Core\Licenses\MbedTLS.txt',
+    'ue4ss\UE4SS.dll','ue4ss\UE4SS-settings.ini','ue4ss\Mods\mods.txt','ue4ss\Licenses\DearImGui.txt')){
     if(-not(Test-Path -LiteralPath (Join-Path $ClientPackage $required))){throw "Missing client package file: $required"}
+}
+if(Test-Path -LiteralPath (Join-Path $ClientPackage 'Briefcase\Mods')){
+    throw 'Framework client package must not include legacy native mods.'
 }
 $commonClient=(Get-FileHash -LiteralPath (Join-Path $ClientPackage 'Briefcase\Core\Briefcase.NativeHost.dll')).Hash
 $commonServer=(Get-FileHash -LiteralPath (Join-Path $ServerPackage 'Briefcase\Core\Briefcase.NativeHost.dll')).Hash
@@ -61,8 +62,12 @@ foreach($package in @($ClientPackage,$ServerPackage)) {
 }
 Write-Output 'PASS client/server package inventories, common runtime, DLL dependencies, manifests, licenses and absence of PDBs.'
 
-foreach($required in @('Briefcase\Core\Tools\Briefcase.ServerUpdater.exe','Briefcase\Core\Updater\build.json','Briefcase\Core\Updater\updater.example.json')) {
-    if(-not(Test-Path -LiteralPath (Join-Path $ServerPackage $required))){throw "Missing server updater file: $required"}
+foreach($required in @('Briefcase\Core\Updater\build.json','Briefcase\Core\Updater\updater.example.json')) {
+    if(-not(Test-Path -LiteralPath (Join-Path $ServerPackage $required))){throw "Missing server metadata file: $required"}
+}
+foreach($forbidden in @('Briefcase\Core\Briefcase.ServerBootstrap.dll', 'Briefcase\Core\Tools\Briefcase.ServerInjector.exe',
+    'Briefcase\Core\Tools\Briefcase.ServerUpdater.exe', 'Briefcase\Core\Tools\Briefcase.ServerRestart.exe')) {
+    if(Test-Path -LiteralPath (Join-Path $ServerPackage $forbidden)){throw "App-only or retired component in Briefcase package: $forbidden"}
 }
 if(Test-Path -LiteralPath (Join-Path $ServerPackage 'Briefcase\updater.json')){throw 'Local update repository configuration in user package.'}
 
@@ -71,11 +76,14 @@ $serverInventory=Get-Content -LiteralPath (Join-Path $ServerPackage 'Package.jso
 $selectionRecord=@($serverInventory.files|Where-Object {$_.path -ceq 'ue4ss/Mods/mods.txt'})
 if($selectionRecord.Count -ne 1 -or $selectionRecord[0].preserve -ne $true){throw 'UE4SS mod selection is not marked for preservation.'}
 
-foreach($forbidden in @('Briefcase.ServerLauncher.exe','Briefcase/Core/Briefcase.ServerBootstrap.dll')){
+foreach($forbidden in @('Briefcase.ServerLauncher.exe')){
  if(Test-Path -LiteralPath (Join-Path $ServerPackage $forbidden)){throw "Legacy launcher file in proxy package: $forbidden"}
 }
 foreach($required in @('version.dll','ue4ss/UE4SS.dll','ue4ss/UE4SS-settings.ini','ue4ss/Mods/mods.txt')){
  if(-not(Test-Path -LiteralPath (Join-Path $ServerPackage $required))){throw "Missing proxy runtime file: $required"}
 }
 $bundledUe4ssMods=@(Get-ChildItem -LiteralPath (Join-Path $ServerPackage 'ue4ss\Mods') -Directory -ErrorAction SilentlyContinue)
-if($bundledUe4ssMods.Count){throw 'Framework server package must not contain independent UE4SS mods.'}
+if($bundledUe4ssMods.Count -ne 1 -or $bundledUe4ssMods[0].Name -cne 'BriefcaseServerBridge' -or
+   -not(Test-Path -LiteralPath (Join-Path $bundledUe4ssMods[0].FullName 'enabled.txt'))){
+    throw 'Framework server package must contain only its enabled state bridge.'
+}

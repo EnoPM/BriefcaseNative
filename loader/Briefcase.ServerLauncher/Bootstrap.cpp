@@ -1,4 +1,5 @@
 #include "../Briefcase.VersionProxy/EntryGate.hpp"
+#include "../Briefcase.VersionProxy/PreEntryMods.hpp"
 #include <detours.h>
 #include <filesystem>
 static DWORD WINAPI run(void* value) {
@@ -15,6 +16,7 @@ static void prepare() noexcept {
         auto init = reinterpret_cast<uint32_t(__cdecl*)(uint32_t)>(GetProcAddress(host, "BriefcasePrepare"));
         auto loop = GetProcAddress(host, "BriefcaseRun");
         if (!init || !loop || init(GetCurrentThreadId())) ExitProcess(119);
+        if (!briefcase::loader::load_preentry_mods(root)) ExitProcess(119);
         // During the UE4SS migration the launcher remains the single injection
         // point. A server package can opt in by installing ue4ss/UE4SS.dll;
         // no proxy DLL beside the game executable is required.

@@ -3,10 +3,11 @@
 #include <limits>
 #include <mutex>
 #include <optional>
+#include <type_traits>
 #include <unordered_map>
 #include <vector>
 namespace bc {
-template <class Object> class HandleTable {
+template <class Object, class Guard = Object *> class HandleTable {
     struct Key {
         uint64_t owner;
         Object *object;
@@ -20,6 +21,8 @@ template <class Object> class HandleTable {
     struct Entry {
         uint64_t owner;
         Object *object;
+        Guard guard;
+        bool guard_available;
         uint32_t refs = 1;
         bool canonical = false;
     };
@@ -28,11 +31,29 @@ template <class Object> class HandleTable {
     std::mutex mutex_;
     uint64_t next_ = 1;
     size_t limit_;
+    static Guard capture(Object *object) {
+        if constexpr (std::is_pointer_v<Guard>) return object;
+        else {
+            Guard guard{};
+            guard = object;
+            return guard;
+        }
+    }
+    static Object *resolve(const Entry &entry) {
+        if constexpr (std::is_pointer_v<Guard>) return entry.object;
+        else return entry.guard_available ? entry.guard.Get() : entry.object;
+    }
     std::optional<uint64_t> add(uint64_t owner, Object *object, bool canonical) {
         if (!owner || !object || !next_ || entries_.size() >= limit_)
             return {};
+        auto guard = capture(object);
+        // Some Unreal objects have no allocated weak serial yet. Their lifetime
+        // is still tracked by the UObject deletion listener, so retain the raw
+        // address until that listener revokes this entry.
+        bool guard_available = true;
+        if constexpr (!std::is_pointer_v<Guard>) guard_available = guard.Get() != nullptr;
         auto token = next_++;
-        entries_.emplace(token, Entry{owner, object, 1, canonical});
+        entries_.emplace(token, Entry{owner, object, guard, guard_available, 1, canonical});
         if (canonical)
             canonical_[{owner, object}] = token;
         return token;
@@ -52,16 +73,22 @@ template <class Object> class HandleTable {
         auto i = canonical_.find({owner, object});
         if (i == canonical_.end())
             return add(owner, object, true);
-        auto &e = entries_.at(i->second);
-        if (e.refs == UINT32_MAX)
-            return {};
-        ++e.refs;
-        return i->second;
+        auto entry = entries_.find(i->second);
+        if (entry != entries_.end() && resolve(entry->second) == object) {
+            if (entry->second.refs == UINT32_MAX)
+                return {};
+            ++entry->second.refs;
+            return i->second;
+        }
+        if (entry != entries_.end()) entries_.erase(entry);
+        canonical_.erase(i);
+        return add(owner, object, true);
     }
     bool retain(uint64_t owner, uint64_t token) {
         std::lock_guard lock(mutex_);
         auto i = entries_.find(token);
-        if (i == entries_.end() || i->second.owner != owner || i->second.refs == UINT32_MAX)
+        if (i == entries_.end() || i->second.owner != owner || i->second.refs == UINT32_MAX ||
+            !resolve(i->second))
             return false;
         ++i->second.refs;
         return true;
@@ -69,12 +96,14 @@ template <class Object> class HandleTable {
     Object *get(uint64_t owner, uint64_t token) {
         std::lock_guard lock(mutex_);
         auto i = entries_.find(token);
-        return i != entries_.end() && i->second.owner == owner ? i->second.object : nullptr;
+        return i != entries_.end() && i->second.owner == owner ? resolve(i->second) : nullptr;
     }
     template <class Predicate> bool valid(uint64_t owner, uint64_t token, Predicate predicate) {
         std::lock_guard lock(mutex_);
         auto i = entries_.find(token);
-        return i != entries_.end() && i->second.owner == owner && predicate(i->second.object);
+        if (i == entries_.end() || i->second.owner != owner) return false;
+        auto *object = resolve(i->second);
+        return object && predicate(object);
     }
     bool release(uint64_t owner, uint64_t token) {
         std::lock_guard lock(mutex_);

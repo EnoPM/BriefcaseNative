@@ -2,6 +2,17 @@
 #include "HookRegistry.hpp"
 #include "ReflectionContract.hpp"
 #include <iostream>
+struct GenerationGuard {
+    inline static unsigned generation = 1;
+    int *object{};
+    unsigned captured{};
+    void operator=(int *value) { object = value; captured = generation; }
+    int *Get() const { return captured == generation ? object : nullptr; }
+};
+struct NoSerialGuard {
+    void operator=(int *) {}
+    int *Get() const { return nullptr; }
+};
 static int checks;
 static void check(bool b) {
     ++checks;
@@ -36,6 +47,21 @@ int main() {
         check(handles.get(1, *reused) == &obj);
         handles.erase_owner(1);
         check(!handles.get(1, *reused));
+        bc::HandleTable<int, GenerationGuard> guarded(2);
+        auto old = guarded.intern(1, &obj);
+        check(old && guarded.get(1, *old) == &obj);
+        ++GenerationGuard::generation; // Same address now represents a new object.
+        check(!guarded.get(1, *old));
+        bc::HandleTable<int, NoSerialGuard> no_serial;
+        auto without_serial = no_serial.intern(1, &obj);
+        check(without_serial && no_serial.get(1, *without_serial) == &obj);
+        no_serial.invalidate(&obj);
+        check(!no_serial.get(1, *without_serial));
+        check(!guarded.valid(1, *old, [](int *) { return true; }));
+        check(!guarded.retain(1, *old));
+        auto fresh = guarded.intern(1, &obj);
+        check(fresh && *fresh != *old && guarded.get(1, *fresh) == &obj);
+        check(!guarded.get(1, *old));
         bc::HookRegistry<int> hooks;
         auto pre = hooks.add(1, 1, 1, [](int &value) { value += 1; });
         auto post = hooks.add(1, 1, 2, [](int &value) { value += 10; });

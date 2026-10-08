@@ -11,6 +11,7 @@
 #include <Unreal/UClass.hpp>
 #include <Unreal/UObject.hpp>
 #include <Unreal/UObjectGlobals.hpp>
+#include <Unreal/UFunction.hpp>
 #include <Unreal/UStruct.hpp>
 #include <Unreal/UScriptStruct.hpp>
 #include <algorithm>
@@ -121,6 +122,15 @@ bool live(UObject *object) {
     return object && !object->IsUnreachable() &&
            !object->HasAnyFlags(static_cast<EObjectFlags>(RF_ClassDefaultObject | RF_ArchetypeObject));
 }
+UObject *selected_count_asset(UObject *manager) {
+    auto *getter = UObjectGlobals::StaticFindObject<UFunction *>(nullptr, nullptr,
+        STR("/Script/DeceiveInc.ObjectSpawningManager:GetObjectsToSpawnCountData"));
+    if (!getter) throw std::runtime_error("Loot count data getter is unavailable");
+    UObject *asset{};
+    manager->ProcessEvent(getter, &asset);
+    if (!asset || asset->IsUnreachable()) throw std::runtime_error("Selected loot count data is unavailable");
+    return asset;
+}
 } // namespace
 
 bool LootDistribution::is_manager(UObject *object) {
@@ -131,14 +141,15 @@ bool LootDistribution::is_manager(UObject *object) {
            object->GetPropertyByNameInChain(STR("ObjectsToSpawn")) &&
            object->GetPropertyByNameInChain(STR("ObjectsToSpawnCount"));
 }
-bool LootDistribution::is_point(UObject *object) {
+bool LootDistribution::is_point(UObject *object, bool include_templates) {
     static UClass *actor{};
     static UClass *component{};
     if (!actor) actor = UObjectGlobals::StaticFindObject<UClass *>(
         nullptr, nullptr, STR("/Script/DeceiveInc.ObjectSpawn"));
     if (!component) component = UObjectGlobals::StaticFindObject<UClass *>(
         nullptr, nullptr, STR("/Script/DeceiveInc.ObjectSpawnComponent"));
-    return live(object) && ((actor && object->IsA(actor)) ||
+    return object && !object->IsUnreachable() && (include_templates || live(object)) &&
+           ((actor && object->IsA(actor)) ||
                             (component && object->IsA(component))) &&
            object->GetPropertyByNameInChain(STR("CustomPossibleObjectsToSpawn")) &&
            object->GetPropertyByNameInChain(STR("PartOfRoomCRC"));
@@ -176,6 +187,31 @@ std::vector<LootCount> LootDistribution::counts(UObject *manager) {
     return result;
 }
 
+std::vector<LootCount> LootDistribution::selected_counts(UObject *manager) {
+    if (!is_manager(manager)) throw std::runtime_error("Not a live loot manager");
+    auto entries = array(selected_count_asset(manager), L"ObjectsToSpawnCount");
+    std::vector<LootCount> result;
+    result.reserve(entries.size());
+    for (int i = 0; i < entries.size(); ++i) {
+        auto *row = entries.row(i);
+        result.push_back({string(entries.type, row, L"ObjectType"),
+                          number<std::uint32_t>(entries.type, row, L"SpawnCount")});
+    }
+    return result;
+}
+
+bool LootDistribution::update_selected_count(UObject *manager, const LootCount &value) {
+    if (!is_manager(manager)) throw std::runtime_error("Not a live loot manager");
+    auto entries = array(selected_count_asset(manager), L"ObjectsToSpawnCount");
+    for (int i = 0; i < entries.size(); ++i) {
+        auto *row = entries.row(i);
+        if (string(entries.type, row, L"ObjectType") != value.object_type) continue;
+        set_number(entries.type, row, L"SpawnCount", value.count);
+        return true;
+    }
+    return false;
+}
+
 bool LootDistribution::update_object(UObject *manager, const LootObject &value) {
     auto entries = array(manager, L"ObjectsToSpawn");
     for (int i = 0; i < entries.size(); ++i) {
@@ -204,8 +240,8 @@ bool LootDistribution::update_count(UObject *manager, const LootCount &value) {
     return false;
 }
 
-std::optional<LootPoint> LootDistribution::point(UObject *object) {
-    if (!is_point(object)) return std::nullopt;
+std::optional<LootPoint> LootDistribution::point(UObject *object, bool include_templates) {
+    if (!is_point(object, include_templates)) return std::nullopt;
     auto *custom_property = field(object, L"CustomPossibleObjectsToSpawn");
     if (!custom_property->IsA<FStructProperty>()) throw std::runtime_error("Loot candidate struct changed");
     auto *custom_type = static_cast<FStructProperty *>(custom_property)->GetStruct();
@@ -229,9 +265,47 @@ std::optional<LootPoint> LootDistribution::point(UObject *object) {
     return result;
 }
 
+std::optional<std::vector<LootCandidate>> LootDistribution::preset_candidates(
+    bool vault, std::uint8_t security, const std::string &point_type) {
+    UObject *asset{};
+    UObjectGlobals::ForEachUObject([&](UObject *object, std::int32_t, std::int32_t) {
+        if (live(object) && object->GetPropertyByNameInChain(STR("InVaultPresets")) &&
+            object->GetPropertyByNameInChain(STR("OutOfVaultPresets"))) {
+            asset = object;
+            return RC::LoopAction::Break;
+        }
+        return RC::LoopAction::Continue;
+    });
+    if (!asset) return std::nullopt;
+    // The preset asset stores one struct per security level in a fixed-size
+    // reflected array, not in a TArray like its nested candidate lists.
+    auto *property = field(asset, vault ? L"InVaultPresets" : L"OutOfVaultPresets");
+    if (!property->IsA<FStructProperty>() || security >= property->GetArrayDim())
+        return std::nullopt;
+    auto *preset_type = static_cast<FStructProperty *>(property)->GetStruct();
+    auto *preset = property->ContainerPtrToValuePtr<void>(asset, security);
+    auto read = [](const StructArray &entries) {
+        std::vector<LootCandidate> result;
+        result.reserve(entries.size());
+        for (int i = 0; i < entries.size(); ++i)
+            result.push_back(candidate(entries.type, entries.row(i)));
+        return result;
+    };
+    if (!point_type.empty() && point_type != "Default") {
+        auto typed = array(preset_type, preset, L"ObjectsToSpawnOnSpawnPointType");
+        for (int i = 0; i < typed.size(); ++i) {
+            auto *entry = typed.row(i);
+            if (string(typed.type, entry, L"SpawnPointType") == point_type)
+                return read(array(typed.type, entry, L"ObjectsToSpawn"));
+        }
+    }
+    return read(array(preset_type, preset, L"ObjectsToSpawn"));
+}
+
 void LootDistribution::replace_candidates(UObject *point,
-                                           const std::vector<LootCandidate> &candidates) {
-    if (!is_point(point) || candidates.empty() || candidates.size() > 64)
+                                           const std::vector<LootCandidate> &candidates,
+                                           bool include_templates) {
+    if (!is_point(point, include_templates) || candidates.empty() || candidates.size() > 64)
         throw std::runtime_error("Invalid loot point replacement");
     auto *custom_property = field(point, L"CustomPossibleObjectsToSpawn");
     if (!custom_property->IsA<FStructProperty>()) throw std::runtime_error("Loot candidate struct changed");

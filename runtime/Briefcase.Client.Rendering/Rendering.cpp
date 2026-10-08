@@ -333,12 +333,15 @@ static HRESULT __stdcall hooked_present(IDXGISwapChain *chain, UINT sync, UINT f
                     deferred_menu_logged = true;
                 }
             }
-            const bool initializing = !imgui && input.menu && stable;
+            // A mod can draw before the framework menu has ever been opened.
+            // Keep shader startup deferred, then create the shared context as
+            // soon as either the menu or a render subscriber needs it.
+            const bool initializing = !imgui && stable && (input.menu || metrics.callback_count != 0);
             if (initializing) {
                 if (!initialize_imgui(chain)) {
                     ++metrics.device_errors;
                     state = 3;
-                    log("ImGui initialization failed; will retry on a later menu opening.");
+                    log("ImGui initialization failed; will retry when rendering is needed.");
                     bc::input::request_menu(false);
                 }
             }

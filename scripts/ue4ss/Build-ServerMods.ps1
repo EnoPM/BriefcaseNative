@@ -57,7 +57,7 @@ if ($Offline) { $configure += '-DFETCHCONTENT_FULLY_DISCONNECTED=ON' }
 & cmake @configure
 if ($LASTEXITCODE) { exit $LASTEXITCODE }
 
-$targets=@('UE4SS','Briefcase.DeceiveInc.Contracts','Briefcase.NativeStamina.Sites')
+$targets=@('UE4SS','Briefcase.DeceiveInc.Contracts','Briefcase.NativeStamina.Sites','Briefcase.ServerBridge.UE4SS')
 if ($RuntimeOnly -and $ModTargets.Count) { throw 'RuntimeOnly cannot build a mod target.' }
 if (-not $RuntimeOnly) {
     if ($ModTargets.Count) {
