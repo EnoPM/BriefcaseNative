@@ -47,7 +47,7 @@
     },
     {
       "path": ".gitignore",
-      "sha256": "c388d0663328c60079636a13daa76ea6b14408f1fee83ce33e2ddebe3bfa5c21"
+      "sha256": "5e4ebc02f5fb1f9246b6ededb23da78027254917bd58783c7023051a994f8063"
     },
     {
       "path": "CMakeLists.txt",
@@ -162,6 +162,10 @@
       "sha256": "79e356f8be0a9cc8040081a82c76af7e6e53fd1ac2ee1a25c1cc937e5e6da7cf"
     },
     {
+      "path": "docs/PlayerCapSmoketestResearch.md",
+      "sha256": "8b3326cf7f549091124faed36456975dfebeb8f7d858a7444d5b1f804fd50086"
+    },
+    {
       "path": "docs/PortableIdentityStorage.md",
       "sha256": "7a2698bb8458dd1273734cd1a7a6a8b247f9eea2510100669a1777df78d8656c"
     },
@@ -176,6 +180,10 @@
     {
       "path": "docs/ServerTelemetry.md",
       "sha256": "10e0c9a5f67e020f012d7ac3e796bafd335abbb2812e2dd001d534bd412145ed"
+    },
+    {
+      "path": "docs/SharedServerInstances.md",
+      "sha256": "a20f8f7f1f8b390b77b244a4fe6751274a492399725085886a7b7c45ffd4a74d"
     },
     {
       "path": "docs/SourcePublication.md",
@@ -215,11 +223,11 @@
     },
     {
       "path": "loader/Briefcase.ServerLauncher/AppInjector.cpp",
-      "sha256": "44d254bc79605be15625e59445127e030d29cdc4c07c8e184281c278afa363a0"
+      "sha256": "f3c229511c7b36da546362bab4d7b970686134d2967fdcb1bbbc9072491ef1fa"
     },
     {
       "path": "loader/Briefcase.ServerLauncher/Bootstrap.cpp",
-      "sha256": "ba3c0d07c6fb36dbae645a8836743f53421efe72a1659d7028c81d4737161c59"
+      "sha256": "7517d88721d5dad514b88995e63d644f58634617ef73e1272d41c5e0c1b17b3c"
     },
     {
       "path": "loader/Briefcase.ServerLauncher/Bootstrap.def",
@@ -539,7 +547,7 @@
     },
     {
       "path": "runtime/Briefcase.NativeHost/GameProfile.hpp",
-      "sha256": "4a6d03f57f214c4a670f1dec6ceb5c04123e448ad0bc78220d57fe105a5ce38d"
+      "sha256": "474a7160429d242d8c37bbceaacd5c4e6d5da30270901bf98add791f87f972a3"
     },
     {
       "path": "runtime/Briefcase.NativeHost/HandleTable.hpp",
@@ -551,7 +559,7 @@
     },
     {
       "path": "runtime/Briefcase.NativeHost/Host.cpp",
-      "sha256": "28c797b672846f3ecd81677d77f7ec0e146a0d5ea30d914a4e0aaf7a0afdf595"
+      "sha256": "79996b13b7e4acdcbecaeb1beb08d10c0aa421688bf7ccc2bb7f20c4a0ee2233"
     },
     {
       "path": "runtime/Briefcase.NativeHost/LinuxHost.inc",
@@ -755,7 +763,7 @@
     },
     {
       "path": "scripts/deploy/Deploy-Server.ps1",
-      "sha256": "d71266b135250abe0ca2ead27a1121b426dfa1882aeee80aa60c40f8aac7181d"
+      "sha256": "0a50643cce53be99fac59cf4e07814df7dde84aa8f2fefd1978bc7013a03bb38"
     },
     {
       "path": "scripts/deploy/Select-ServerMods.ps1",
@@ -9619,7 +9627,7 @@
     },
     {
       "path": "ue4ss/ServerBridge.cpp",
-      "sha256": "6ecdade80655fdfa6bcd0f452e2a370df7b5c3533e9a992bb23c26a6e1cf987e"
+      "sha256": "fafd986dac91d16b467cc9ebb31166ac24deaa0997ecf884679dc26fc24daee5"
     },
     {
       "path": "ue4ss/ServerEquipmentIds.hpp",

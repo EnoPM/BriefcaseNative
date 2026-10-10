@@ -10,17 +10,26 @@ static void prepare() noexcept {
         wchar_t exe[32768]{};
         if (!GetModuleFileNameW(nullptr, exe, 32768)) ExitProcess(119);
         const auto root = std::filesystem::path(exe).parent_path();
+        wchar_t instance_path[32768]{};
+        const auto instance_length = GetEnvironmentVariableW(L"BRIEFCASE_INSTANCE_ROOT", instance_path, 32768);
+        if (instance_length >= 32768) ExitProcess(119);
+        const auto runtime_root = instance_length ? std::filesystem::path(instance_path) : root;
         auto host = LoadLibraryExW((root / L"Briefcase/Core/Briefcase.NativeHost.dll").c_str(), nullptr,
                                   LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32);
         if (!host) ExitProcess(119);
+        if (instance_length) {
+            const auto support = reinterpret_cast<uint32_t(__cdecl*)()>(
+                GetProcAddress(host, "BriefcaseInstanceSupportVersion"));
+            if (!support || support() < 1) ExitProcess(119);
+        }
         auto init = reinterpret_cast<uint32_t(__cdecl*)(uint32_t)>(GetProcAddress(host, "BriefcasePrepare"));
         auto loop = GetProcAddress(host, "BriefcaseRun");
         if (!init || !loop || init(GetCurrentThreadId())) ExitProcess(119);
-        if (!briefcase::loader::load_preentry_mods(root)) ExitProcess(119);
+        if (!briefcase::loader::load_preentry_mods(runtime_root)) ExitProcess(119);
         // During the UE4SS migration the launcher remains the single injection
         // point. A server package can opt in by installing ue4ss/UE4SS.dll;
         // no proxy DLL beside the game executable is required.
-        const auto ue4ss_path = root / L"ue4ss/UE4SS.dll";
+        const auto ue4ss_path = runtime_root / L"ue4ss/UE4SS.dll";
         if (std::filesystem::is_regular_file(ue4ss_path) &&
             !LoadLibraryExW(ue4ss_path.c_str(), nullptr,
                             LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32))

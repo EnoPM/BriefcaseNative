@@ -28,6 +28,7 @@
 #include <array>
 #include <chrono>
 #include <cctype>
+#include <cmath>
 #include <cstddef>
 #include <filesystem>
 #include <format>
@@ -37,6 +38,7 @@
 #include <optional>
 #include <string>
 #include <thread>
+#include <tuple>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -62,8 +64,12 @@ struct PlayerEntry {
     std::string platform_type;
 };
 struct Command {
+    enum class Kind { Kick, MoveTeam, SwapTeam } kind{Kind::Kick};
     std::string request_id;
     std::string player_token;
+    std::string other_token;
+    int team_index{-1};
+    int team_size{};
     std::uint64_t session;
 };
 std::unordered_map<UObject*, PlayerEntry> player_entries;
@@ -74,7 +80,7 @@ std::deque<std::string> responses;
 std::atomic<bool> commands_pending{};
 std::atomic<std::uint64_t> pipe_session{};
 UFunction* backend_init_function{};
-std::array<UFunction*, 9> state_change_functions{};
+std::array<UFunction*, 14> state_change_functions{};
 constexpr std::array state_change_paths{
     STR("/Script/Engine.GameModeBase:K2_PostLogin"),
     STR("/Script/Engine.GameModeBase:K2_OnLogout"),
@@ -85,6 +91,11 @@ constexpr std::array state_change_paths{
     STR("/Script/DeceiveInc.DeceiveIncPlayerController:Server_SetPlayerName"),
     STR("/Script/DeceiveInc.DeceiveIncPlayerController:ServerInitPlayerInfos"),
     STR("/Script/DeceiveInc.Spy:OnPowerupStateChangedServer"),
+    STR("/Script/DeceiveInc.DeceiveIncPlayerController:ServerJoinTeam"),
+    STR("/Script/DeceiveInc.DeceiveIncPlayerController:ServerLeaveTeam"),
+    STR("/Script/DeceiveInc.HealthComponent:HandleTakeAnyDamage"),
+    STR("/Script/DeceiveInc.HealthComponent:SetHealth"),
+    STR("/Script/DeceiveInc.HealthComponent:SetMaxHealth"),
 };
 
 PlayerEntry& connection_entry(UObject* controller) {
@@ -126,6 +137,19 @@ bool flag(UObject* object, const wchar_t* name) {
     auto* property = object->GetPropertyByNameInChain(name);
     return property && property->GetClass().GetName() == STR("BoolProperty") &&
         static_cast<FBoolProperty*>(property)->GetPropertyValueInContainer(object);
+}
+
+std::optional<float> health_value(UObject* component, const wchar_t* function_name) {
+    if (!valid(component)) return std::nullopt;
+    auto* function = component->GetFunctionByNameInChain(function_name);
+    auto* result = function ? function->GetPropertyByNameInChain(STR("ReturnValue")) : nullptr;
+    if (!function || function->GetParmsSize() != sizeof(float) || !result ||
+        result->GetClass().GetName() != STR("FloatProperty") ||
+        result->GetOffset_Internal() != 0) return std::nullopt;
+    float value{};
+    component->ProcessEvent(function, &value);
+    return std::isfinite(value) && value >= 0 && value <= 10000
+        ? std::optional<float>(value) : std::nullopt;
 }
 
 UObject* object_field(UObject* object, const wchar_t* name) {
@@ -191,6 +215,15 @@ std::optional<int> level_field(const void* base, FProperty* property) {
     return level >= 1 && level <= 10000 ? std::optional<int>(level) : std::nullopt;
 }
 
+std::optional<int> player_team(UObject* player) {
+    if (!valid(player)) return std::nullopt;
+    auto* property = player->GetPropertyByNameInChain(STR("FactionID"));
+    if (!property || property->GetClass().GetName() != STR("ByteProperty") ||
+        property->GetElementSize() != sizeof(std::uint8_t)) return std::nullopt;
+    const auto id = *property->ContainerPtrToValuePtr<std::uint8_t>(player);
+    return id < 32 ? std::optional<int>(id) : std::nullopt;
+}
+
 std::string agent_slug(std::string name) {
     const auto prefix = name.find("DA_AgentData_");
     if (prefix != std::string::npos) name.erase(0, prefix + sizeof("DA_AgentData_") - 1);
@@ -238,6 +271,42 @@ nlohmann::json selected_gadgets(UObject* player) {
     for (const auto* field : {STR("Gadget1"), STR("Gadget2")}) {
         auto slug = gadget_slug(primary_asset_name(info, info_type->GetPropertyByNameInChain(field)));
         if (!slug.empty() && slug != "None") result.push_back(std::move(slug));
+    }
+    return result;
+}
+
+std::optional<int> selection_variant(const void* info, UScriptStruct* type,
+                                     const wchar_t* field, std::string_view prefix,
+                                     std::string_view agent) {
+    if (!info || !type || agent.empty()) return std::nullopt;
+    const auto name = primary_asset_name(info, type->GetPropertyByNameInChain(field));
+    const auto expected = std::string(prefix) + std::string(agent) + "_";
+    if (!name.starts_with(expected)) return std::nullopt;
+    const auto variant = std::string_view(name).substr(expected.size());
+    if (variant == "Default") return 0;
+    if (variant == "Mod1") return 1;
+    if (variant == "Mod2") return 2;
+    return std::nullopt;
+}
+
+nlohmann::json selected_loadout(UObject* player, std::string_view agent) {
+    nlohmann::json result = nlohmann::json::object();
+    auto* selection_property = player->GetPropertyByNameInChain(STR("AgentSelection"));
+    const auto* selection = struct_field(player, selection_property,
+        STR("/Script/DeceiveInc.PlayerAgentSelectionInfo"));
+    if (!selection) return result;
+    auto* selection_type = static_cast<FStructProperty*>(selection_property)->GetStruct();
+    auto* info_property = selection_type->GetPropertyByNameInChain(STR("SelectionInfo"));
+    const auto* info = struct_field(selection, info_property,
+        STR("/Script/DeceiveInc.DISerializedAgentSelectionInfo"));
+    if (!info) return result;
+    auto* info_type = static_cast<FStructProperty*>(info_property)->GetStruct();
+    for (const auto& [key, field, prefix] : {
+             std::tuple{"weapon", STR("WeaponVariant"), "DA_AgentWeaponData_"},
+             std::tuple{"expertise", STR("ActiveVariant"), "DA_AgentExpertiseData_"},
+             std::tuple{"passive", STR("PassiveVariant"), "DA_AgentPassiveData_"}}) {
+        if (auto variant = selection_variant(info, info_type, field, prefix, agent))
+            result[key] = *variant;
     }
     return result;
 }
@@ -404,8 +473,13 @@ void receive_command(std::string_view line) {
     try {
         if (line.size() > 4096) return;
         const auto value = nlohmann::json::parse(line);
-        if (value.at("schemaVersion") != 2 || value.at("type") != "command" ||
-            value.at("command") != "kick") return;
+        if (value.at("schemaVersion") != 2 || value.at("type") != "command") return;
+        const auto name = value.at("command").get<std::string>();
+        Command::Kind kind;
+        if (name == "kick") kind = Command::Kind::Kick;
+        else if (name == "moveTeam") kind = Command::Kind::MoveTeam;
+        else if (name == "swapTeam") kind = Command::Kind::SwapTeam;
+        else return;
         const auto request_id = value.at("requestId").get<std::string>();
         const auto token = value.at("playerToken").get<std::string>();
         if (request_id.empty() || request_id.size() > 64 || token.empty() || token.size() > 64 ||
@@ -414,15 +488,186 @@ void receive_command(std::string_view line) {
             }) || !std::all_of(token.begin(), token.end(), [](unsigned char ch) {
                 return std::isalnum(ch);
             })) return;
+        Command command{kind, request_id, token, {}, -1, 0,
+                        pipe_session.load(std::memory_order_relaxed)};
+        if (kind != Command::Kind::Kick) {
+            command.team_size = value.at("teamSize").get<int>();
+            if (command.team_size != 2 && command.team_size != 3) return;
+            if (kind == Command::Kind::MoveTeam) {
+                command.team_index = value.at("team").get<int>();
+                if (command.team_index < 0 || command.team_index >= 32) return;
+            } else {
+                command.other_token = value.at("otherToken").get<std::string>();
+                if (command.other_token.empty() || command.other_token.size() > 64 ||
+                    command.other_token == token ||
+                    !std::all_of(command.other_token.begin(), command.other_token.end(),
+                        [](unsigned char ch) { return std::isalnum(ch); })) return;
+            }
+        }
         std::lock_guard lock(command_gate);
         if (pending_commands.size() >= 32) {
             responses.push_back(nlohmann::json{{"schemaVersion", 2}, {"type", "result"},
                 {"requestId", request_id}, {"ok", false}, {"message", "Server command queue is full"}}.dump() + '\n');
             return;
         }
-        pending_commands.push_back({request_id, token, pipe_session.load(std::memory_order_relaxed)});
+        pending_commands.push_back(std::move(command));
         commands_pending.store(true, std::memory_order_release);
     } catch (...) { /* Malformed commands are ignored without touching Unreal. */ }
+}
+
+UObject* current_match_state() {
+    auto* type = UObjectGlobals::StaticFindObject<UClass*>(
+        nullptr, nullptr, STR("/Script/DeceiveInc.DeceiveIncMatchGameState"));
+    if (!type) return nullptr;
+    UObject* state{};
+    UObjectGlobals::ForEachUObject([&](UObject* object, std::int32_t, std::int32_t) {
+        if (valid(object) && object->IsA(type) &&
+            !object->HasAnyFlags(static_cast<EObjectFlags>(RF_ClassDefaultObject | RF_ArchetypeObject)) &&
+            object->GetWorld()) {
+            state = object;
+            return RC::LoopAction::Break;
+        }
+        return RC::LoopAction::Continue;
+    });
+    return state;
+}
+
+bool lobby_phase(UObject* state) {
+    if (!valid(state)) return false;
+    auto* property = state->GetPropertyByNameInChain(STR("GamePhase"));
+    auto* enumeration = UObjectGlobals::StaticFindObject<UEnum*>(nullptr, nullptr,
+        STR("/Script/DeceiveInc.ESpyGamePhase"));
+    if (!property || property->GetSize() != 1 || !enumeration) return false;
+    for (const auto pair : enumeration->ForEachName()) {
+        const auto name = pair.Key.ToString();
+        if (name == STR("PREGAME") || name.ends_with(STR("::PREGAME")))
+            return *property->ContainerPtrToValuePtr<std::uint8_t>(state) == pair.Value;
+    }
+    return false;
+}
+
+std::optional<int> faction_size(UObject* state) {
+    if (!state) return std::nullopt;
+    auto* type = UObjectGlobals::StaticFindObject<UClass*>(
+        nullptr, nullptr, STR("/Script/DeceiveInc.DIFactionsManager"));
+    if (!type) return std::nullopt;
+    UObject* manager{};
+    UObjectGlobals::ForEachUObject([&](UObject* object, std::int32_t, std::int32_t) {
+        if (valid(object) && object->IsA(type) &&
+            !object->HasAnyFlags(static_cast<EObjectFlags>(RF_ClassDefaultObject | RF_ArchetypeObject)) &&
+            object->GetWorld() == state->GetWorld()) {
+            manager = object;
+            return RC::LoopAction::Break;
+        }
+        return RC::LoopAction::Continue;
+    });
+    if (!manager) return std::nullopt;
+    auto* function = manager->GetFunctionByNameInChain(STR("GetFactionSize"));
+    auto* result = function ? function->GetPropertyByNameInChain(STR("ReturnValue")) : nullptr;
+    if (!function || function->GetParmsSize() != 1 || !result ||
+        result->GetClass().GetName() != STR("ByteProperty") ||
+        result->GetOffset_Internal() != 0) return std::nullopt;
+    std::uint8_t size{};
+    manager->ProcessEvent(function, &size);
+    return size >= 1 && size <= 3 ? std::optional<int>(size) : std::nullopt;
+}
+
+bool call_team(UObject* controller, bool join, int index = 0) {
+    auto* function = controller->GetFunctionByNameInChain(
+        join ? STR("ServerJoinTeam") : STR("ServerLeaveTeam"));
+    if (!function) return false;
+    if (!join) {
+        if (function->GetParmsSize() != 0) return false;
+        controller->ProcessEvent(function, nullptr);
+        return true;
+    }
+    auto* team = function->GetPropertyByNameInChain(STR("TeamIndex"));
+    if (function->GetParmsSize() != sizeof(std::int32_t) || !team ||
+        team->GetClass().GetName() != STR("IntProperty") ||
+        team->GetOffset_Internal() != 0) return false;
+    std::int32_t parameter = index;
+    controller->ProcessEvent(function, &parameter);
+    return true;
+}
+
+bool connected_entry(const PlayerEntry& entry) {
+    auto* player = entry.player.Get();
+    auto* controller = entry.controller.Get();
+    return valid(player) && valid(controller) && connected_human(player) &&
+        object_field(player, STR("Owner")) == controller;
+}
+
+void process_team_command(const Command& command, PlayerEntry& source) {
+    auto* state = current_match_state();
+    if (!lobby_phase(state)) {
+        reply(command, false, "Teams can only be changed in the pregame lobby");
+        return;
+    }
+    if (faction_size(state) != command.team_size) {
+        reply(command, false, "The server's team size does not match the selected game mode");
+        return;
+    }
+    auto* source_player = source.player.Get();
+    auto* source_controller = source.controller.Get();
+    const auto source_team = player_team(source_player);
+    if (!source_team) {
+        reply(command, false, "The player has no assigned team");
+        return;
+    }
+    int target_team = command.team_index;
+    PlayerEntry* other{};
+    if (command.kind == Command::Kind::SwapTeam) {
+        auto found = std::find_if(player_entries.begin(), player_entries.end(), [&](const auto& item) {
+            return item.second.token == command.other_token;
+        });
+        if (found == player_entries.end() || !connected_entry(found->second)) {
+            reply(command, false, "The other player is no longer connected");
+            return;
+        }
+        other = &found->second;
+        auto other_team = player_team(other->player.Get());
+        if (!other_team) {
+            reply(command, false, "The other player has no assigned team");
+            return;
+        }
+        target_team = *other_team;
+    }
+    if (target_team == *source_team) {
+        reply(command, true, "Players are already on the same team");
+        return;
+    }
+    if (target_team < 0 || target_team >= 32) {
+        reply(command, false, "Invalid target team");
+        return;
+    }
+    try {
+        // Use the dedicated server's own leave/join operations so its faction
+        // plan and replicated PlayerState stay in sync. Restore both assignments
+        // if an intermediate operation is rejected.
+        if (other && !call_team(other->controller.Get(), false)) {
+            reply(command, false, "Team controls are unavailable in this game build");
+            return;
+        }
+        if (!call_team(source_controller, false) || !call_team(source_controller, true, target_team) ||
+            player_team(source_player) != target_team) {
+            call_team(source_controller, true, *source_team);
+            if (other) call_team(other->controller.Get(), true, target_team);
+            reply(command, false, "The server rejected the team change");
+            return;
+        }
+        if (other && (!call_team(other->controller.Get(), true, *source_team) ||
+                      player_team(other->player.Get()) != *source_team)) {
+            call_team(source_controller, false);
+            call_team(source_controller, true, *source_team);
+            call_team(other->controller.Get(), true, target_team);
+            reply(command, false, "The server rejected the team swap");
+            return;
+        }
+        snapshot_dirty.store(true, std::memory_order_release);
+        reply(command, true, other ? "Players swapped" : "Player moved to team");
+    } catch (...) {
+        reply(command, false, "The team change failed in Unreal");
+    }
 }
 
 void process_commands() {
@@ -448,6 +693,10 @@ void process_commands() {
             reply(command, false, "Player is no longer connected");
             continue;
         }
+        if (command.kind != Command::Kind::Kick) {
+            process_team_command(command, entry->second);
+            continue;
+        }
         try {
             auto* function = UObjectGlobals::StaticFindObject<UFunction*>(nullptr, nullptr,
                 STR("/Script/Engine.PlayerController:ClientReturnToMainMenu"));
@@ -469,19 +718,7 @@ void process_commands() {
 }
 
 bool collect() {
-    auto* type = UObjectGlobals::StaticFindObject<UClass*>(
-        nullptr, nullptr, STR("/Script/DeceiveInc.DeceiveIncMatchGameState"));
-    if (!type) return false;
-    UObject* state{};
-    UObjectGlobals::ForEachUObject([&](UObject* object, std::int32_t, std::int32_t) {
-        if (valid(object) && object->IsA(type) &&
-            !object->HasAnyFlags(static_cast<EObjectFlags>(RF_ClassDefaultObject | RF_ArchetypeObject)) &&
-            object->GetWorld()) {
-            state = object;
-            return RC::LoopAction::Break;
-        }
-        return RC::LoopAction::Continue;
-    });
+    auto* state = current_match_state();
     if (!state) return false;
     auto* property = state->GetPropertyByNameInChain(STR("PlayerArray"));
     if (!property || property->GetClass().GetName() != STR("ArrayProperty")) return false;
@@ -526,7 +763,22 @@ bool collect() {
         if (!agent.empty()) details["character"] = agent == "Socialite" ? "Red" : agent;
         if (account_level) details["accountLevel"] = *account_level;
         if (agent_level) details["characterLevel"] = *agent_level;
+        if (auto team = player_team(player)) details["team"] = *team;
+        if (auto* dead = player->GetPropertyByNameInChain(STR("bIsDead"));
+            dead && dead->GetClass().GetName() == STR("BoolProperty"))
+            details["dead"] = static_cast<FBoolProperty*>(dead)->GetPropertyValueInContainer(player);
+        if (auto* spy = object_field(player, STR("OwnedSpy")); valid(spy)) {
+            if (auto* health = object_field(spy, STR("HealthComponent")); valid(health)) {
+                const auto current = health_value(health, STR("GetHealth"));
+                const auto maximum = health_value(health, STR("GetMaxHealth"));
+                if (current && maximum && *maximum > 0) {
+                    details["health"] = *current;
+                    details["maxHealth"] = *maximum;
+                }
+            }
+        }
         details["gadgets"] = selected_gadgets(player);
+        details["loadout"] = selected_loadout(player, agent);
         details["upgrades"] = selected_upgrades(player);
         names.push_back(std::move(details));
     }
@@ -555,6 +807,9 @@ bool collect() {
     nlohmann::json value{{"schemaVersion", 2}, {"type", "snapshot"},
                          {"processId", GetCurrentProcessId()},
                          {"state", phase}, {"map", map}, {"players", std::move(names)}};
+    char instance_id[64]{};
+    const auto instance_length = GetEnvironmentVariableA("BRIEFCASE_INSTANCE_ID", instance_id, sizeof(instance_id));
+    if (instance_length == 32) value["instanceId"] = std::string(instance_id, instance_length);
     std::lock_guard lock(snapshot_gate);
     auto updated = value.dump() + '\n';
     if (snapshot != updated) {

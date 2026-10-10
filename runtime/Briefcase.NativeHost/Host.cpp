@@ -22,6 +22,7 @@
 #include <condition_variable>
 #endif
 #include <atomic>
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <cmath>
@@ -41,6 +42,9 @@ static const auto start_time = std::chrono::steady_clock::now();
 static BcBuild build_info{};
 static Environment environment = Environment::server;
 static fs::path administration_root;
+#ifdef _WIN32
+static HANDLE instance_identity_event{};
+#endif
 static bool external_unreal_runtime{};
 struct Scope {
     uint64_t id;
@@ -371,14 +375,41 @@ static void load_phase(std::string_view phase, bool rendering_only = false) {
 #endif
 } // namespace bc
 #ifdef _WIN32
+extern "C" __declspec(dllexport) uint32_t __cdecl BriefcaseInstanceSupportVersion() noexcept { return 1; }
 extern "C" __declspec(dllexport) uint32_t __cdecl BriefcasePrepare(uint32_t game_thread) noexcept {
     try {
         wchar_t path[32768]{};
         auto length = GetModuleFileNameW(nullptr, path, 32768);
         if (!length || length == 32768)
             return 1;
-        const std::filesystem::path exe(path), root = exe.parent_path() / "Briefcase";
+        const std::filesystem::path exe(path);
         const bool client = exe.filename() == L"DeceiveInc-Win64-Shipping.exe";
+        std::filesystem::path runtime_root = exe.parent_path();
+        std::wstring instance_id;
+        if (!client) {
+            wchar_t instance_path[32768]{}, id[64]{};
+            const auto path_length = GetEnvironmentVariableW(L"BRIEFCASE_INSTANCE_ROOT", instance_path, 32768);
+            const auto id_length = GetEnvironmentVariableW(L"BRIEFCASE_INSTANCE_ID", id, 64);
+            if (path_length >= 32768 || id_length >= 64 || (path_length == 0) != (id_length == 0))
+                throw std::runtime_error("Invalid instance context");
+            if (path_length) {
+                instance_id.assign(id, id_length);
+                if (instance_id.size() != 32 ||
+                    !std::all_of(instance_id.begin(), instance_id.end(), [](wchar_t ch) {
+                        return (ch >= L'0' && ch <= L'9') || (ch >= L'a' && ch <= L'f');
+                    }))
+                    throw std::runtime_error("Invalid instance ID");
+                runtime_root = std::filesystem::path(instance_path).lexically_normal();
+                if (!runtime_root.is_absolute() || !std::filesystem::is_directory(runtime_root))
+                    throw std::runtime_error("Instance directory is missing");
+                const auto name = L"Local\\BriefcaseNative.Instance." + instance_id + L"." +
+                                  std::to_wstring(GetCurrentProcessId());
+                bc::instance_identity_event = CreateEventW(nullptr, TRUE, TRUE, name.c_str());
+                if (!bc::instance_identity_event || GetLastError() == ERROR_ALREADY_EXISTS)
+                    throw std::runtime_error("Cannot register instance identity");
+            }
+        }
+        const auto root = runtime_root / "Briefcase";
         bc::environment = client ? bc::Environment::client : bc::Environment::server;
         bc::initial_game_thread = game_thread;
         bc::administration_root = root;
@@ -412,9 +443,17 @@ extern "C" __declspec(dllexport) uint32_t __cdecl BriefcasePrepare(uint32_t game
             throw std::runtime_error("Unsupported executable SHA256; backend not installed");
         bc::log("Working directory: " + exe.parent_path().string());
         bc::game_image = base;
-        bc::server_config_root = (exe.parent_path() / "../../Saved/Config/WindowsServer").lexically_normal();
+        bc::server_config_root = instance_id.empty()
+            ? (exe.parent_path() / "../../Saved/Config/WindowsServer").lexically_normal()
+            : runtime_root;
         bc::external_unreal_runtime =
-            std::filesystem::is_regular_file(exe.parent_path() / "ue4ss/UE4SS.dll");
+            std::filesystem::is_regular_file(runtime_root / "ue4ss/UE4SS.dll");
+        if (!instance_id.empty()) {
+            std::string printable(instance_id.size(), '\0');
+            std::transform(instance_id.begin(), instance_id.end(), printable.begin(),
+                           [](wchar_t ch) { return static_cast<char>(ch); });
+            bc::log("Managed instance: " + printable);
+        }
         if (!client) {
             bc::discover_mods(root / "Mods");
             bc::load_phase("startup");

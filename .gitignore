@@ -1,4 +1,6 @@
 /build/
+/bin/
+/obj/
 /build-ue4ss*/
 /dist/
 /artifacts/

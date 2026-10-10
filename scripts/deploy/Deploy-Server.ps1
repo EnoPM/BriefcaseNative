@@ -1,9 +1,10 @@
 [CmdletBinding()]
 param([string]$ServerWin64 = '', [switch]$PlanOnly,
       [ValidatePattern('^[a-z0-9]+([.-][a-z0-9]+)*$')][string]$ModId,
-      [switch]$IncludeRuntime, [switch]$ActivateOnly, [switch]$RuntimeOnly, [string]$PackagePath='')
+      [switch]$IncludeRuntime, [switch]$ActivateOnly, [switch]$RuntimeOnly, [string]$PackagePath='',
+      [string]$SettingsPath='')
 . (Join-Path $PSScriptRoot 'Common.ps1')
-$paths = Get-DeploymentPaths -ServerWin64 $ServerWin64
+$paths = Get-DeploymentPaths -ServerWin64 $ServerWin64 -SettingsPath $SettingsPath
 $package = if($PackagePath){[IO.Path]::GetFullPath($PackagePath)}else{Join-Path $paths.Project 'dist\Win64'}
 if($RuntimeOnly -and ($ModId -or $ActivateOnly)){throw 'RuntimeOnly cannot select or activate mods.'}
 $required = @()
