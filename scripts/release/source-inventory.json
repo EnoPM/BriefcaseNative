@@ -227,7 +227,7 @@
     },
     {
       "path": "loader/Briefcase.ServerLauncher/Bootstrap.cpp",
-      "sha256": "7517d88721d5dad514b88995e63d644f58634617ef73e1272d41c5e0c1b17b3c"
+      "sha256": "2d367352dbdeb244c7bb595f1ef67a0bdb1d897621eaaf0985112b6b5ac6d9d3"
     },
     {
       "path": "loader/Briefcase.ServerLauncher/Bootstrap.def",
@@ -559,7 +559,7 @@
     },
     {
       "path": "runtime/Briefcase.NativeHost/Host.cpp",
-      "sha256": "79996b13b7e4acdcbecaeb1beb08d10c0aa421688bf7ccc2bb7f20c4a0ee2233"
+      "sha256": "f87c6d3e5202aa4e0ce6c79a536eab0cb6ba63957135776d4f9a35846c72b75b"
     },
     {
       "path": "runtime/Briefcase.NativeHost/LinuxHost.inc",
@@ -743,7 +743,7 @@
     },
     {
       "path": "scripts/client/Package-Client.ps1",
-      "sha256": "e6553c7f2a79aa7696b009fdba954f7abbb6257ede0968319bf52478056b1bca"
+      "sha256": "e33581bc6faefccf6a56c4f3a57f2a369846199404f41218dd3f2e3a20b4159f"
     },
     {
       "path": "scripts/client/Start-Client.ps1",
@@ -863,7 +863,7 @@
     },
     {
       "path": "scripts/ue4ss/Package-ServerMod.ps1",
-      "sha256": "59745d8c55441fb2a02da3b46463f5247f0f52f92ac0047bc9bbc9fdf4d4e206"
+      "sha256": "f2f99d248fd147cc635a0f33f19012b9389909738fe6ec4a525efb7f2cb49411"
     },
     {
       "path": "scripts/ue4ss/Package-UE4SS-Runtime.ps1",
@@ -911,7 +911,7 @@
     },
     {
       "path": "sdk/Briefcase.DeceiveInc/ue4ss/include/Briefcase/DeceiveInc/LootDistribution.hpp",
-      "sha256": "6ad7b5d65d9300ae56a778a94930981726aa398d3a250e6b758b35d3ca3eaf57"
+      "sha256": "edb6a99546b83f0164b0a1d09e071f32bfb4cb21e007f8b4a9684a753a8ea192"
     },
     {
       "path": "sdk/Briefcase.DeceiveInc/ue4ss/include/Briefcase/DeceiveInc/MatchState.hpp",
@@ -939,7 +939,7 @@
     },
     {
       "path": "sdk/Briefcase.DeceiveInc/ue4ss/src/LootDistribution.cpp",
-      "sha256": "1e7ce398149b19c28eabff51f512a9594bc8632d07b845fcb4db04077d9cf23e"
+      "sha256": "5132eba8e2df06cc121d3ecd3f34b1b8f6ae0b02df6816c1f2246d0614448df4"
     },
     {
       "path": "sdk/Briefcase.DeceiveInc/ue4ss/src/MatchState.cpp",
@@ -9627,7 +9627,7 @@
     },
     {
       "path": "ue4ss/ServerBridge.cpp",
-      "sha256": "fafd986dac91d16b467cc9ebb31166ac24deaa0997ecf884679dc26fc24daee5"
+      "sha256": "7c9e904d8942fdae17a9218bb9450b88c484278a61534962da4f4400a3c16a89"
     },
     {
       "path": "ue4ss/ServerEquipmentIds.hpp",
@@ -9636,6 +9636,10 @@
     {
       "path": "ue4ss/ServerTransport.hpp",
       "sha256": "c006d9bee256ad7b591f985009a78dee1fcb913abe03d31c80631f497385156e"
+    },
+    {
+      "path": "ue4ss/SpectatorExtension.hpp",
+      "sha256": "3ac59b92b9d04a7dcdecf9b9fbc4678f68a4cdecb0d26c9b79197477942f024f"
     },
     {
       "path": "ue4ss/tests/ServerEquipmentIds.cpp",
