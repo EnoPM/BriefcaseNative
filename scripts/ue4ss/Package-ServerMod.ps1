@@ -51,6 +51,16 @@ try {
             Copy-Item -LiteralPath $source -Destination $target
         }
     }
+    $packagedCatalogs = @()
+    $catalogSource = Join-Path $repository 'Data\vanilla-catalogs'
+    if (Test-Path -LiteralPath $catalogSource -PathType Container) {
+        $catalogTarget = Join-Path $mod 'Data\vanilla-catalogs'
+        New-Item -ItemType Directory -Path $catalogTarget -Force | Out-Null
+        foreach ($catalog in Get-ChildItem -LiteralPath $catalogSource -Filter 'LVL_*.json' -File) {
+            Copy-Item -LiteralPath $catalog.FullName -Destination (Join-Path $catalogTarget $catalog.Name)
+            $packagedCatalogs += "ue4ss/Mods/$InstallName/Data/vanilla-catalogs/$($catalog.Name)"
+        }
+    }
     if (-not (Test-Path -LiteralPath (Join-Path $mod 'LICENSE') -PathType Leaf)) {
         throw 'Mod license is missing.'
     }
@@ -72,8 +82,9 @@ try {
     $zip = [IO.Compression.ZipFile]::OpenRead($archive)
     try {
         $entries = @($zip.Entries | Where-Object { -not [string]::IsNullOrEmpty($_.Name) } |
-            ForEach-Object FullName)
+            ForEach-Object { $_.FullName.Replace('\', '/') })
         $required = @("ue4ss/Mods/$InstallName/dlls/main.dll", "ue4ss/Mods/$InstallName/LICENSE")
+        $required += $packagedCatalogs
         if ($PreEntry) { $required += "ue4ss/Mods/$InstallName/BriefcasePreEntry.dll" }
         foreach ($name in $required) {
             if ($name -cnotin $entries) { throw "Mod archive is missing $name" }

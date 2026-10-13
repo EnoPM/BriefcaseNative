@@ -19,9 +19,11 @@
 #include <Unreal/UObjectArray.hpp>
 #include <Unreal/UObjectGlobals.hpp>
 #include <Unreal/UScriptStruct.hpp>
+#include <DynamicOutput/Output.hpp>
 #include <Unreal/World.hpp>
 #include "ServerTransport.hpp"
 #include "ServerEquipmentIds.hpp"
+#include "SpectatorExtension.hpp"
 #include <nlohmann/json.hpp>
 #include <atomic>
 #include <algorithm>
@@ -60,26 +62,40 @@ struct PlayerEntry {
     FWeakObjectPtr player;
     FWeakObjectPtr controller;
     std::string account_id;
+    std::string bandit_id;
     std::string platform_id;
     std::string platform_type;
 };
 struct Command {
-    enum class Kind { Kick, MoveTeam, SwapTeam } kind{Kind::Kick};
+    enum class Kind { Kick, Kill, MoveTeam, SwapTeam, SetSpectator } kind{Kind::Kick};
     std::string request_id;
     std::string player_token;
     std::string other_token;
     int team_index{-1};
     int team_size{};
     std::uint64_t session;
+    bool spectator{};
 };
 std::unordered_map<UObject*, PlayerEntry> player_entries;
 std::uint64_t next_player_token{};
+std::atomic<std::int64_t> next_extension_tick_ms{};
 std::mutex command_gate;
 std::deque<Command> pending_commands;
 std::deque<std::string> responses;
 std::atomic<bool> commands_pending{};
 std::atomic<std::uint64_t> pipe_session{};
+// The game's StopServerSession method is only used for the exact executable below.
+// Unknown builds continue through the agent's existing bounded forced-stop fallback.
+constexpr std::string_view graceful_stop_sha256 =
+    "0fec2be320ce099f088316c569a24c91974c518cd4b75479bf069d6b14d29d59";
+constexpr std::uint32_t graceful_stop_timestamp = 0x6AC59711;
+constexpr std::uint32_t graceful_stop_image_size = 0x05B06000;
+constexpr std::uint32_t stop_server_session_rva = 0x010DE4B0;
+HANDLE graceful_stop_ack{};
+bool graceful_stop_supported{};
+bool graceful_stop_started{};
 UFunction* backend_init_function{};
+UFunction* player_infos_function{};
 std::array<UFunction*, 14> state_change_functions{};
 constexpr std::array state_change_paths{
     STR("/Script/Engine.GameModeBase:K2_PostLogin"),
@@ -131,6 +147,71 @@ std::string utf8(std::wstring_view value) {
 bool valid(UObject* object) {
     return object && !object->IsUnreachable() &&
         UObjectArray::IsValid(object->GetObjectItem(), false);
+}
+
+bool verify_graceful_stop_build() {
+    using GetVerifiedSha = const char* (__cdecl*)();
+    auto* host = GetModuleHandleW(L"Briefcase.NativeHost.dll");
+    auto* getter = host ? reinterpret_cast<GetVerifiedSha>(
+        GetProcAddress(host, "BriefcaseVerifiedGameSha256")) : nullptr;
+    const char* sha = getter ? getter() : nullptr;
+    if (!sha || std::string_view(sha) != graceful_stop_sha256) return false;
+    auto* image = reinterpret_cast<const std::uint8_t*>(GetModuleHandleW(nullptr));
+    if (!image) return false;
+    const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(image);
+    if (dos->e_magic != IMAGE_DOS_SIGNATURE || dos->e_lfanew <= 0 ||
+        static_cast<std::uint32_t>(dos->e_lfanew) > graceful_stop_image_size - sizeof(IMAGE_NT_HEADERS64))
+        return false;
+    const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS64*>(image + dos->e_lfanew);
+    if (nt->Signature != IMAGE_NT_SIGNATURE ||
+        nt->FileHeader.TimeDateStamp != graceful_stop_timestamp ||
+        nt->OptionalHeader.SizeOfImage != graceful_stop_image_size) return false;
+    constexpr std::array<std::uint8_t, 6> prologue{0x48, 0x8B, 0xC4, 0x55, 0x57, 0x48};
+    auto* stop_session = image + stop_server_session_rva;
+    MEMORY_BASIC_INFORMATION page{};
+    if (!VirtualQuery(stop_session, &page, sizeof(page)) || page.State != MEM_COMMIT ||
+        (page.Protect & (PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE |
+                         PAGE_EXECUTE_WRITECOPY)) == 0) return false;
+    return std::equal(prologue.begin(), prologue.end(), stop_session);
+}
+
+void process_graceful_stop() {
+    if (!graceful_stop_supported || graceful_stop_started) return;
+    if (!graceful_stop_ack) {
+        const auto name = L"Local\\BriefcaseNative.Stopped." + std::to_wstring(GetCurrentProcessId());
+        graceful_stop_ack = OpenEventW(SYNCHRONIZE, FALSE, name.c_str());
+    }
+    if (!graceful_stop_ack || WaitForSingleObject(graceful_stop_ack, 0) != WAIT_OBJECT_0) return;
+    auto* type = UObjectGlobals::StaticFindObject<UClass*>(nullptr, nullptr,
+        STR("/Script/DeceiveInc.TripwireDedicatedServerManager"));
+    if (!type) return;
+    UObject* manager{};
+    UObjectGlobals::ForEachUObject([&](UObject* object, std::int32_t, std::int32_t) {
+        if (valid(object) && object->IsA(type) &&
+            !object->HasAnyFlags(static_cast<EObjectFlags>(RF_ClassDefaultObject | RF_ArchetypeObject))) {
+            manager = object;
+            return RC::LoopAction::Break;
+        }
+        return RC::LoopAction::Continue;
+    });
+    if (!manager) return;
+    using StopSession = void (*)(UObject*);
+    auto* image = reinterpret_cast<std::uint8_t*>(GetModuleHandleW(nullptr));
+    // The vanilla restart action sets manager+0x18d first, then calls these two
+    // functions. Leave that flag clear: FinishShutdown then exits without relaunching.
+    auto* restart_requested = reinterpret_cast<const std::uint8_t*>(manager) + 0x18d;
+    if (*restart_requested != 0) return;
+    auto* shutdown = *reinterpret_cast<void (***)(UObject*)>(manager);
+    auto* shutdown_method = shutdown[0x280 / sizeof(void*)];
+    MEMORY_BASIC_INFORMATION shutdown_page{};
+    if (!VirtualQuery(reinterpret_cast<const void*>(shutdown_method), &shutdown_page,
+            sizeof(shutdown_page)) || shutdown_page.State != MEM_COMMIT ||
+        (shutdown_page.Protect & (PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE |
+                                  PAGE_EXECUTE_WRITECOPY)) == 0) return;
+    graceful_stop_started = true; // Guard against recursive ProcessEvent calls.
+    Output::send(STR("[Briefcase.ServerBridge] Stopping session and requesting graceful process exit.\n"));
+    reinterpret_cast<StopSession>(image + stop_server_session_rva)(manager);
+    shutdown_method(manager);
 }
 
 bool flag(UObject* object, const wchar_t* name) {
@@ -191,6 +272,31 @@ std::string player_network_id(UObject* player) {
     auto result = utf8(std::wstring_view(exported.value.GetCharArray(), count - 1));
     if (result.empty() || result == "()" || result == "INVALID") return {};
     return result;
+}
+
+std::string spectator_identity(const PlayerEntry& entry, UObject* player) {
+    const auto network_id = valid(player) ? player_network_id(player) : std::string{};
+    if (!network_id.empty()) return "network:" + network_id;
+    return entry.account_id.empty() ? std::string{} : "account:" + entry.account_id;
+}
+
+const BriefcaseSpectatorApiV1* spectator_extension() {
+    HMODULE bridge{};
+    if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+            GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+            reinterpret_cast<LPCWSTR>(&active), &bridge)) return nullptr;
+    wchar_t path[32768]{};
+    const auto length = GetModuleFileNameW(bridge, path, std::size(path));
+    if (!length || length >= std::size(path)) return nullptr;
+    const auto mods_root = std::filesystem::path(path).parent_path().parent_path().parent_path();
+    const auto mod_path = mods_root / L"briefcasespectator" / L"dlls" / L"main.dll";
+    auto* module = GetModuleHandleW(mod_path.c_str());
+    if (!module) return nullptr;
+    auto* get_api = reinterpret_cast<BriefcaseGetSpectatorApiV1>(
+        GetProcAddress(module, "briefcase_spectator_api_v1"));
+    const auto* api = get_api ? get_api() : nullptr;
+    return api && api->version == 1 && api->ready && api->ready() &&
+        api->set_selected && api->is_selected && api->tick_player ? api : nullptr;
 }
 
 std::string string_field(const void* base, FProperty* property) {
@@ -460,6 +566,17 @@ void capture_identity(UObject* controller, UFunction* function, void* params) {
     entry.platform_type = std::move(platform_type);
 }
 
+void capture_bandit_identity(UObject* controller, UFunction* function, void* params) {
+    if (!valid(controller) || !params || !function ||
+        function->GetPathName() != STR("/Script/DeceiveInc.DeceiveIncPlayerController:ServerInitPlayerInfos")) return;
+    auto* property = function->GetPropertyByNameInChain(STR("BanditIdIn"));
+    if (!property || property->GetClass().GetName() != STR("StrProperty") ||
+        property->GetOffset_Internal() != 0 || property->GetElementSize() != sizeof(FString) ||
+        function->GetParmsSize() < sizeof(FString)) return;
+    auto id = string_field(params, property);
+    if (!id.empty()) connection_entry(controller).bandit_id = std::move(id);
+}
+
 void reply(const Command& command, bool ok, std::string_view message) {
     if (command.session != pipe_session.load(std::memory_order_acquire)) return;
     nlohmann::json value{{"schemaVersion", 2}, {"type", "result"},
@@ -477,8 +594,10 @@ void receive_command(std::string_view line) {
         const auto name = value.at("command").get<std::string>();
         Command::Kind kind;
         if (name == "kick") kind = Command::Kind::Kick;
+        else if (name == "kill") kind = Command::Kind::Kill;
         else if (name == "moveTeam") kind = Command::Kind::MoveTeam;
         else if (name == "swapTeam") kind = Command::Kind::SwapTeam;
+        else if (name == "setSpectator") kind = Command::Kind::SetSpectator;
         else return;
         const auto request_id = value.at("requestId").get<std::string>();
         const auto token = value.at("playerToken").get<std::string>();
@@ -490,7 +609,9 @@ void receive_command(std::string_view line) {
             })) return;
         Command command{kind, request_id, token, {}, -1, 0,
                         pipe_session.load(std::memory_order_relaxed)};
-        if (kind != Command::Kind::Kick) {
+        if (kind == Command::Kind::SetSpectator)
+            command.spectator = value.at("spectator").get<bool>();
+        if (kind == Command::Kind::MoveTeam || kind == Command::Kind::SwapTeam) {
             command.team_size = value.at("teamSize").get<int>();
             if (command.team_size != 2 && command.team_size != 3) return;
             if (kind == Command::Kind::MoveTeam) {
@@ -544,6 +665,91 @@ bool lobby_phase(UObject* state) {
             return *property->ContainerPtrToValuePtr<std::uint8_t>(state) == pair.Value;
     }
     return false;
+}
+
+bool active_match_phase(UObject* state) {
+    if (!valid(state)) return false;
+    auto* property = state->GetPropertyByNameInChain(STR("GamePhase"));
+    auto* enumeration = UObjectGlobals::StaticFindObject<UEnum*>(nullptr, nullptr,
+        STR("/Script/DeceiveInc.ESpyGamePhase"));
+    if (!property || property->GetSize() != 1 || !enumeration) return false;
+    const auto phase = *property->ContainerPtrToValuePtr<std::uint8_t>(state);
+    for (const auto pair : enumeration->ForEachName()) {
+        if (pair.Value != phase) continue;
+        const auto name = pair.Key.ToString();
+        return name.ends_with(STR("VAULT_LOCKED")) ||
+            name.ends_with(STR("VAULT_UNLOCKED")) ||
+            name.ends_with(STR("EXTRACTION_ARRIVING")) ||
+            name.ends_with(STR("EXTRACTION_ARRIVED"));
+    }
+    return false;
+}
+
+void process_kill_command(const Command& command, const PlayerEntry& entry) {
+    if (!active_match_phase(current_match_state())) {
+        reply(command, false, "Players can only be eliminated during a match");
+        return;
+    }
+    auto* player = entry.player.Get();
+    if (flag(player, STR("bIsDead"))) {
+        reply(command, false, "Player is already eliminated");
+        return;
+    }
+    auto* spy = object_field(player, STR("OwnedSpy"));
+    auto* health = valid(spy) ? object_field(spy, STR("HealthComponent")) : nullptr;
+    const auto current_health = valid(health)
+        ? health_value(health, STR("GetHealth")) : std::nullopt;
+    if (!current_health || *current_health <= 0) {
+        reply(command, false, "Player does not control a living character");
+        return;
+    }
+    if (flag(health, STR("bIgnoreDamage"))) {
+        reply(command, false, "Character cannot be eliminated until the introduction ends");
+        return;
+    }
+    auto* gameplay = UObjectGlobals::StaticFindObject<UObject*>(nullptr, nullptr,
+        STR("/Script/Engine.Default__GameplayStatics"));
+    auto* function = valid(gameplay)
+        ? gameplay->GetFunctionByNameInChain(STR("ApplyDamage")) : nullptr;
+    auto valid_parameter = [&](const wchar_t* name, const wchar_t* type, int offset) {
+        auto* property = function ? function->GetPropertyByNameInChain(name) : nullptr;
+        return property && property->GetClass().GetName() == type &&
+            property->GetOffset_Internal() == offset;
+    };
+    if (!function || (function->GetParmsSize() != 0x2C &&
+                      function->GetParmsSize() != 0x30) ||
+        !valid_parameter(STR("DamagedActor"), STR("ObjectProperty"), 0) ||
+        !valid_parameter(STR("BaseDamage"), STR("FloatProperty"), 8) ||
+        !valid_parameter(STR("EventInstigator"), STR("ObjectProperty"), 0x10) ||
+        !valid_parameter(STR("DamageCauser"), STR("ObjectProperty"), 0x18) ||
+        !valid_parameter(STR("DamageTypeClass"), STR("ClassProperty"), 0x20) ||
+        !valid_parameter(STR("ReturnValue"), STR("FloatProperty"), 0x28)) {
+        reply(command, false, "Elimination is unavailable in this game build");
+        return;
+    }
+    try {
+        struct alignas(8) ApplyDamageParams {
+            UObject* damaged_actor{};
+            float base_damage{};
+            std::uint32_t padding{};
+            UObject* event_instigator{};
+            UObject* damage_causer{};
+            UClass* damage_type_class{};
+            float return_value{};
+        } parameters{};
+        static_assert(sizeof(ApplyDamageParams) == 0x30);
+        parameters.damaged_actor = spy;
+        parameters.base_damage = 1'000'000.0f;
+        gameplay->ProcessEvent(function, &parameters);
+        if (!std::isfinite(parameters.return_value) || parameters.return_value <= 0) {
+            reply(command, false, "The game rejected the damage");
+            return;
+        }
+        snapshot_dirty.store(true, std::memory_order_release);
+        reply(command, true, "Elimination requested");
+    } catch (...) {
+        reply(command, false, "Elimination failed in Unreal");
+    }
 }
 
 std::optional<int> faction_size(UObject* state) {
@@ -693,8 +899,31 @@ void process_commands() {
             reply(command, false, "Player is no longer connected");
             continue;
         }
-        if (command.kind != Command::Kind::Kick) {
+        if (command.kind == Command::Kind::SetSpectator) {
+            if (!lobby_phase(current_match_state())) {
+                reply(command, false, "Spectator selection is only available in the lobby");
+                continue;
+            }
+            const auto* spectator = spectator_extension();
+            if (!spectator) {
+                reply(command, false, "Spectator Mode is not installed or ready");
+                continue;
+            }
+            const auto identity = spectator_identity(entry->second, player);
+            if (!spectator->set_selected(player, identity.c_str(), command.spectator)) {
+                reply(command, false, "Spectator selection failed");
+                continue;
+            }
+            snapshot_dirty.store(true, std::memory_order_release);
+            reply(command, true, command.spectator ? "Spectator selected" : "Spectator selection removed");
+            continue;
+        }
+        if (command.kind == Command::Kind::MoveTeam || command.kind == Command::Kind::SwapTeam) {
             process_team_command(command, entry->second);
+            continue;
+        }
+        if (command.kind == Command::Kind::Kill) {
+            process_kill_command(command, entry->second);
             continue;
         }
         try {
@@ -720,6 +949,8 @@ void process_commands() {
 bool collect() {
     auto* state = current_match_state();
     if (!state) return false;
+    const bool match_active = active_match_phase(state);
+    const auto* spectator_api = spectator_extension();
     auto* property = state->GetPropertyByNameInChain(STR("PlayerArray"));
     if (!property || property->GetClass().GetName() != STR("ArrayProperty")) return false;
     auto* array = static_cast<FArrayProperty*>(property);
@@ -747,6 +978,9 @@ bool collect() {
         seen.insert(controller);
         auto& entry = connection_entry(controller);
         entry.player = player;
+        const auto identity = spectator_identity(entry, player);
+        const bool spectator_selected = spectator_api &&
+            spectator_api->is_selected(player, identity.c_str());
         auto agent = selected_agent(player);
         UScriptStruct* progression_type{};
         const auto* progression = player_progression(player, progression_type);
@@ -755,10 +989,12 @@ bool collect() {
             : std::nullopt;
         const auto agent_level = selected_agent_level(progression, progression_type, agent);
         nlohmann::json details{{"name", std::move(readable)}, {"token", entry.token},
+                               {"spectator", spectator_selected},
                                {"platform", entry.platform_type.empty()
                                   ? player_platform(player) : entry.platform_type},
                                {"networkId", entry.account_id.empty()
                                   ? player_network_id(player) : entry.account_id},
+                               {"banditId", entry.bandit_id},
                                {"platformId", entry.platform_id}};
         if (!agent.empty()) details["character"] = agent == "Socialite" ? "Red" : agent;
         if (account_level) details["accountLevel"] = *account_level;
@@ -767,6 +1003,7 @@ bool collect() {
         if (auto* dead = player->GetPropertyByNameInChain(STR("bIsDead"));
             dead && dead->GetClass().GetName() == STR("BoolProperty"))
             details["dead"] = static_cast<FBoolProperty*>(dead)->GetPropertyValueInContainer(player);
+        bool elimination_ready{};
         if (auto* spy = object_field(player, STR("OwnedSpy")); valid(spy)) {
             if (auto* health = object_field(spy, STR("HealthComponent")); valid(health)) {
                 const auto current = health_value(health, STR("GetHealth"));
@@ -774,9 +1011,13 @@ bool collect() {
                 if (current && maximum && *maximum > 0) {
                     details["health"] = *current;
                     details["maxHealth"] = *maximum;
+                    elimination_ready = match_active && *current > 0 &&
+                        !flag(player, STR("bIsDead")) &&
+                        !flag(health, STR("bIgnoreDamage"));
                 }
             }
         }
+        details["eliminationReady"] = elimination_ready;
         details["gadgets"] = selected_gadgets(player);
         details["loadout"] = selected_loadout(player, agent);
         details["upgrades"] = selected_upgrades(player);
@@ -806,7 +1047,8 @@ bool collect() {
     if (auto* world = state->GetWorld()) map = utf8(world->GetName());
     nlohmann::json value{{"schemaVersion", 2}, {"type", "snapshot"},
                          {"processId", GetCurrentProcessId()},
-                         {"state", phase}, {"map", map}, {"players", std::move(names)}};
+                         {"state", phase}, {"map", map}, {"players", std::move(names)},
+                         {"capabilities", {{"spectatorMode", spectator_api != nullptr}}}};
     char instance_id[64]{};
     const auto instance_length = GetEnvironmentVariableA("BRIEFCASE_INSTANCE_ID", instance_id, sizeof(instance_id));
     if (instance_length == 32) value["instanceId"] = std::string(instance_id, instance_length);
@@ -821,17 +1063,49 @@ bool collect() {
 
 void on_event(UObject* context, UFunction* function, void* params) {
     if (!active.load(std::memory_order_relaxed) || !function) return;
+    if (function == state_change_functions[1] && params &&
+        function->GetParmsSize() == sizeof(UObject*)) {
+        auto* exiting = *reinterpret_cast<UObject**>(params);
+        if (auto it = player_entries.find(exiting); it != player_entries.end()) {
+            player_entries.erase(it);
+            snapshot_dirty.store(true, std::memory_order_release);
+        }
+    }
     if (function == backend_init_function) {
         try { capture_identity(context, function, params); }
         catch (...) { /* Identity is optional; never obstruct player login. */ }
     }
+    if (function == player_infos_function) {
+        try { capture_bandit_identity(context, function, params); }
+        catch (...) { /* Identity is optional; never obstruct player login. */ }
+    }
     if (function->GetName() != STR("ReceiveTick")) return;
+    process_graceful_stop();
     if (commands_pending.load(std::memory_order_acquire)) {
         const std::unique_lock lock(scan_gate, std::try_to_lock);
         if (lock.owns_lock()) process_commands();
     }
     const auto now = std::chrono::steady_clock::now().time_since_epoch();
     const auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
+    if (milliseconds >= next_extension_tick_ms.load(std::memory_order_relaxed)) {
+        const std::unique_lock lock(scan_gate, std::try_to_lock);
+        if (lock.owns_lock()) {
+            next_extension_tick_ms.store(milliseconds + 250, std::memory_order_relaxed);
+            try {
+                if (const auto* spectator = spectator_extension();
+                    spectator && active_match_phase(current_match_state())) {
+                    for (const auto& [controller, entry] : player_entries) {
+                        auto* player = entry.player.Get();
+                        if (!valid(controller) || !valid(player) || !connected_human(player) ||
+                            object_field(player, STR("Owner")) != controller) continue;
+                        const auto identity = spectator_identity(entry, player);
+                        if (spectator->is_selected(player, identity.c_str()))
+                            spectator->tick_player(player, true);
+                    }
+                }
+            } catch (...) { /* A level transition may invalidate reflected objects. */ }
+        }
+    }
     const auto event_due = snapshot_dirty.load(std::memory_order_acquire) &&
         milliseconds - last_scan_ms.load(std::memory_order_relaxed) >= event_coalesce_ms;
     if (!event_due && milliseconds < next_scan_ms.load(std::memory_order_relaxed)) return;
@@ -848,10 +1122,10 @@ void on_event(UObject* context, UFunction* function, void* params) {
     }
 }
 
-void on_state_changed(UObject*, UFunction* function, void*) {
+void on_state_changed(UObject* context, UFunction* function, void*) {
     if (!active.load(std::memory_order_relaxed) || !function) return;
     // Wait until Unreal finishes the call before reading its resulting state.
-    if (function == backend_init_function ||
+    if (function == backend_init_function || function == player_infos_function ||
         std::find(state_change_functions.begin(), state_change_functions.end(), function) !=
             state_change_functions.end())
         snapshot_dirty.store(true, std::memory_order_release);
@@ -1033,8 +1307,13 @@ public:
         ModAuthors = STR("EnoPM");
     }
     void on_unreal_init() override {
+        graceful_stop_supported = verify_graceful_stop_build();
+        if (graceful_stop_supported)
+            Output::send(STR("[Briefcase.ServerBridge] Graceful server shutdown verified for this build.\n"));
         backend_init_function = UObjectGlobals::StaticFindObject<UFunction*>(nullptr, nullptr,
             STR("/Script/DeceiveInc.DeceiveIncPlayerController:ServerInitBackend"));
+        player_infos_function = UObjectGlobals::StaticFindObject<UFunction*>(nullptr, nullptr,
+            STR("/Script/DeceiveInc.DeceiveIncPlayerController:ServerInitPlayerInfos"));
         for (std::size_t index = 0; index < state_change_paths.size(); ++index)
             state_change_functions[index] = UObjectGlobals::StaticFindObject<UFunction*>(
                 nullptr, nullptr, state_change_paths[index]);
@@ -1056,6 +1335,7 @@ public:
     }
     ~Bridge() override {
         active.store(false);
+        if (graceful_stop_ack) CloseHandle(graceful_stop_ack);
         if (worker_.joinable()) {
             worker_.request_stop();
             transport_->interrupt();

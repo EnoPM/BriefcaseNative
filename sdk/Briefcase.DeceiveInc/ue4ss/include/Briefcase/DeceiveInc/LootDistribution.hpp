@@ -55,7 +55,7 @@ class LootDistribution {
     static std::optional<LootPoint> point(RC::Unreal::UObject *object, bool include_templates = false);
     // Reads the active game's room preset rather than embedding a cooked candidate table.
     static std::optional<std::vector<LootCandidate>> preset_candidates(bool vault,
-        std::uint8_t security, const std::string &point_type);
+        std::uint8_t security, const std::string &point_type, bool *typed_source = nullptr);
     static void replace_candidates(RC::Unreal::UObject *point,
                                    const std::vector<LootCandidate> &candidates,
                                    bool include_templates = false);

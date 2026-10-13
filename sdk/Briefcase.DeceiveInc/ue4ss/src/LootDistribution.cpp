@@ -266,24 +266,8 @@ std::optional<LootPoint> LootDistribution::point(UObject *object, bool include_t
 }
 
 std::optional<std::vector<LootCandidate>> LootDistribution::preset_candidates(
-    bool vault, std::uint8_t security, const std::string &point_type) {
-    UObject *asset{};
-    UObjectGlobals::ForEachUObject([&](UObject *object, std::int32_t, std::int32_t) {
-        if (live(object) && object->GetPropertyByNameInChain(STR("InVaultPresets")) &&
-            object->GetPropertyByNameInChain(STR("OutOfVaultPresets"))) {
-            asset = object;
-            return RC::LoopAction::Break;
-        }
-        return RC::LoopAction::Continue;
-    });
-    if (!asset) return std::nullopt;
-    // The preset asset stores one struct per security level in a fixed-size
-    // reflected array, not in a TArray like its nested candidate lists.
-    auto *property = field(asset, vault ? L"InVaultPresets" : L"OutOfVaultPresets");
-    if (!property->IsA<FStructProperty>() || security >= property->GetArrayDim())
-        return std::nullopt;
-    auto *preset_type = static_cast<FStructProperty *>(property)->GetStruct();
-    auto *preset = property->ContainerPtrToValuePtr<void>(asset, security);
+    bool vault, std::uint8_t security, const std::string &point_type, bool *typed_source) {
+    if (typed_source) *typed_source = false;
     auto read = [](const StructArray &entries) {
         std::vector<LootCandidate> result;
         result.reserve(entries.size());
@@ -291,15 +275,42 @@ std::optional<std::vector<LootCandidate>> LootDistribution::preset_candidates(
             result.push_back(candidate(entries.type, entries.row(i)));
         return result;
     };
-    if (!point_type.empty() && point_type != "Default") {
-        auto typed = array(preset_type, preset, L"ObjectsToSpawnOnSpawnPointType");
-        for (int i = 0; i < typed.size(); ++i) {
-            auto *entry = typed.row(i);
-            if (string(typed.type, entry, L"SpawnPointType") == point_type)
-                return read(array(typed.type, entry, L"ObjectsToSpawn"));
+    std::optional<std::vector<LootCandidate>> found;
+    UObjectGlobals::ForEachUObject([&](UObject *object, std::int32_t, std::int32_t) {
+        if (!live(object) || !object->GetPropertyByNameInChain(STR("InVaultPresets")) ||
+            !object->GetPropertyByNameInChain(STR("OutOfVaultPresets")) ||
+            !RC::to_string(object->GetPathName()).starts_with("/Game/"))
+            return RC::LoopAction::Continue;
+        try {
+            // Several live objects can expose these fields. Prefer the first
+            // populated preset instead of stopping at an uninitialized one.
+            auto *property = field(object, vault ? L"InVaultPresets" : L"OutOfVaultPresets");
+            if (!property->IsA<FStructProperty>() || security >= property->GetArrayDim())
+                return RC::LoopAction::Continue;
+            auto *preset_type = static_cast<FStructProperty *>(property)->GetStruct();
+            auto *preset = property->ContainerPtrToValuePtr<void>(object, security);
+            auto base = array(preset_type, preset, L"ObjectsToSpawn");
+            auto typed = array(preset_type, preset, L"ObjectsToSpawnOnSpawnPointType");
+            for (int i = 0; i < typed.size(); ++i) {
+                auto *row = typed.row(i);
+                if (string(typed.type, row, L"SpawnPointType") != point_type) continue;
+                auto specific = read(array(typed.type, row, L"ObjectsToSpawn"));
+                if (!specific.empty()) {
+                    found = std::move(specific);
+                    if (typed_source) *typed_source = true;
+                    return RC::LoopAction::Break;
+                }
+            }
+            auto candidates = read(base);
+            if (!candidates.empty()) { found = std::move(candidates); return RC::LoopAction::Break; }
+            if (!found) found = std::move(candidates);
+        } catch (const std::exception &) {
+            // Some reflected objects are partial templates; continue to the
+            // live asset instead of aborting the entire catalog capture.
         }
-    }
-    return read(array(preset_type, preset, L"ObjectsToSpawn"));
+        return RC::LoopAction::Continue;
+    });
+    return found;
 }
 
 void LootDistribution::replace_candidates(UObject *point,

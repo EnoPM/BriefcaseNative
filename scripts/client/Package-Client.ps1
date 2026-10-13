@@ -40,8 +40,13 @@ foreach($kind in @('Client','Server')) {
         $record
     })
     $gameHash=if($kind -eq 'Server'){'f2125f09cbeb7922a4912706cc546477454ce229c15ed477af2731a21c828fd3'}else{(Get-Content -LiteralPath (Join-Path $project 'runtime\Briefcase.NativeHost\ClientBuild.json') -Raw|ConvertFrom-Json).sha256}
-    [ordered]@{updateSchema=1;platform='windows-x64';gameSha256=$gameHash;frameworkVersion=$frameworkVersion;environment=$kind.ToLowerInvariant();configuration='Release x64';files=$records}|
-        ConvertTo-Json -Depth 5|Set-Content -LiteralPath (Join-Path $destination 'Package.json') -Encoding utf8
+    $manifest=[ordered]@{updateSchema=1;platform='windows-x64';gameSha256=$gameHash;frameworkVersion=$frameworkVersion;environment=$kind.ToLowerInvariant();configuration='Release x64';files=$records}
+    if($kind -eq 'Server'){
+        # Keep the original build as the primary identity for existing tools.
+        # ServerApp also accepts the current public dedicated-server executable.
+        $manifest.compatibleGameSha256=@('0fec2be320ce099f088316c569a24c91974c518cd4b75479bf069d6b14d29d59')
+    }
+    $manifest|ConvertTo-Json -Depth 5|Set-Content -LiteralPath (Join-Path $destination 'Package.json') -Encoding utf8
 }
 & (Join-Path $PSScriptRoot 'Assert-Package.ps1')
 

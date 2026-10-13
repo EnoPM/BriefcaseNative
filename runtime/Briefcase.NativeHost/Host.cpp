@@ -376,6 +376,12 @@ static void load_phase(std::string_view phase, bool rendering_only = false) {
 } // namespace bc
 #ifdef _WIN32
 extern "C" __declspec(dllexport) uint32_t __cdecl BriefcaseInstanceSupportVersion() noexcept { return 1; }
+// Only expose a build identity after BriefcasePrepare has verified the entire executable.
+// The UE4SS bridge uses it to opt in to build-specific native game callbacks.
+extern "C" __declspec(dllexport) const char* __cdecl BriefcaseVerifiedGameSha256() noexcept {
+    return bc::game_image && bc::environment == bc::Environment::server
+        ? bc::build_info.executable_sha256 : nullptr;
+}
 extern "C" __declspec(dllexport) uint32_t __cdecl BriefcasePrepare(uint32_t game_thread) noexcept {
     try {
         wchar_t path[32768]{};

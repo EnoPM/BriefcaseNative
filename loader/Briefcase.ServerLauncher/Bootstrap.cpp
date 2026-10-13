@@ -14,7 +14,7 @@ static void prepare() noexcept {
         const auto instance_length = GetEnvironmentVariableW(L"BRIEFCASE_INSTANCE_ROOT", instance_path, 32768);
         if (instance_length >= 32768) ExitProcess(119);
         const auto runtime_root = instance_length ? std::filesystem::path(instance_path) : root;
-        auto host = LoadLibraryExW((root / L"Briefcase/Core/Briefcase.NativeHost.dll").c_str(), nullptr,
+        auto host = LoadLibraryExW((runtime_root / L"Briefcase/Core/Briefcase.NativeHost.dll").c_str(), nullptr,
                                   LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32);
         if (!host) ExitProcess(119);
         if (instance_length) {
