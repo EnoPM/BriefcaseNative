@@ -37,7 +37,8 @@ foreach(name Unreal patternsleuth_bind SinglePassSigScanner ASMHelper DynamicOut
   list(APPEND backend_archives "${backend_lib}/lib${name}.a")
 endforeach()
 add_library(Briefcase.NativeHost SHARED runtime/Briefcase.NativeHost/Host.cpp
-  runtime/Briefcase.UnrealBackend/Backend.cpp)
+  runtime/Briefcase.UnrealBackend/Backend.cpp
+  runtime/Briefcase.NativeHost/LinuxServerBridge.cpp)
 target_compile_definitions(Briefcase.NativeHost PRIVATE BRIEFCASE_FRAMEWORK_VERSION="${PROJECT_VERSION}")
 target_include_directories(Briefcase.NativeHost PRIVATE runtime/Briefcase.UnrealBackend)
 foreach(name Unreal File Helpers DynamicOutput SinglePassSigScanner Constructs Function ASMHelper String Profiler)

@@ -2,6 +2,7 @@
 #include "../Briefcase.Localization/Catalog.hpp"
 #include "../Briefcase.NativeHost/Configuration.hpp"
 #include "../Briefcase.NativeHost/Startup.hpp"
+#include <cstdlib>
 #ifdef _WIN32
 #include <Windows.h>
 #else
@@ -247,6 +248,20 @@ Json Management::config_schema() {
 Management::Management(fs::path root, std::vector<Manifest> manifests)
     : root(std::move(root)), manifests(std::move(manifests)) {
     auto game = this->root.parent_path().parent_path().parent_path();
+    fs::path defaults;
+#ifndef _WIN32
+    const auto *instance_path = std::getenv("BRIEFCASE_INSTANCE_ROOT");
+    if (instance_path && *instance_path) {
+        const auto instance = fs::path(instance_path).lexically_normal();
+        require(instance.is_absolute() && instance == this->root.parent_path().lexically_normal(),
+                "Invalid managed instance path.");
+        ini = instance / "TripwireServer.ini";
+        profile = instance / "CommunityBalanceProfile.json";
+        defaults = instance / "CommunityBalanceProfile.default.json";
+        game_log = instance / "GameView" / "DeceiveInc" / "Saved" / "Logs" / "DeceiveInc.log";
+    } else
+#endif
+    {
 #ifdef _WIN32
     const auto platform_config = "WindowsServer";
 #else
@@ -254,9 +269,11 @@ Management::Management(fs::path root, std::vector<Manifest> manifests)
 #endif
     ini = game / "Saved" / "Config" / platform_config / "TripwireServer.ini";
     profile = game / "CommunityBalanceProfile.json";
+    defaults = game / "Community Balance Template" / "CommunityBalanceProfile.default.json";
+    game_log = game / "Saved" / "Logs" / "DeceiveInc.log";
+    }
     config_active = ini_values(read_file(ini, 262144));
     selection_active = selection_read()["saved"];
-    const auto defaults = game / "Community Balance Template" / "CommunityBalanceProfile.default.json";
     if (fs::exists(defaults))
         catalog = profile_entries(document(defaults));
     if (fs::exists(profile))
@@ -534,9 +551,7 @@ Json Management::dispatch(const std::string &op, const Json &p) {
         require(p.size() == 1 && p.contains("source") && p["source"].is_string(), "Invalid log source.");
         auto source = p["source"].get<std::string>();
         require(source == "framework" || source == "game", "Unknown log source.");
-        auto path = source == "framework" ? root / "Logs" / "BriefcaseNative.log"
-                                          : root.parent_path().parent_path().parent_path() / "Saved" /
-                                                "Logs" / "DeceiveInc.log";
+        auto path = source == "framework" ? root / "Logs" / "BriefcaseNative.log" : game_log;
         auto out = log_tail(path);
         out["source"] = source;
         return out;
@@ -554,9 +569,7 @@ Json Management::dispatch(const std::string &op, const Json &p) {
 
 Json Management::session_status() {
     std::lock_guard lock(mutex);
-    const auto path = root.parent_path().parent_path().parent_path() / "Saved" / "Logs" /
-                      "DeceiveInc.log";
-    const auto tail = log_tail(path, 65536).value("text", std::string{});
+    const auto tail = log_tail(game_log, 65536).value("text", std::string{});
     Json result = {{"available", false}};
     const std::map<std::string, std::string> names = {
         {"ServerName", "name"},       {"MapName", "map"},

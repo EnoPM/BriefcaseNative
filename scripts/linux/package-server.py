@@ -2,7 +2,7 @@
 import argparse, hashlib, json, os, re, shutil, stat, struct, subprocess, tempfile, zipfile
 from pathlib import Path
 import package_support as u
-GAME_HASH="b0b275eac71bb8314b8afb5b36368d882faefafc993d5eac05bb5956a7334ef7"
+GAME_HASH="023b4a18f48122d1a553e4421ca1ae820b6dd9994b9bd13f21d8bf2850fa866b"
 
 def package(project,build,backend,deps,output,json_source=None):
     version=u.source_version(project)

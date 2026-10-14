@@ -18,6 +18,10 @@
 
 namespace bc::launcher {
 namespace {
+struct Instance {
+    fs::path root;
+    std::string id;
+};
 volatile sig_atomic_t stopping = 0;
 void stop(int) { stopping = 1; }
 struct Fd {
@@ -80,10 +84,12 @@ public:
         if (!reaped) { kill(pid, SIGKILL); while (waitpid(pid, nullptr, 0) < 0 && errno == EINTR) {} }
     }
 };
-pid_t launch(const fs::path& game, const std::vector<std::string>& arguments, int channel, int parent_channel) {
+pid_t launch(const fs::path& game, const std::vector<std::string>& arguments,
+             const std::optional<Instance>& instance, int channel, int parent_channel) {
     const auto root = game.parent_path();
-    const auto host = package_path(root, "Briefcase/Core/libBriefcase.NativeHost.so");
-    const auto bridge = package_path(root, "Briefcase/Core/libBriefcase.ServerBootstrap.so");
+    const auto runtime = instance ? instance->root : root;
+    const auto host = package_path(runtime, "Briefcase/Core/libBriefcase.NativeHost.so");
+    const auto bridge = package_path(runtime, "Briefcase/Core/libBriefcase.ServerBootstrap.so");
     require(fs::is_regular_file(host) && fs::is_regular_file(bridge), "Runtime libraries missing");
     Fd bridge_fd(open(bridge.c_str(), O_RDONLY | O_NOFOLLOW | O_CLOEXEC));
     require(bridge_fd.value >= 0, "Cannot open bootstrap");
@@ -100,6 +106,10 @@ pid_t launch(const fs::path& game, const std::vector<std::string>& arguments, in
         if (setsid() < 0 || chdir(root.c_str()) || fcntl(channel, F_SETFD, 0) || fcntl(bridge_fd.value, F_SETFD, 0)) _exit(78);
         auto env = [](const char* key, const std::string& value) { if (setenv(key, value.c_str(), 1)) _exit(78); };
         env("BRIEFCASE_SERVER_EXECUTABLE", game.string()); env("BRIEFCASE_NATIVE_HOST", host.string());
+        if (instance) {
+            env("BRIEFCASE_INSTANCE_ROOT", instance->root.string());
+            env("BRIEFCASE_INSTANCE_ID", instance->id);
+        }
         env("BRIEFCASE_BOOTSTRAP_FD", std::to_string(bridge_fd.value)); env("BRIEFCASE_SUPERVISOR_FD", std::to_string(channel));
         env("BRIEFCASE_SUPERVISOR_PID", std::to_string(getppid())); env("LD_PRELOAD", "/proc/self/fd/" + std::to_string(bridge_fd.value));
         std::string libraries = root.parent_path().parent_path().parent_path().string();
@@ -111,23 +121,46 @@ pid_t launch(const fs::path& game, const std::vector<std::string>& arguments, in
     }
     return child;
 }
-int supervise(const fs::path& game, const std::vector<std::string>& arguments) {
+int supervise(const fs::path& game, const std::vector<std::string>& arguments,
+              const std::optional<Instance>& instance) {
     require(game.filename() == game_name && fs::is_regular_file(plain(game)) && access(game.c_str(), X_OK) == 0, "Invalid dedicated-server executable");
     const auto preload = std::getenv("LD_PRELOAD");
     require(!preload || !*preload, "An existing LD_PRELOAD is not supported");
     const auto root = game.parent_path();
-    Lock lock(root);
+    const auto runtime = instance ? instance->root : root;
+    Lock lock(runtime);
     std::signal(SIGINT, stop); std::signal(SIGTERM, stop);
+    std::vector<std::string> game_arguments;
+    if (instance) {
+        const auto ini = package_path(instance->root, "TripwireServer.ini");
+        const auto runtime_ini = package_path(instance->root,
+            "GameView/DeceiveInc/TripwireServer.ini");
+        const auto balance = package_path(instance->root, "CommunityBalanceProfile.json");
+        require(fs::is_regular_file(ini) && fs::is_regular_file(runtime_ini) &&
+                fs::is_regular_file(balance), "Instance configuration is incomplete");
+        for (const auto& argument : arguments)
+            require(!argument.starts_with("-ini:Engine:") &&
+                    !argument.starts_with("-TripwireServerIni=") &&
+                    !argument.starts_with("-CommunityBalanceProfile="),
+                    "Instance configuration arguments are managed by the launcher");
+        game_arguments.emplace_back("-ini:Engine:[ConsoleVariables]:sb.DisableEAC=1");
+        // Unreal persists its expanded MapRotation array to this path on exit.
+        // The app refreshes this disposable copy from the instance's canonical INI
+        // before each start, so game writes cannot multiply its saved rotation.
+        game_arguments.emplace_back("-TripwireServerIni=" + runtime_ini.string());
+        game_arguments.emplace_back("-CommunityBalanceProfile=" + balance.string());
+    }
+    game_arguments.insert(game_arguments.end(), arguments.begin(), arguments.end());
     while (!stopping) {
-        require(!game_running(game), "Dedicated server already running");
-        if (ensure_eac_disabled(root, "LinuxServer"))
+        if (!instance) require(!game_running(game), "Dedicated server already running");
+        if (!instance && ensure_eac_disabled(root, "LinuxServer"))
             log(root, "Configured sb.DisableEAC=1 for the Briefcase server.");
         int pair[2]; require(socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, pair) == 0, "Cannot create restart channel");
         Fd parent(pair[0]);
         pid_t pid;
-        { Fd channel(pair[1]); pid = launch(game, arguments, channel.value, parent.value); }
+        { Fd channel(pair[1]); pid = launch(game, game_arguments, instance, channel.value, parent.value); }
         Child child(pid);
-        log(root, "Server started pid=" + std::to_string(pid));
+        log(runtime, "Server started pid=" + std::to_string(pid));
         bool restart = false, shutdown = false, channel_open = true, interrupt_sent = false, terminate_sent = false;
         std::string prepared, prepared_action;
         auto prepared_at = std::chrono::steady_clock::now(), stop_at = prepared_at;
@@ -136,7 +169,7 @@ int supervise(const fs::path& game, const std::vector<std::string>& arguments) {
             if (wait == pid) {
                 child.reaped = true;
                 const auto code = WIFEXITED(status) ? WEXITSTATUS(status) : 128 + WTERMSIG(status);
-                log(root, "Server exited code=" + std::to_string(code));
+                log(runtime, "Server exited code=" + std::to_string(code));
                 if (restart && !stopping) break;
                 if (shutdown) return 0;
                 return code;
@@ -145,7 +178,7 @@ int supervise(const fs::path& game, const std::vector<std::string>& arguments) {
             const auto now = std::chrono::steady_clock::now();
             if (stopping || restart || shutdown) {
                 if (!interrupt_sent) { stop_at = now; kill(pid, SIGINT); interrupt_sent = true; }
-                else if (!terminate_sent && now - stop_at > std::chrono::seconds(30)) { kill(pid, SIGTERM); terminate_sent = true; log(root, "Graceful stop timed out; requesting termination"); }
+                else if (!terminate_sent && now - stop_at > std::chrono::seconds(30)) { kill(pid, SIGTERM); terminate_sent = true; log(runtime, "Graceful stop timed out; requesting termination"); }
                 else if (now - stop_at > std::chrono::seconds(40)) kill(pid, SIGKILL);
             }
             pollfd descriptor{parent.value, POLLIN, 0};
@@ -173,7 +206,7 @@ int supervise(const fs::path& game, const std::vector<std::string>& arguments) {
                             (action == "commit-stop" && prepared_action == "prepare-stop"))) {
                     restart = action == "commit"; shutdown = action == "commit-stop";
                     prepared.clear(); prepared_action.clear();
-                    log(root, restart ? "Acknowledged administration restart" :
+                    log(runtime, restart ? "Acknowledged administration restart" :
                                         "Acknowledged administration shutdown");
                 }
             }
@@ -181,16 +214,16 @@ int supervise(const fs::path& game, const std::vector<std::string>& arguments) {
     }
     return 0;
 }
-int deploy(const fs::path& game, const fs::path& archive) {
+int deploy(const fs::path& game, const fs::path& archive, const std::optional<Instance>& instance) {
     require(game.filename() == game_name && fs::is_regular_file(plain(game)) && access(game.c_str(), X_OK) == 0, "Invalid dedicated-server executable");
-    const auto root = game.parent_path();
+    const auto root = instance ? instance->root : game.parent_path();
     Lock lock(root);
     require(!game_running(game), "Stop the dedicated server before installation");
     Updater updater(root); updater.recover();
     const auto stage = package_path(root, "Briefcase/Updates/install-" + identifier());
     extract(plain(archive), stage);
     const auto manifest = package_manifest(stage, document(stage / "Package.json").at("frameworkVersion"), digest(game));
-    updater.install(stage, manifest);
+    updater.install(stage, manifest, {}, game);
     updater.cleanup([](const std::string&) {});
     const auto config = package_path(root, "Briefcase/updater.json");
     if (!fs::exists(config)) atomic(config, read(package_path(root, "Briefcase/Core/Updater/updater.example.json")));
@@ -203,7 +236,8 @@ int main(int argc, char** argv) {
     using namespace bc::launcher;
     try {
         fs::path game = executable().parent_path() / game_name;
-        fs::path archive;
+        fs::path archive, instance_root;
+        std::string instance_id;
         std::vector<std::string> arguments;
         bool game_arguments = false;
         for (int i = 1; i < argc; ++i) {
@@ -212,14 +246,27 @@ int main(int argc, char** argv) {
             if (!game_arguments && (argument == "--help" || argument == "--version")) {
                 std::puts("Briefcase native Linux server launcher " BRIEFCASE_FRAMEWORK_VERSION "\nUsage: Briefcase.ServerLauncher [--server /path/to/DeceiveIncServer-Linux-Shipping] [--install-archive package.zip] [-- game arguments]"); return 0;
             }
-            if (!game_arguments && (argument == "--server" || argument == "--install-archive")) {
+            if (!game_arguments && (argument == "--server" || argument == "--install-archive" ||
+                                    argument == "--instance-root" || argument == "--instance-id")) {
                 require(i + 1 < argc, "Missing launcher option value");
-                (argument == "--server" ? game : archive) = plain(argv[++i]); continue;
+                if (argument == "--instance-id") instance_id = argv[++i];
+                else (argument == "--server" ? game : argument == "--install-archive" ? archive : instance_root) = plain(argv[++i]);
+                continue;
             }
             arguments.push_back(argument);
         }
-        if (!archive.empty()) { require(arguments.empty(), "Installation does not accept game arguments"); return deploy(game, archive); }
-        return supervise(game, arguments);
+        require(instance_root.empty() == instance_id.empty(), "Instance root and ID must be supplied together");
+        std::optional<Instance> instance;
+        if (!instance_root.empty()) {
+            require(std::regex_match(instance_id, std::regex("[a-f0-9]{32}")) &&
+                    fs::is_directory(instance_root), "Invalid instance directory or ID");
+            instance = Instance{instance_root, instance_id};
+        }
+        if (!archive.empty()) {
+            require(arguments.empty(), "Installation does not accept game arguments");
+            return deploy(game, archive, instance);
+        }
+        return supervise(game, arguments, instance);
     } catch (const std::exception& error) { std::fprintf(stderr, "Briefcase launcher: %s\n", error.what()); return 78; }
     catch (...) { std::fputs("Briefcase launcher: unexpected failure\n", stderr); return 78; }
 }

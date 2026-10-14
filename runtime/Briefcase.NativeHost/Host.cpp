@@ -7,6 +7,9 @@
 #include "Manifest.hpp"
 #include "Startup.hpp"
 #include "UnrealServices.hpp"
+#ifndef _WIN32
+#include "LinuxServerBridge.hpp"
+#endif
 #include "../Briefcase.Admin/Management.hpp"
 #ifdef _WIN32
 #include "../Briefcase.Client.Rendering/ClientBridge.h"

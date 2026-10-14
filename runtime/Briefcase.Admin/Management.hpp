@@ -3,7 +3,7 @@
 #include "Service.hpp"
 namespace bc::admin {
 class Management {
-    fs::path root, ini, profile;
+    fs::path root, ini, profile, game_log;
     std::mutex mutex;
     Json config_active, selection_active, balance_active;
     std::vector<Manifest> manifests;

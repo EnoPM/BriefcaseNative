@@ -150,7 +150,10 @@ Json package_manifest(const fs::path& stage, const std::string& expected, const 
         if (entry.is_regular_file()) actual.insert(entry.path().lexically_relative(stage).generic_string());
     }
     auto all = seen; all.insert("Package.json");
-    require(actual == all && preserves_mod_selection &&
+    require(actual == all &&
+#ifdef _WIN32
+            preserves_mod_selection &&
+#endif
             std::includes(seen.begin(), seen.end(), required.begin(), required.end()), "Incomplete or unlisted package content");
     require(document(package_path(stage, "Briefcase/Core/Updater/build.json")).at("frameworkVersion") == expected, "Version marker mismatch");
     return manifest;
@@ -233,9 +236,11 @@ void Updater::recover() {
     }
     journal["state"] = "rolled-back"; write_json(journal_path, journal);
 }
-void Updater::install(const fs::path& stage, const Json& supplied, const std::function<void(size_t)>& after_write) {
+void Updater::install(const fs::path& stage, const Json& supplied, const std::function<void(size_t)>& after_write,
+                      const fs::path& game) {
     // Revalidate immediately before mutating installed files.
-    const auto manifest = package_manifest(stage, supplied.at("frameworkVersion"), digest(root_ / game_name));
+    const auto manifest = package_manifest(stage, supplied.at("frameworkVersion"),
+                                           digest(game.empty() ? root_ / game_name : plain(game)));
     require(manifest == supplied, "Manifest changed before installation");
     recover();
     const auto id = identifier();

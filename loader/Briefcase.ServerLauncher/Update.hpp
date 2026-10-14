@@ -45,7 +45,8 @@ public:
     explicit Updater(fs::path root, Download fetch = download);
     void recover();
     void install(const fs::path& stage, const Json& manifest,
-                 const std::function<void(size_t)>& after_write = {});
+                 const std::function<void(size_t)>& after_write = {},
+                 const fs::path& game = {});
     std::string update(const std::function<void(const std::string&)>& log, bool install = true);
     Json update_mods(const std::function<void(const std::string&)>& log, bool install = true);
     void cleanup(const std::function<void(const std::string&)>& log);
