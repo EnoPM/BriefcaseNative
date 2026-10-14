@@ -75,7 +75,7 @@
     },
     {
       "path": "cmake/LinuxBackend.cmake",
-      "sha256": "01ae948f934e69d727caacfda35f3fa7e2462d431b5db6889c28b0a7300926f8"
+      "sha256": "4f913ef6e8b902f8fea27b85cec0eded7de98f3027df4b29aa0c87260e914de3"
     },
     {
       "path": "cmake/LinuxServer.cmake",
@@ -251,7 +251,7 @@
     },
     {
       "path": "loader/Briefcase.ServerLauncher/LinuxMain.cpp",
-      "sha256": "d7ba539fb8fb690b2181c9842a09f93a03c0330434c7170f7c15f2da44ae766b"
+      "sha256": "9c86cb654e19cb032444e3fdf2f30fb32e282ed55eb6398369eee7ee6bdc92eb"
     },
     {
       "path": "loader/Briefcase.ServerLauncher/Main.cpp",
@@ -259,11 +259,11 @@
     },
     {
       "path": "loader/Briefcase.ServerLauncher/Update.cpp",
-      "sha256": "3620a2beed25b78ec7dc0ba0a518a5a921eaa4d53f78c20ff7605d302d8fad3a"
+      "sha256": "b3ce2d1feaf1557240e1db13edd5dd9db6a7309ef19b1f3aacdceeedc88f2428"
     },
     {
       "path": "loader/Briefcase.ServerLauncher/Update.hpp",
-      "sha256": "6b97514b89411edc14bf3fc407eb6baab124548465a8bdc5824fb6f87bcc2988"
+      "sha256": "940e707988915a9957a8e85b8402011d970f6a5883b48ba9227ffdf73eba3455"
     },
     {
       "path": "loader/Briefcase.ServerLauncher/WindowsDownload.cpp",
@@ -319,11 +319,11 @@
     },
     {
       "path": "runtime/Briefcase.Admin/Management.cpp",
-      "sha256": "23b201d50df91eca7b9e1324c78716b2d9e8343dc01980fb8e7b42362c11edbe"
+      "sha256": "a64053a344cbc702976d317963c65bf38e93186df92924dc75461036c4687243"
     },
     {
       "path": "runtime/Briefcase.Admin/Management.hpp",
-      "sha256": "312ca0d3a7aeea6cfea3625805a44981fb198cced7d84a55459bacb754907a62"
+      "sha256": "7c7672ca1ade8d1959b7a1281a62fbbfead76767f8e865d8aec9785c5d501027"
     },
     {
       "path": "runtime/Briefcase.Admin/PosixFiles.cpp",
@@ -559,11 +559,19 @@
     },
     {
       "path": "runtime/Briefcase.NativeHost/Host.cpp",
-      "sha256": "f87c6d3e5202aa4e0ce6c79a536eab0cb6ba63957135776d4f9a35846c72b75b"
+      "sha256": "3dade1e6f34c46b7eff125146d148b8618327f9db903fb9fccf00cd570ea100d"
     },
     {
       "path": "runtime/Briefcase.NativeHost/LinuxHost.inc",
-      "sha256": "2687254166e4d37f28bea88b31d642a921dd4090ec12b12e3017ef09935b1b16"
+      "sha256": "f37ed2e0d9d0a7e36ae5796a64857d92319f3c76da04fd6a30f8282a51438f13"
+    },
+    {
+      "path": "runtime/Briefcase.NativeHost/LinuxServerBridge.cpp",
+      "sha256": "098a0e86318d3a9b4ed017edc2ec1382e8f0836d9f6a2d3db617c757a90c5b23"
+    },
+    {
+      "path": "runtime/Briefcase.NativeHost/LinuxServerBridge.hpp",
+      "sha256": "0a401ab94b81e50d4b7dfea2bc86a5e6a1f1d1a8ce72921b3fab43a22399bbe0"
     },
     {
       "path": "runtime/Briefcase.NativeHost/Manifest.cpp",
@@ -803,7 +811,7 @@
     },
     {
       "path": "scripts/linux/package-server.py",
-      "sha256": "7f1c159e26716d930bb2b1bc4708f48c662962108ac24857001a62cb2936e857"
+      "sha256": "742a633610b38d2f0d2941a89a45d6987c2de46dc8f9dec3a0d96888b64907a8"
     },
     {
       "path": "scripts/linux/package_support.py",
@@ -1139,7 +1147,7 @@
     },
     {
       "path": "tests/LinuxGameFixture.cpp",
-      "sha256": "94c39e769ef5864c5866173934a7e0c0d54d1934f06b27c20edcad58505e27c7"
+      "sha256": "16ba185542518a88e8ef36e06fa42e0cc7a3a7f767bc95216a8890334d98d8d7"
     },
     {
       "path": "tests/LinuxHostFixture.cpp",
@@ -1147,7 +1155,7 @@
     },
     {
       "path": "tests/LinuxLauncherContracts.py",
-      "sha256": "1a9bf38c65417188f962c6372f37091bb8684943caded490270d796b743de4fa"
+      "sha256": "e90df69f76d5f5281fb094f9aa753ed3070c74f3efe3893f693233dd7f1053f7"
     },
     {
       "path": "tests/LinuxNativeContracts.cpp",
@@ -9630,8 +9638,20 @@
       "sha256": "7c9e904d8942fdae17a9218bb9450b88c484278a61534962da4f4400a3c16a89"
     },
     {
+      "path": "ue4ss/ServerBridgeChannel.hpp",
+      "sha256": "115fa4a152f3a194d13ca9dabbfaba1a7505f27f46763c341d2d506dec1b9b01"
+    },
+    {
+      "path": "ue4ss/ServerBridgeProtocol.hpp",
+      "sha256": "63d95a48cf5fc498653e2b641d6227ec3ac56bb5a4d5ee7f9312c6232570fca7"
+    },
+    {
+      "path": "ue4ss/ServerBridgeSnapshot.hpp",
+      "sha256": "bac14fde89f0b6c1a811b41b5c6fc7db2316997882023a9ff2eede0e17882d80"
+    },
+    {
       "path": "ue4ss/ServerEquipmentIds.hpp",
-      "sha256": "516505dba2bf1da7db75a87bcc92e0e2b632e9440201c80cd16190881e30324d"
+      "sha256": "894715e61973d947eb59aa2e50152e3f557beb1ed79a79295a4adb3621bef132"
     },
     {
       "path": "ue4ss/ServerTransport.hpp",
