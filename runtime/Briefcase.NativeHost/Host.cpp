@@ -86,6 +86,17 @@ static Scope *scope(void *context, uint64_t capability = 0) {
             return s.get();
     return nullptr;
 }
+#ifndef _WIN32
+void* linux_loaded_mod_symbol(std::string_view id, const char* name) noexcept {
+    if (!name) return nullptr;
+    try {
+        for (const auto& mod : scopes)
+            if (mod->loaded && mod->manifest.id == id && mod->module)
+                return platform::symbol(mod->module, name);
+    } catch (...) {}
+    return nullptr;
+}
+#endif
 static BcResult BC_CALL api_log(void *c, uint32_t level, const char *data, uint32_t size) noexcept {
     try {
         auto *s = scope(c, BC_CAP_LOG);

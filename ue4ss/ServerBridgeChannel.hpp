@@ -30,7 +30,8 @@ public:
         if (supported == BridgeCommandSet::LocalBasic &&
             command->kind != BridgeCommand::Kind::Kick &&
             command->kind != BridgeCommand::Kind::MoveTeam &&
-            command->kind != BridgeCommand::Kind::SwapTeam) return;
+            command->kind != BridgeCommand::Kind::SwapTeam &&
+            command->kind != BridgeCommand::Kind::SetSpectator) return;
         std::lock_guard lock(mutex_);
         if (commands_.size() >= 32) {
             responses_.push_back(BridgeProtocol::result(

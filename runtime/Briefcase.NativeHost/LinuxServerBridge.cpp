@@ -1,5 +1,6 @@
 #ifndef _WIN32
 #include "LinuxServerBridge.hpp"
+#include "LinuxSpectatorApi.hpp"
 #include "../Briefcase.UnrealBackend/Backend.hpp"
 
 #include <Helpers/String.hpp>
@@ -64,12 +65,22 @@ struct Player {
     FWeakObjectPtr controller;
     std::string account_id, bandit_id, platform_id, platform_type;
 };
+struct PendingPack {
+    FWeakObjectPtr spy;
+    FWeakObjectPtr world;
+    std::vector<FWeakObjectPtr> cached_packs;
+    std::chrono::steady_clock::time_point expires;
+};
 using Command = briefcase::server::BridgeCommand;
 
 std::atomic<bool> active{};
 briefcase::server::BridgeCommandChannel channel;
 briefcase::server::BridgeSnapshot snapshots;
 std::unordered_map<UObject*, Player> players;
+std::vector<PendingPack> pending_packs;
+UClass* spy_pack_class{};
+UFunction* destroy_actor_function{};
+std::atomic<std::int64_t> next_extension_ms{};
 std::uint64_t next_token{};
 std::jthread worker;
 fs::path socket_path;
@@ -173,6 +184,22 @@ std::string player_network_id(UObject* player) {
     exported.Clear();
     if (id.empty() || id == "()" || id == "INVALID") return {};
     return id;
+}
+
+std::string spectator_identity(const Player& entry, UObject* player) {
+    auto network = valid(player) ? player_network_id(player) : std::string{};
+    if (!network.empty()) return "network:" + network;
+    return entry.account_id.empty() ? std::string{} : "account:" + entry.account_id;
+}
+
+const BriefcaseLinuxSpectatorApiV1* spectator_extension() {
+    auto* symbol = linux_loaded_mod_symbol("briefcase.spectator-mode",
+        "briefcase_linux_spectator_api_v1");
+    auto get_api = reinterpret_cast<BriefcaseGetLinuxSpectatorApiV1>(symbol);
+    const auto* api = get_api ? get_api() : nullptr;
+    return api && api->version == 1 && api->ready && api->ready() &&
+        api->set_selected && api->is_selected && api->forget_token && api->any_selected
+        ? api : nullptr;
 }
 
 std::string primary_asset_name(const void* base, FProperty* property) {
@@ -433,6 +460,128 @@ bool in_lobby(UObject* state) {
     return false;
 }
 
+bool active_match_phase(UObject* state) {
+    if (!valid(state)) return false;
+    auto* property = state->GetPropertyByNameInChain(STR("GamePhase"));
+    auto* enumeration = UObjectGlobals::StaticFindObject<UEnum*>(
+        nullptr, nullptr, STR("/Script/DeceiveInc.ESpyGamePhase"));
+    if (!property || property->GetSize() != 1 || !enumeration) return false;
+    const auto phase = *property->ContainerPtrToValuePtr<std::uint8_t>(state);
+    for (const auto pair : enumeration->ForEachName()) {
+        if (pair.Value != phase) continue;
+        const auto name = pair.Key.ToString();
+        return name.ends_with(STR("VAULT_LOCKED")) ||
+            name.ends_with(STR("VAULT_UNLOCKED")) ||
+            name.ends_with(STR("EXTRACTION_ARRIVING")) ||
+            name.ends_with(STR("EXTRACTION_ARRIVED"));
+    }
+    return false;
+}
+
+bool is_spy_pack(UObject* object) {
+    return valid(object) && spy_pack_class && object->IsA(spy_pack_class);
+}
+
+std::vector<FWeakObjectPtr> cached_packs_for(UObject* spy, UObject* world) {
+    std::vector<FWeakObjectPtr> result;
+    const auto prefix = spy->GetName() + STR("_");
+    UObjectGlobals::ForEachUObject([&](UObject* object, std::int32_t, std::int32_t) {
+        if (is_spy_pack(object) && object->GetWorld() == world &&
+            object->GetName().starts_with(prefix) &&
+            flag(object, STR("bIsCached")) && flag(object, STR("bHiddenInContainer"))) {
+            FWeakObjectPtr weak;
+            weak = object;
+            result.push_back(weak);
+        }
+        return RC::LoopAction::Continue;
+    });
+    return result;
+}
+
+std::size_t remove_activated_packs(PendingPack& pending) {
+    auto* spy = pending.spy.Get();
+    if (!valid(spy) || !valid(pending.world.Get()) || !destroy_actor_function) return 0;
+    std::size_t removed{};
+    for (const auto& weak : pending.cached_packs) {
+        auto* pack = weak.Get();
+        if (!is_spy_pack(pack) || pack->GetWorld() != pending.world.Get() ||
+            !pack->GetName().starts_with(spy->GetName() + STR("_")) ||
+            flag(pack, STR("bIsCached")) || flag(pack, STR("bHiddenInContainer"))) continue;
+        pack->ProcessEvent(destroy_actor_function, nullptr);
+        ++removed;
+    }
+    return removed;
+}
+
+bool apply_fatal_damage(UObject* spy) {
+    auto* gameplay = UObjectGlobals::StaticFindObject<UObject*>(nullptr, nullptr,
+        STR("/Script/Engine.Default__GameplayStatics"));
+    auto* function = valid(gameplay) ? gameplay->GetFunctionByNameInChain(STR("ApplyDamage")) : nullptr;
+    if (!function || (function->GetParmsSize() != 0x2C && function->GetParmsSize() != 0x30))
+        return false;
+    const auto parameter = [&](const RC::CharType* name, const RC::CharType* type, int offset) {
+        auto* property = function->GetPropertyByNameInChain(name);
+        return property && property->GetClass().GetName() == type &&
+            property->GetOffset_Internal() == offset;
+    };
+    if (!parameter(STR("DamagedActor"), STR("ObjectProperty"), 0) ||
+        !parameter(STR("BaseDamage"), STR("FloatProperty"), 8) ||
+        !parameter(STR("EventInstigator"), STR("ObjectProperty"), 0x10) ||
+        !parameter(STR("DamageCauser"), STR("ObjectProperty"), 0x18) ||
+        !parameter(STR("DamageTypeClass"), STR("ClassProperty"), 0x20) ||
+        !parameter(STR("ReturnValue"), STR("FloatProperty"), 0x28)) return false;
+    struct alignas(8) Params {
+        UObject* damaged_actor{};
+        float damage{};
+        std::uint32_t padding{};
+        UObject* instigator{};
+        UObject* causer{};
+        UClass* damage_class{};
+        float result{};
+    } params{};
+    static_assert(sizeof(Params) == 0x30);
+    params.damaged_actor = spy;
+    params.damage = 1'000'000.0f;
+    gameplay->ProcessEvent(function, &params);
+    return std::isfinite(params.result) && params.result > 0;
+}
+
+void tick_spectator(UObject* player) {
+    if (!valid(player) || flag(player, STR("bIsDead"))) return;
+    auto* spy = object_field(player, STR("OwnedSpy"));
+    auto* health = object_field(spy, STR("HealthComponent"));
+    if (!valid(spy) || !valid(health) || flag(health, STR("bIgnoreDamage"))) return;
+    auto* world = spy->GetWorld();
+    if (!valid(world)) return;
+    PendingPack pending{};
+    pending.spy = spy;
+    pending.world = world;
+    pending.cached_packs = cached_packs_for(spy, world);
+    pending.expires = std::chrono::steady_clock::now() + std::chrono::seconds(3);
+    if (!apply_fatal_damage(spy)) return;
+    const auto removed = remove_activated_packs(pending);
+    log("Linux spectator elimination removed " + std::to_string(removed) + " Spy Pack(s)");
+    if (!removed) pending_packs.push_back(std::move(pending));
+}
+
+void tick_spectators() {
+    auto now = std::chrono::steady_clock::now();
+    std::erase_if(pending_packs, [now](PendingPack& pending) {
+        if (!valid(pending.spy.Get()) || !valid(pending.world.Get())) return true;
+        return remove_activated_packs(pending) || now >= pending.expires;
+    });
+    const auto* spectator = spectator_extension();
+    if (!spectator || !spectator->any_selected() || !active_match_phase(match_state())) return;
+    for (const auto& [controller, entry] : players) {
+        auto* player = entry.state.Get();
+        if (!valid(controller) || !connected(player) ||
+            object_field(player, STR("Owner")) != controller) continue;
+        const auto identity = spectator_identity(entry, player);
+        if (spectator->is_selected(entry.token.c_str(), identity.c_str()))
+            tick_spectator(player);
+    }
+}
+
 void reply(const Command& command, bool ok, std::string_view message) {
     channel.reply(command, ok, message);
 }
@@ -482,6 +631,27 @@ void process_commands() {
             controller->ProcessEvent(function, &reason_text);
             reason_text.Clear();
             reply(command, true, "Kick sent to player");
+            continue;
+        }
+        if (command.kind == Command::Kind::SetSpectator) {
+            if (!in_lobby(match_state())) {
+                reply(command, false, "Spectator selection is only available in the lobby");
+                continue;
+            }
+            const auto* spectator = spectator_extension();
+            if (!spectator || !spy_pack_class || !destroy_actor_function) {
+                reply(command, false, "Spectator Mode is not installed or ready");
+                continue;
+            }
+            auto* player = found->second.state.Get();
+            const auto identity = spectator_identity(found->second, player);
+            if (!spectator->set_selected(found->second.token.c_str(), identity.c_str(),
+                                         command.spectator)) {
+                reply(command, false, "Spectator selection failed");
+                continue;
+            }
+            next_collect_ms.store(0);
+            reply(command, true, command.spectator ? "Spectator selected" : "Spectator selection removed");
             continue;
         }
         if (command.kind != Command::Kind::MoveTeam &&
@@ -559,6 +729,8 @@ void collect() {
         (values->Num() && !values->GetData())) return;
 
     auto rows = Json::array();
+    const auto* spectator = spectator_extension();
+    const bool spectator_ready = spectator && spy_pack_class && destroy_actor_function;
     std::unordered_set<UObject*> seen;
     auto* data = reinterpret_cast<UObject* const*>(values->GetData());
     for (int i = 0; i < values->Num(); ++i) {
@@ -584,6 +756,10 @@ void collect() {
                      : entry.account_id},
                  {"platformId", entry.platform_id}, {"banditId", entry.bandit_id},
                  {"dead", flag(state_player, STR("bIsDead"))}};
+        if (spectator_ready) {
+            const auto identity = spectator_identity(entry, state_player);
+            row["spectator"] = spectator->is_selected(entry.token.c_str(), identity.c_str());
+        }
         if (!agent.empty()) row["character"] = agent == "Socialite" ? "Red" : agent;
         if (account_level) row["accountLevel"] = *account_level;
         if (agent_level) row["characterLevel"] = *agent_level;
@@ -604,7 +780,10 @@ void collect() {
         rows.push_back(std::move(row));
     }
     for (auto it = players.begin(); it != players.end();) {
-        if (!seen.contains(it->first)) it = players.erase(it);
+        if (!seen.contains(it->first)) {
+            if (spectator_ready) spectator->forget_token(it->second.token.c_str());
+            it = players.erase(it);
+        }
         else ++it;
     }
     std::string map;
@@ -613,7 +792,7 @@ void collect() {
     Json value{{"schemaVersion", 2}, {"type", "snapshot"},
                {"processId", getpid()}, {"state", in_lobby(state) ? "Lobby" : "In match"},
                {"map", map}, {"players", std::move(rows)},
-               {"capabilities", {{"spectatorMode", false}}}};
+               {"capabilities", {{"spectatorMode", spectator_ready}}}};
     if (auto* id = std::getenv("BRIEFCASE_INSTANCE_ID"); id && std::strlen(id) == 32)
         value["instanceId"] = id;
     snapshots.publish(value.dump() + '\n');
@@ -634,6 +813,10 @@ void on_event(UObject* context, UFunction* function, void* params) {
         process_commands();
         auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::steady_clock::now().time_since_epoch()).count();
+        if (now >= next_extension_ms.load(std::memory_order_relaxed)) {
+            next_extension_ms.store(now + 250, std::memory_order_relaxed);
+            tick_spectators();
+        }
         if (now >= next_collect_ms.load(std::memory_order_relaxed)) {
             next_collect_ms.store(now + 1000, std::memory_order_relaxed);
             collect();
@@ -648,6 +831,12 @@ void initialize(void*) noexcept {
             STR("/Script/DeceiveInc.DeceiveIncPlayerController:ServerInitBackend"));
         player_infos_function = UObjectGlobals::StaticFindObject<UFunction*>(nullptr, nullptr,
             STR("/Script/DeceiveInc.DeceiveIncPlayerController:ServerInitPlayerInfos"));
+        spy_pack_class = UObjectGlobals::StaticFindObject<UClass*>(nullptr, nullptr,
+            STR("/Script/DeceiveInc.SpyPack"));
+        destroy_actor_function = UObjectGlobals::StaticFindObject<UFunction*>(nullptr, nullptr,
+            STR("/Script/Engine.Actor:K2_DestroyActor"));
+        if (!destroy_actor_function || destroy_actor_function->GetParmsSize() != 0)
+            destroy_actor_function = nullptr;
         Hook::RegisterProcessEventPreCallback(on_event);
         log("Linux server bridge: Unreal state collector ready");
     } catch (...) { log("ERROR: Linux server bridge collector could not start"); }

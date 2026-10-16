@@ -79,7 +79,7 @@
     },
     {
       "path": "cmake/LinuxServer.cmake",
-      "sha256": "0e14d620517cd4c7b09f387af73cdef0dc42cfe5bbc9451577b6adf5af931ad3"
+      "sha256": "083f0e2264a384f9643b179b1a2094694b0ce3c975f4d956ba40a703cf0e0d85"
     },
     {
       "path": "cmake/PortableCore.cmake",
@@ -139,7 +139,7 @@
     },
     {
       "path": "docs/LinuxServer.md",
-      "sha256": "eb878bce228313e54918d99b49c77e11dc4bd4d7e61652f29b524c722ba83190"
+      "sha256": "dfa89a548518b93b64be8d5bcd229b91b76dc9dc2d43112c7edb1fed9e83450d"
     },
     {
       "path": "docs/Localization.md",
@@ -559,7 +559,7 @@
     },
     {
       "path": "runtime/Briefcase.NativeHost/Host.cpp",
-      "sha256": "3dade1e6f34c46b7eff125146d148b8618327f9db903fb9fccf00cd570ea100d"
+      "sha256": "3a0f2408107783fba1e02b16cf4d9ec80d48bdd41ca7cad5c5038131b3a2fdb7"
     },
     {
       "path": "runtime/Briefcase.NativeHost/LinuxHost.inc",
@@ -567,11 +567,15 @@
     },
     {
       "path": "runtime/Briefcase.NativeHost/LinuxServerBridge.cpp",
-      "sha256": "098a0e86318d3a9b4ed017edc2ec1382e8f0836d9f6a2d3db617c757a90c5b23"
+      "sha256": "51808ffed56f2d57ad953fe5067926628a97575ab4f8a1c217795ed2f51d7327"
     },
     {
       "path": "runtime/Briefcase.NativeHost/LinuxServerBridge.hpp",
-      "sha256": "0a401ab94b81e50d4b7dfea2bc86a5e6a1f1d1a8ce72921b3fab43a22399bbe0"
+      "sha256": "2ab3ec6be0669094a4acc0bec231db49f03cab45c6016ef33dacbe9a5d08235a"
+    },
+    {
+      "path": "runtime/Briefcase.NativeHost/LinuxSpectatorApi.hpp",
+      "sha256": "c578e7556a3c908ff508fedee2439cfce7b737190cacc392d4243a29888d70b9"
     },
     {
       "path": "runtime/Briefcase.NativeHost/Manifest.cpp",
@@ -9639,7 +9643,7 @@
     },
     {
       "path": "ue4ss/ServerBridgeChannel.hpp",
-      "sha256": "115fa4a152f3a194d13ca9dabbfaba1a7505f27f46763c341d2d506dec1b9b01"
+      "sha256": "df4b76a2197b917f3b275c906ea475296278eea92638a6276cfdefd0aa41a398"
     },
     {
       "path": "ue4ss/ServerBridgeProtocol.hpp",
@@ -9660,6 +9664,10 @@
     {
       "path": "ue4ss/SpectatorExtension.hpp",
       "sha256": "3ac59b92b9d04a7dcdecf9b9fbc4678f68a4cdecb0d26c9b79197477942f024f"
+    },
+    {
+      "path": "ue4ss/tests/ServerBridgeProtocol.cpp",
+      "sha256": "e933c3a44b42e71b731b5c903137db155d2f97e9ea13646d510e96efe2fa0988"
     },
     {
       "path": "ue4ss/tests/ServerEquipmentIds.cpp",

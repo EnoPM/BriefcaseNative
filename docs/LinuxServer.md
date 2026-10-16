@@ -22,6 +22,13 @@ replaces the Python launcher/update runtime shipped in 0.4.0 with native C++.
 | Administration | Shared Mbed TLS protocol, POSIX sockets/files and private supervisor channel |
 | Mods | Independent .so packages using the public C ABI |
 
+The optional Spectator Mode Linux package adds lobby selections to the local
+server bridge. When installed and enabled, the bridge marks selected players in
+its snapshots and eliminates them once their character is controllable in a
+match, removing the Spy Pack produced by that elimination. It does not create
+extra player slots or change EOS occupancy. The bridge advertises the spectator
+capability only when the package and required game functions are available.
+
 No UE4SSProgram, Lua loader, ImGui, input services or graphics libraries are linked.
 The host loads after C++ static initialization, before game main. Startup mods
 finish before game initialization; Unreal discovery runs on a worker. Unreal
